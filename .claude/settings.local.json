@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma:*)",
+      "Bash(npx prisma@7.5.0 validate)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx -e \":*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}

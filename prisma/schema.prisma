@@ -1,0 +1,501 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════
+
+enum ProjectPhase {
+  concept
+  pre_loi
+  loi_submitted
+  loi_approved
+  pre_commitment
+  final_commitment
+  financial_close
+}
+
+enum ProjectSector {
+  power
+  transport
+  water
+  telecom
+  mining
+  other
+}
+
+enum EximCoverType {
+  comprehensive
+  political_only
+}
+
+enum ProjectMemberRole {
+  owner
+  editor
+  viewer
+}
+
+enum SponsorRole {
+  lead_sponsor
+  co_sponsor
+  project_company
+}
+
+enum StakeholderRoleType {
+  epc_contact
+  offtaker_contact
+  legal_counsel
+  exim_officer
+  government_liaison
+  financial_advisor
+  community_rep
+  sponsor_team
+  other
+}
+
+enum RequirementCategory {
+  contracts
+  permits
+  studies
+  corporate
+  financial
+  environmental_social
+}
+
+enum RequirementPhase {
+  loi
+  final_commitment
+}
+
+/// The completion state of a requirement on a project.
+/// Progression: not_started → in_progress → draft → substantially_final → executed → waived
+enum RequirementStatus {
+  not_started
+  in_progress
+  draft
+  substantially_final
+  executed
+  waived
+}
+
+enum DocumentState {
+  current
+  superseded
+}
+
+enum MeetingType {
+  in_person
+  virtual
+  phone_call
+  site_visit
+}
+
+enum ActionItemStatus {
+  open
+  in_progress
+  completed
+  cancelled
+}
+
+enum ActionItemPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum BidQualificationStatus {
+  under_review
+  qualified
+  disqualified
+  selected
+  rejected
+}
+
+enum FunderType {
+  exim
+  dfi
+  commercial_bank
+  equity
+  mezzanine
+  other
+}
+
+enum FunderEngagementStage {
+  identified
+  initial_contact
+  due_diligence
+  term_sheet
+  committed
+  declined
+}
+
+enum FunderConditionStatus {
+  open
+  in_progress
+  satisfied
+  waived
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODELS
+// ═══════════════════════════════════════════════════════════
+
+/// A company or institution (sponsor, EPC firm, bank, law firm, etc.)
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  countryCode String?  @db.Char(2)
+  website     String?
+  isUsEntity  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stakeholders        Stakeholder[]
+  projectSponsors     ProjectSponsor[]
+  epcBids             EpcBid[]
+  funderRelationships FunderRelationship[]
+
+  @@index([name])
+  @@index([isUsEntity])
+  @@map("organizations")
+}
+
+/// An infrastructure project being developed toward EXIM financing.
+model Project {
+  id                   String        @id @default(cuid())
+  name                 String
+  slug                 String        @unique
+  description          String?
+  countryCode          String        @db.Char(2)
+  sector               ProjectSector
+  capexUsdCents        BigInt?
+  eximCoverType        EximCoverType?
+  stage                ProjectPhase  @default(concept)
+  targetLoiDate        DateTime?     @db.Date
+  targetCloseDate      DateTime?     @db.Date
+  ownerClerkId         String
+
+  /// Readiness score in basis points (e.g. 7543 = 75.43%).
+  /// Updated by application layer on every requirement status change.
+  /// Null until first calculation.
+  cachedReadinessScore Int?
+  cachedScoreUpdatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sponsors            ProjectSponsor[]
+  members             ProjectMember[]
+  stakeholderRoles    StakeholderRole[]
+  requirementStatuses ProjectRequirement[]
+  documents           Document[]
+  meetings            Meeting[]
+  actionItems         ActionItem[]
+  epcBids             EpcBid[]
+  funderRelationships FunderRelationship[]
+
+  @@index([ownerClerkId])
+  @@index([stage])
+  @@index([cachedReadinessScore])
+  @@map("projects")
+}
+
+/// Which organizations sponsor a project, and in what capacity.
+model ProjectSponsor {
+  id             String      @id @default(cuid())
+  projectId      String
+  organizationId String
+  role           SponsorRole
+
+  /// Ownership share in basis points (e.g. 5000 = 50%). Nullable until known.
+  equityShareBps Int?
+
+  createdAt DateTime @default(now())
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([projectId, organizationId])
+  @@index([projectId])
+  @@map("project_sponsors")
+}
+
+/// Which Clerk users have access to a project, and at what permission level.
+model ProjectMember {
+  id          String            @id @default(cuid())
+  projectId   String
+  clerkUserId String
+  role        ProjectMemberRole @default(editor)
+  invitedBy   String?
+  createdAt   DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, clerkUserId])
+  @@index([clerkUserId])
+  @@index([projectId, role])
+  @@map("project_members")
+}
+
+/// A named human being involved in one or more projects.
+/// Not scoped to a project — roles are defined in StakeholderRole.
+model Stakeholder {
+  id             String   @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  title          String?
+  organizationId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  roles        StakeholderRole[]
+  attendances  MeetingAttendee[]
+  actionItems  ActionItem[]
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("stakeholders")
+}
+
+/// The typed role a Stakeholder plays on a specific Project.
+/// One stakeholder can have multiple role types on the same project.
+model StakeholderRole {
+  id            String              @id @default(cuid())
+  stakeholderId String
+  projectId     String
+  roleType      StakeholderRoleType
+  description   String?
+  isPrimary     Boolean             @default(false)
+  createdAt     DateTime            @default(now())
+
+  stakeholder Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([stakeholderId, projectId, roleType])
+  @@index([projectId, roleType])
+  @@index([stakeholderId])
+  @@map("stakeholder_roles")
+}
+
+/// Static EXIM project finance checklist items. Seeded from src/lib/exim/requirements.ts.
+/// ID is a stable text slug (e.g. "epc_contract") — not a cuid.
+model EximRequirement {
+  id            String              @id // e.g. "epc_contract", "ppa", "environmental_assessment"
+  category      RequirementCategory
+  name          String
+  description   String?
+  phaseRequired RequirementPhase
+
+  /// True if this item must be substantially_final or better for LOI submission.
+  isLoiCritical Boolean @default(false)
+
+  /// Relative weight for readiness score calculation. Default 100 = equal weight.
+  weight    Int @default(100)
+  sortOrder Int
+
+  projectRequirements ProjectRequirement[]
+
+  @@unique([category, sortOrder])
+  @@map("exim_requirements")
+}
+
+/// The live completion state of one EximRequirement on one Project.
+/// One row per (project, requirement) pair — created by seed/backfill.
+model ProjectRequirement {
+  id            String            @id @default(cuid())
+  projectId     String
+  requirementId String
+  status        RequirementStatus @default(not_started)
+  notes         String?
+  waiverReason  String?
+
+  /// Timestamp of most recent status transition — used for velocity tracking.
+  statusChangedAt DateTime @default(now())
+  statusChangedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement EximRequirement @relation(fields: [requirementId], references: [id])
+
+  documents        Document[]
+  actionItems      ActionItem[]
+  funderConditions FunderCondition[]
+
+  @@unique([projectId, requirementId])
+  @@index([projectId, status])
+  @@map("requirement_statuses")
+}
+
+/// An uploaded file, linked to a Project and optionally to a ProjectRequirement.
+/// Version history is modeled via documentGroupId + version + state.
+model Document {
+  id                   String        @id @default(cuid())
+  projectId            String
+  projectRequirementId String?
+
+  /// Groups all versions of the same logical document together.
+  /// Generated on first upload; re-uploads share the same group ID.
+  documentGroupId String
+
+  version     Int           @default(1)
+  filename    String
+  storagePath String
+  contentType String
+  sizeBytes   BigInt
+  uploadedBy  String
+  state       DocumentState @default(current)
+  createdAt   DateTime      @default(now())
+
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectRequirement ProjectRequirement? @relation(fields: [projectRequirementId], references: [id], onDelete: SetNull)
+
+  @@unique([documentGroupId, version])
+  @@index([projectId, state])
+  @@index([documentGroupId])
+  @@index([projectRequirementId])
+  @@map("documents")
+}
+
+/// A recorded or logged meeting, with attendees drawn from project Stakeholders.
+model Meeting {
+  id                    String      @id @default(cuid())
+  projectId             String
+  title                 String
+  meetingType           MeetingType @default(in_person)
+  meetingDate           DateTime
+  durationMinutes       Int?
+  location              String?
+  summary               String?
+  transcriptStoragePath String?
+  createdBy             String
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attendees   MeetingAttendee[]
+  actionItems ActionItem[]
+
+  @@index([projectId, meetingDate])
+  @@map("meetings")
+}
+
+/// Which Stakeholders attended a Meeting.
+model MeetingAttendee {
+  id            String @id @default(cuid())
+  meetingId     String
+  stakeholderId String
+
+  meeting     Meeting     @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  stakeholder Stakeholder @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+
+  @@unique([meetingId, stakeholderId])
+  @@index([meetingId])
+  @@map("meeting_attendees")
+}
+
+/// A task extracted from a Meeting. Assignable to a Stakeholder.
+/// Optionally linked to a ProjectRequirement to model blocking dependencies.
+model ActionItem {
+  id                   String             @id @default(cuid())
+  meetingId            String
+  /// Denormalized from meeting.projectId for efficient project-level queries.
+  projectId            String
+  assignedToId         String?
+  projectRequirementId String?
+  title                String
+  description          String?
+  status               ActionItemStatus   @default(open)
+  priority             ActionItemPriority @default(medium)
+  dueDate              DateTime?          @db.Date
+  completedAt          DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  meeting            Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignedTo         Stakeholder?        @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  projectRequirement ProjectRequirement? @relation(fields: [projectRequirementId], references: [id], onDelete: SetNull)
+
+  @@index([meetingId, status])
+  @@index([projectRequirementId, status])
+  @@index([projectId, status, dueDate])
+  @@index([assignedToId, status])
+  @@map("action_items")
+}
+
+/// An EPC firm's bid response to an RFQ/RFP on a Project.
+model EpcBid {
+  id                     String                 @id @default(cuid())
+  projectId              String
+  organizationId         String
+  bidAmountUsdCents      BigInt?
+  /// Integer percentage 0–100. Must be >51 for EXIM US-content eligibility.
+  usContentPct           Int?
+  qualificationStatus    BidQualificationStatus @default(under_review)
+  disqualificationReason String?
+  submittedAt            DateTime?
+  notes                  String?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([projectId, organizationId])
+  @@index([projectId, qualificationStatus])
+  @@map("epc_bids")
+}
+
+/// Engagement tracking with a funder (EXIM, DFI, commercial bank, equity) per Project.
+model FunderRelationship {
+  id               String                @id @default(cuid())
+  projectId        String
+  organizationId   String
+  funderType       FunderType
+  engagementStage  FunderEngagementStage @default(identified)
+  amountUsdCents   BigInt?
+  notes            String?
+  lastContactDate  DateTime?             @db.Date
+  nextFollowupDate DateTime?             @db.Date
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+  conditions   FunderCondition[]
+
+  @@unique([projectId, organizationId])
+  @@index([projectId, funderType])
+  @@index([projectId, engagementStage])
+  @@map("funder_relationships")
+}
+
+/// An open condition or CP a funder requires before advancing.
+/// Optionally linked to the EXIM requirement it maps to.
+model FunderCondition {
+  id                   String                @id @default(cuid())
+  funderRelationshipId String
+  description          String
+  status               FunderConditionStatus @default(open)
+  projectRequirementId String?
+  dueDate              DateTime?             @db.Date
+  satisfiedAt          DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  funderRelationship FunderRelationship  @relation(fields: [funderRelationshipId], references: [id], onDelete: Cascade)
+  projectRequirement ProjectRequirement? @relation(fields: [projectRequirementId], references: [id], onDelete: SetNull)
+
+  @@index([funderRelationshipId, status])
+  @@map("funder_conditions")
+}

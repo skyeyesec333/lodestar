@@ -1,0 +1,25 @@
+# Environment variables — never commit
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Prisma
+prisma/migrations/
+
+# Build output
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript incremental cache
+*.tsbuildinfo
