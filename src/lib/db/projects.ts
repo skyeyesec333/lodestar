@@ -1,0 +1,203 @@
+import type { ProjectSector, EximCoverType } from "@prisma/client";
+import { db } from "./index";
+import type {
+  Project,
+  ProjectSummary,
+  ProjectListQuery,
+  ProjectListSort,
+  Result,
+} from "@/types";
+
+// ── Select shapes ─────────────────────────────────────────────────────────────
+
+const projectSummarySelect = {
+  id: true,
+  name: true,
+  slug: true,
+  countryCode: true,
+  sector: true,
+  stage: true,
+  targetLoiDate: true,
+  cachedReadinessScore: true,
+  createdAt: true,
+} as const;
+
+const projectFullSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  countryCode: true,
+  sector: true,
+  capexUsdCents: true,
+  eximCoverType: true,
+  stage: true,
+  targetLoiDate: true,
+  targetCloseDate: true,
+  ownerClerkId: true,
+  cachedReadinessScore: true,
+  cachedScoreUpdatedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+// ── Query helpers ─────────────────────────────────────────────────────────────
+
+export async function getProjectsByUser(
+  clerkUserId: string,
+  query: ProjectListQuery = {}
+): Promise<Result<ProjectSummary[]>> {
+  try {
+    const sort = query.sort ?? "created_desc";
+    const search = query.q?.trim();
+
+    const where = {
+      ownerClerkId: clerkUserId,
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" as const } },
+              { countryCode: { contains: search.toUpperCase(), mode: "insensitive" as const } },
+              { slug: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+      ...(query.sector && query.sector !== "all" ? { sector: query.sector } : {}),
+      ...(query.stage && query.stage !== "all" ? { stage: query.stage } : {}),
+      ...getReadinessWhere(query.readiness),
+    };
+
+    const rows = await db.project.findMany({
+      where,
+      select: projectSummarySelect,
+      orderBy: getProjectListOrderBy(sort),
+    });
+    return { ok: true, value: rows };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+function getReadinessWhere(
+  readiness: ProjectListQuery["readiness"]
+) {
+  switch (readiness) {
+    case "not_started":
+      return { cachedReadinessScore: null };
+    case "at_risk":
+      return { cachedReadinessScore: { gte: 1, lt: 4000 } };
+    case "progressing":
+      return { cachedReadinessScore: { gte: 4000, lt: 7500 } };
+    case "ready":
+      return { cachedReadinessScore: { gte: 7500 } };
+    default:
+      return {};
+  }
+}
+
+function getProjectListOrderBy(sort: ProjectListSort) {
+  switch (sort) {
+    case "name_asc":
+      return [{ name: "asc" as const }];
+    case "readiness_desc":
+      return [
+        { cachedReadinessScore: { sort: "desc" as const, nulls: "last" as const } },
+        { createdAt: "desc" as const },
+      ];
+    case "loi_asc":
+      return [
+        { targetLoiDate: { sort: "asc" as const, nulls: "last" as const } },
+        { createdAt: "desc" as const },
+      ];
+    case "created_desc":
+    default:
+      return [{ createdAt: "desc" as const }];
+  }
+}
+
+export async function getProjectBySlug(
+  slug: string,
+  clerkUserId: string
+): Promise<Result<Project>> {
+  try {
+    const row = await db.project.findFirst({
+      where: { slug, ownerClerkId: clerkUserId },
+      select: projectFullSelect,
+    });
+    if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
+    return { ok: true, value: row };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+export async function updateProjectRecord(
+  id: string,
+  clerkUserId: string,
+  data: {
+    name?: string;
+    description?: string | null;
+    countryCode?: string;
+    sector?: ProjectSector;
+    capexUsdCents?: bigint | null;
+    eximCoverType?: EximCoverType | null;
+    targetLoiDate?: Date | null;
+    targetCloseDate?: Date | null;
+    stage?: import("@prisma/client").ProjectPhase;
+  }
+): Promise<Result<Project>> {
+  try {
+    const row = await db.project.update({
+      where: { id, ownerClerkId: clerkUserId },
+      data,
+      select: projectFullSelect,
+    });
+    return { ok: true, value: row };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+// ── Write helpers ─────────────────────────────────────────────────────────────
+
+export type CreateProjectInput = {
+  name: string;
+  slug: string;
+  description: string | null;
+  countryCode: string;
+  sector: ProjectSector;
+  capexUsdCents: bigint | null;
+  eximCoverType: EximCoverType | null;
+  targetLoiDate: Date | null;
+  targetCloseDate: Date | null;
+  ownerClerkId: string;
+};
+
+export async function createProjectRecord(
+  input: CreateProjectInput
+): Promise<Result<Project>> {
+  try {
+    const row = await db.project.create({
+      data: input,
+      select: projectFullSelect,
+    });
+    return { ok: true, value: row };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown database error";
+    if (message.toLowerCase().includes("unique")) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "A project with that name already exists.",
+        },
+      };
+    }
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}

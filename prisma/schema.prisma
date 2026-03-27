@@ -199,6 +199,7 @@ model Project {
   actionItems         ActionItem[]
   epcBids             EpcBid[]
   funderRelationships FunderRelationship[]
+  activityEvents      ActivityEvent[]
 
   @@index([ownerClerkId])
   @@index([stage])
@@ -334,6 +335,22 @@ model ProjectRequirement {
   @@unique([projectId, requirementId])
   @@index([projectId, status])
   @@map("requirement_statuses")
+}
+
+/// A record of any notable event on a Project, used to power the activity feed.
+model ActivityEvent {
+  id            String   @id @default(cuid())
+  projectId     String
+  clerkUserId   String
+  eventType     String   // e.g. "requirement_status_changed", "stage_advanced", "project_updated"
+  label         String   // Human-readable summary, e.g. "EPC Contract → Draft"
+  metadata      Json?    // Optional structured payload
+  createdAt     DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("activity_events")
 }
 
 /// An uploaded file, linked to a Project and optionally to a ProjectRequirement.
