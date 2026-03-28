@@ -134,6 +134,23 @@ export async function getProjectBySlug(
   }
 }
 
+export async function getProjectById(
+  id: string,
+  clerkUserId: string
+): Promise<Result<Project>> {
+  try {
+    const row = await db.project.findFirst({
+      where: { id, ownerClerkId: clerkUserId },
+      select: projectFullSelect,
+    });
+    if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
+    return { ok: true, value: row };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
 export async function updateProjectRecord(
   id: string,
   clerkUserId: string,

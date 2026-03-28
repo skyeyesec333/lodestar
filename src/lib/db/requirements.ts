@@ -4,12 +4,14 @@ import type { RequirementStatusValue } from "@/types/requirements";
 import type { AppError, Result } from "@/types";
 
 const requirementStatusSelect = {
+  id: true,
   requirementId: true,
   status: true,
   notes: true,
 } as const;
 
 export type ProjectRequirementRow = {
+  projectRequirementId: string;
   requirementId: string;
   name: string;
   description: string;
@@ -21,6 +23,27 @@ export type ProjectRequirementRow = {
   status: RequirementStatusValue;
   notes: string | null;
 };
+
+type StatusRow = { id: string; requirementId: string; status: string; notes: string | null };
+
+function buildRows(statusMap: Map<string, StatusRow>): ProjectRequirementRow[] {
+  return EXIM_REQUIREMENTS.map((req) => {
+    const live = statusMap.get(req.id);
+    return {
+      projectRequirementId: live?.id ?? "",
+      requirementId: req.id,
+      name: req.name,
+      description: req.description,
+      category: req.category,
+      phaseRequired: req.phaseRequired,
+      isLoiCritical: req.isLoiCritical,
+      weight: req.weight,
+      sortOrder: req.sortOrder,
+      status: (live?.status ?? "not_started") as RequirementStatusValue,
+      notes: live?.notes ?? null,
+    };
+  });
+}
 
 /**
  * Returns all 36 requirement rows for a project, merged with static taxonomy.
@@ -49,27 +72,15 @@ export async function getProjectRequirements(
         })),
         skipDuplicates: true,
       });
+      // Re-fetch so newly created rows have their UUIDs
+      const all = await db.projectRequirement.findMany({
+        where: { projectId },
+        select: requirementStatusSelect,
+      });
+      return { ok: true, value: buildRows(new Map(all.map((r) => [r.requirementId, r]))) };
     }
 
-    const statusMap = new Map(existing.map((r) => [r.requirementId, r]));
-
-    const rows: ProjectRequirementRow[] = EXIM_REQUIREMENTS.map((req) => {
-      const live = statusMap.get(req.id);
-      return {
-        requirementId: req.id,
-        name: req.name,
-        description: req.description,
-        category: req.category,
-        phaseRequired: req.phaseRequired,
-        isLoiCritical: req.isLoiCritical,
-        weight: req.weight,
-        sortOrder: req.sortOrder,
-        status: (live?.status ?? "not_started") as RequirementStatusValue,
-        notes: live?.notes ?? null,
-      };
-    });
-
-    return { ok: true, value: rows };
+    return { ok: true, value: buildRows(new Map(existing.map((r) => [r.requirementId, r]))) };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };

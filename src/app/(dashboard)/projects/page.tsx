@@ -8,6 +8,9 @@ import type {
   ProjectReadinessFilter,
 } from "@/types";
 import { getProjectsByUser } from "@/lib/db/projects";
+import { ChatWidget } from "@/components/chat/ChatWidget";
+import { getProjectsListChatPresets } from "@/lib/ai/chat-presets";
+import { CreateDemoProjectButton } from "@/components/projects/CreateDemoProjectButton";
 
 const STAGE_OPTIONS = [
   { value: "all", label: "All stages" },
@@ -144,9 +147,18 @@ export default async function ProjectsPage({
 
   const projects = result.value;
   const activeFilterCount = getActiveFilterCount(query);
+  const chatPresets = getProjectsListChatPresets();
 
   return (
     <div>
+      <ChatWidget
+        presetQuestions={chatPresets}
+        title="Portfolio Assistant"
+        subtitle="Ask about filters, readiness bands, and portfolio triage."
+        pageContext={`Projects portfolio page. ${projects.length} projects visible. ${activeFilterCount} active filters. Sort is ${query.sort.replace(/_/g, " ")}.`}
+        context={{ page: "projects_list" }}
+      />
+
       <div
         style={{
           display: "flex",
@@ -174,23 +186,26 @@ export default async function ProjectsPage({
           </h1>
         </div>
 
-        <Link
-          href="/projects/new"
-          style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: "11px",
-            fontWeight: 500,
-            letterSpacing: "0.10em",
-            textTransform: "uppercase",
-            color: "#ffffff",
-            backgroundColor: "var(--accent)",
-            padding: "10px 20px",
-            borderRadius: "3px",
-            textDecoration: "none",
-          }}
-        >
-          New Project
-        </Link>
+        <div style={{ display: "flex", gap: "10px", alignItems: "start", flexWrap: "wrap" }}>
+          <CreateDemoProjectButton />
+          <Link
+            href="/projects/new"
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "11px",
+              fontWeight: 500,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: "#ffffff",
+              backgroundColor: "var(--accent)",
+              padding: "10px 20px",
+              borderRadius: "3px",
+              textDecoration: "none",
+            }}
+          >
+            New Project
+          </Link>
+        </div>
       </div>
 
       <form

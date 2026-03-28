@@ -88,6 +88,13 @@ enum DocumentState {
   superseded
 }
 
+enum DocumentRequestStatus {
+  requested
+  received
+  waived
+  cancelled
+}
+
 enum MeetingType {
   in_person
   virtual
@@ -195,6 +202,7 @@ model Project {
   stakeholderRoles    StakeholderRole[]
   requirementStatuses ProjectRequirement[]
   documents           Document[]
+  documentRequests    DocumentRequest[]
   meetings            Meeting[]
   actionItems         ActionItem[]
   epcBids             EpcBid[]
@@ -260,6 +268,7 @@ model Stakeholder {
   roles        StakeholderRole[]
   attendances  MeetingAttendee[]
   actionItems  ActionItem[]
+  documentRequests DocumentRequest[]
 
   @@index([organizationId])
   @@index([email])
@@ -330,6 +339,7 @@ model ProjectRequirement {
 
   documents        Document[]
   actionItems      ActionItem[]
+  documentRequests DocumentRequest[]
   funderConditions FunderCondition[]
 
   @@unique([projectId, requirementId])
@@ -381,6 +391,31 @@ model Document {
   @@index([documentGroupId])
   @@index([projectRequirementId])
   @@map("documents")
+}
+
+/// A specific document or deliverable request assigned to a stakeholder.
+model DocumentRequest {
+  id                   String                @id @default(cuid())
+  projectId            String
+  stakeholderId        String
+  projectRequirementId String?
+  title                String
+  description          String?
+  status               DocumentRequestStatus @default(requested)
+  dueDate              DateTime?             @db.Date
+  fulfilledAt          DateTime?
+  createdBy            String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  stakeholder        Stakeholder         @relation(fields: [stakeholderId], references: [id], onDelete: Cascade)
+  projectRequirement ProjectRequirement? @relation(fields: [projectRequirementId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status, dueDate])
+  @@index([stakeholderId, status, dueDate])
+  @@index([projectRequirementId, status])
+  @@map("document_requests")
 }
 
 /// A recorded or logged meeting, with attendees drawn from project Stakeholders.

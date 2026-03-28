@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import type { ProjectSector, EximCoverType, ProjectPhase } from "@prisma/client";
 import { createProjectRecord, updateProjectRecord } from "@/lib/db/projects";
 import { recordActivity } from "@/lib/db/activity";
+import { createDemoPortfolioForUser, createDemoProjectForUser } from "@/lib/db/demo";
 import type { ProjectSummary, AppError, Result } from "@/types";
 
 // ── Slug utility ──────────────────────────────────────────────────────────────
@@ -234,4 +235,46 @@ export async function advanceProjectStage(
   revalidatePath("/projects");
 
   return { ok: true, value: { stage: nextStage } };
+}
+
+export async function createDemoProject(): Promise<Result<{ slug: string }>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be signed in to create a demo project.",
+      },
+    };
+  }
+
+  const result = await createDemoProjectForUser(userId);
+  if (!result.ok) return result;
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${result.value.slug}`);
+
+  return { ok: true, value: { slug: result.value.slug } };
+}
+
+export async function createDemoPortfolio(): Promise<Result<{ slug: string }>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be signed in to create a demo portfolio.",
+      },
+    };
+  }
+
+  const result = await createDemoPortfolioForUser(userId);
+  if (!result.ok) return result;
+
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${result.value.leadSlug}`);
+
+  return { ok: true, value: { slug: result.value.leadSlug } };
 }

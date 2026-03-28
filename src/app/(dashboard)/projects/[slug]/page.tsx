@@ -16,6 +16,15 @@ import { getProjectActivity } from "@/lib/db/activity";
 import { getProjectStakeholders } from "@/lib/db/stakeholders";
 import { LoiBlockersPanel } from "@/components/requirements/LoiBlockersPanel";
 import { RequirementsChecklist } from "@/components/requirements/RequirementsChecklist";
+import { DocumentPanel } from "@/components/documents/DocumentPanel";
+import { getProjectDocuments } from "@/lib/db/documents";
+import { MeetingsLog } from "@/components/meetings/MeetingsLog";
+import { getProjectMeetings } from "@/lib/db/meetings";
+import { GanttChart } from "@/components/projects/GanttChart";
+import { ProjectNav } from "@/components/projects/ProjectNav";
+import { TourGuide } from "@/components/projects/TourGuide";
+import { ChatWidget } from "@/components/chat/ChatWidget";
+import { getProjectDetailChatPresets } from "@/lib/ai/chat-presets";
 import type { RequirementStatusValue } from "@/types/requirements";
 
 export default async function ProjectPage({
@@ -38,12 +47,16 @@ export default async function ProjectPage({
   }
   const rows = reqResult.value;
 
-  const [activityResult, stakeholdersResult] = await Promise.all([
+  const [activityResult, stakeholdersResult, documentsResult, meetingsResult] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
+    getProjectDocuments(project.id),
+    getProjectMeetings(project.id),
   ]);
   const activityEvents = activityResult.ok ? activityResult.value : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
+  const documents = documentsResult.ok ? documentsResult.value : [];
+  const meetings = meetingsResult.ok ? meetingsResult.value : [];
 
   const serializableProject: SerializableProject = {
     id: project.id,
@@ -72,11 +85,27 @@ export default async function ProjectPage({
       status: r.status as RequirementStatusValue,
     }))
   );
+  const chatPresets = getProjectDetailChatPresets({
+    projectName: project.name,
+    scoreBps,
+    loiReady,
+    loiBlockerCount: loiBlockers.length,
+  });
 
   return (
     <div>
+      <ProjectNav />
+      <TourGuide />
+      <ChatWidget
+        presetQuestions={chatPresets}
+        title="Project Assistant"
+        subtitle="Ask about this project page, readiness, or EXIM terms in context."
+        pageContext={`Project detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. Readiness ${(scoreBps / 100).toFixed(1)}%. LOI blockers ${loiBlockers.length}.`}
+        context={{ page: "project_detail", projectId: project.id, projectSlug: project.slug }}
+      />
+
       {/* Breadcrumb */}
-      <div style={{ marginBottom: "32px" }}>
+      <div id="section-overview" style={{ marginBottom: "32px" }}>
         <Link
           href="/projects"
           style={{
@@ -237,6 +266,7 @@ export default async function ProjectPage({
       </div>
 
       {/* Stakeholders */}
+      <div id="section-stakeholders" />
       <StakeholderPanel
         projectId={project.id}
         slug={project.slug}
@@ -320,6 +350,7 @@ export default async function ProjectPage({
       </div>
 
       {/* Readiness gauge */}
+      <div id="section-readiness" />
       <ReadinessGauge
         scoreBps={scoreBps}
         loiReady={loiReady}
@@ -329,7 +360,37 @@ export default async function ProjectPage({
       {/* LOI blockers */}
       {!loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
 
+      {/* Timeline / Gantt chart */}
+      <div id="section-timeline" />
+      <div
+        style={{
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border)",
+          borderRadius: "4px",
+          padding: "24px",
+          marginBottom: "24px",
+        }}
+      >
+        <p className="eyebrow" style={{ marginBottom: "20px" }}>Timeline</p>
+        <GanttChart
+          rows={rows}
+          projectCreatedAt={project.createdAt}
+          targetLoiDate={project.targetLoiDate}
+          targetCloseDate={project.targetCloseDate}
+        />
+      </div>
+
+      {/* Documents */}
+      <div id="section-documents" />
+      <DocumentPanel
+        projectId={project.id}
+        slug={project.slug}
+        initialDocuments={documents}
+        requirementRows={rows}
+      />
+
       {/* Claude gap analysis */}
+      <div id="section-gap-analysis" />
       <GapAnalysis projectId={project.id} />
 
       {/* Getting started callout — shown only at 0% */}
@@ -418,10 +479,21 @@ export default async function ProjectPage({
       )}
 
       {/* Requirements checklist */}
-      <RequirementsChecklist projectId={project.id} rows={rows} />
+      <div id="section-requirements" />
+      <RequirementsChecklist projectId={project.id} slug={project.slug} rows={rows} documents={documents} />
+
+      {/* Meetings log */}
+      <div id="section-meetings" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
+        <MeetingsLog
+          projectId={project.id}
+          slug={project.slug}
+          initialMeetings={meetings}
+          stakeholders={stakeholders}
+        />
+      </div>
 
       {/* Activity feed */}
-      <div style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
+      <div id="section-activity" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
         <ActivityFeed events={activityEvents} />
       </div>
     </div>

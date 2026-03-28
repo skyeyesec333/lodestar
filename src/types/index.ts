@@ -73,3 +73,12 @@ export type ProjectListQuery = {
   readiness?: ProjectReadinessFilter;
   sort?: ProjectListSort;
 };
+
+export type {
+  ChatCitation,
+  ChatContextDocument,
+  ChatMessage,
+  ChatRequest,
+  ChatRole,
+  ChatRuntimeContext,
+} from "@/types/chat";

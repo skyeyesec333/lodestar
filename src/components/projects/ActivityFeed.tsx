@@ -7,6 +7,9 @@ const EVENT_ICONS: Record<string, string> = {
   project_created:            "★",
   stakeholder_added:          "●",
   stakeholder_removed:        "○",
+  stakeholder_updated:        "✎",
+  document_request_added:     "↗",
+  document_request_updated:   "◆",
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -16,6 +19,9 @@ const EVENT_COLORS: Record<string, string> = {
   project_created:            "var(--accent)",
   stakeholder_added:          "var(--teal)",
   stakeholder_removed:        "var(--ink-muted)",
+  stakeholder_updated:        "var(--gold)",
+  document_request_added:     "var(--accent)",
+  document_request_updated:   "var(--teal)",
 };
 
 function timeAgo(date: Date): string {
