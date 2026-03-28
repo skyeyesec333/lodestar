@@ -105,7 +105,7 @@ export default async function ProjectPage({
       />
 
       {/* Breadcrumb */}
-      <div id="section-overview" style={{ marginBottom: "32px" }}>
+      <div style={{ marginBottom: "32px" }}>
         <Link
           href="/projects"
           style={{
@@ -122,7 +122,7 @@ export default async function ProjectPage({
       </div>
 
       {/* Project header */}
-      <div style={{ marginBottom: "40px" }}>
+      <section id="section-overview" style={{ marginBottom: "40px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "24px", flexWrap: "wrap" }}>
           <div style={{ flex: 1 }}>
             <p className="eyebrow" style={{ marginBottom: "10px" }}>
@@ -263,7 +263,7 @@ export default async function ProjectPage({
             </p>
           </div>
         )}
-      </div>
+      </section>
 
       {/* Stakeholders */}
       <div id="section-stakeholders" />
@@ -350,19 +350,20 @@ export default async function ProjectPage({
       </div>
 
       {/* Readiness gauge */}
-      <div id="section-readiness" />
-      <ReadinessGauge
-        scoreBps={scoreBps}
-        loiReady={loiReady}
-        categoryScores={categoryScores}
-      />
+      <section id="section-readiness">
+        <ReadinessGauge
+          scoreBps={scoreBps}
+          loiReady={loiReady}
+          categoryScores={categoryScores}
+        />
+      </section>
 
       {/* LOI blockers */}
       {!loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
 
       {/* Timeline / Gantt chart */}
-      <div id="section-timeline" />
-      <div
+      <section
+        id="section-timeline"
         style={{
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border)",
@@ -378,16 +379,17 @@ export default async function ProjectPage({
           targetLoiDate={project.targetLoiDate}
           targetCloseDate={project.targetCloseDate}
         />
-      </div>
+      </section>
 
       {/* Documents */}
-      <div id="section-documents" />
-      <DocumentPanel
-        projectId={project.id}
-        slug={project.slug}
-        initialDocuments={documents}
-        requirementRows={rows}
-      />
+      <section id="section-documents">
+        <DocumentPanel
+          projectId={project.id}
+          slug={project.slug}
+          initialDocuments={documents}
+          requirementRows={rows}
+        />
+      </section>
 
       {/* Claude gap analysis */}
       <div id="section-gap-analysis" />
@@ -479,18 +481,19 @@ export default async function ProjectPage({
       )}
 
       {/* Requirements checklist */}
-      <div id="section-requirements" />
-      <RequirementsChecklist projectId={project.id} slug={project.slug} rows={rows} documents={documents} />
+      <section id="section-requirements">
+        <RequirementsChecklist projectId={project.id} slug={project.slug} rows={rows} documents={documents} />
+      </section>
 
       {/* Meetings log */}
-      <div id="section-meetings" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
+      <section id="section-meetings" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
         <MeetingsLog
           projectId={project.id}
           slug={project.slug}
           initialMeetings={meetings}
           stakeholders={stakeholders}
         />
-      </div>
+      </section>
 
       {/* Activity feed */}
       <div id="section-activity" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>

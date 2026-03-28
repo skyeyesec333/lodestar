@@ -66,23 +66,56 @@ function getRect(selector: string): Rect | null {
   const el = document.querySelector(selector);
   if (!el) return null;
   const r = el.getBoundingClientRect();
-  return { top: r.top + window.scrollY, left: r.left, width: r.width, height: r.height };
+  return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-function calloutPosition(rect: Rect, placement: TourStep["placement"], vpW: number): React.CSSProperties {
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function calloutPosition(
+  rect: Rect,
+  placement: TourStep["placement"],
+  vpW: number,
+  vpH: number
+): React.CSSProperties {
   const PAD = 16;
-  const W   = Math.min(320, vpW - 48);
+  const EDGE = 24;
+  const W = Math.min(320, vpW - EDGE * 2);
+  const H = Math.min(220, vpH - EDGE * 2);
+  const fitsBelow = rect.top + rect.height + PAD + H <= vpH - EDGE;
+  const fitsAbove = rect.top - PAD - H >= EDGE;
+  const fitsRight = rect.left + rect.width + PAD + W <= vpW - EDGE;
+  const fitsLeft = rect.left - PAD - W >= EDGE;
+  let top = rect.top;
+  let left = rect.left;
 
   switch (placement) {
     case "right":
-      return { top: rect.top + rect.height / 2 - 80, left: rect.left + rect.width + PAD, width: W };
+      left = fitsRight || !fitsLeft ? rect.left + rect.width + PAD : rect.left - W - PAD;
+      top = rect.top + rect.height / 2 - H / 2;
+      break;
     case "left":
-      return { top: rect.top + rect.height / 2 - 80, left: rect.left - W - PAD, width: W };
+      left = fitsLeft || !fitsRight ? rect.left - W - PAD : rect.left + rect.width + PAD;
+      top = rect.top + rect.height / 2 - H / 2;
+      break;
     case "bottom":
-      return { top: rect.top + rect.height + PAD, left: Math.min(rect.left, vpW - W - 24), width: W };
+      top = fitsBelow || !fitsAbove ? rect.top + rect.height + PAD : rect.top - H - PAD;
+      left = rect.left + rect.width / 2 - W / 2;
+      break;
     case "top":
-      return { top: rect.top - 180, left: Math.min(rect.left, vpW - W - 24), width: W };
+      top = fitsAbove || !fitsBelow ? rect.top - H - PAD : rect.top + rect.height + PAD;
+      left = rect.left + rect.width / 2 - W / 2;
+      break;
   }
+
+  return {
+    top: clamp(top, EDGE, Math.max(EDGE, vpH - H - EDGE)),
+    left: clamp(left, EDGE, Math.max(EDGE, vpW - W - EDGE)),
+    width: W,
+    maxHeight: `calc(100vh - ${EDGE * 2}px)`,
+    overflowY: "auto",
+  };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -94,11 +127,13 @@ export function TourGuide() {
   const [step, setStep]   = useState<number>(-1);
   const [rect, setRect]   = useState<Rect | null>(null);
   const [vpW, setVpW]     = useState(0);
+  const [vpH, setVpH]     = useState(0);
   const tour              = PROJECT_TOUR;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setVpW(window.innerWidth);
+    setVpH(window.innerHeight);
     const done = localStorage.getItem(STORAGE_KEY);
     if (!done) {
       const t = setTimeout(() => setStep(0), 800);
@@ -114,7 +149,8 @@ export function TourGuide() {
       if (el) {
         const y = el.getBoundingClientRect().top + window.scrollY - window.innerHeight * 0.25;
         window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-        setTimeout(() => setRect(getRect(s.target)), 400);
+        // Wait for smooth scroll to finish before measuring viewport position
+        setTimeout(() => setRect(getRect(s.target)), 700);
         return;
       }
     }
@@ -126,6 +162,7 @@ export function TourGuide() {
     measureAndScroll(currentStep);
     const handleResize = () => {
       setVpW(window.innerWidth);
+      setVpH(window.innerHeight);
       setRect(getRect(currentStep.target));
     };
     window.addEventListener("resize", handleResize);
@@ -155,7 +192,7 @@ export function TourGuide() {
 
   const isActive = step >= 0 && !!currentStep;
   const calloutStyle = rect && currentStep
-    ? calloutPosition(rect, currentStep.placement, vpW)
+    ? calloutPosition(rect, currentStep.placement, vpW, vpH)
     : { top: "50%", left: "50%", width: 320, transform: "translate(-50%,-50%)" };
 
   return (
@@ -174,7 +211,7 @@ export function TourGuide() {
               position: "fixed",
               inset: 0,
               zIndex: 900,
-              backgroundColor: "rgba(0,0,0,0.5)",
+              backgroundColor: "transparent",
               pointerEvents: "auto",
             }}
           />
@@ -192,14 +229,14 @@ export function TourGuide() {
             exit={{ opacity: 0 }}
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             style={{
-              position: "absolute",
+              position: "fixed",
               zIndex: 901,
               top: rect.top - PAD,
               left: rect.left - PAD,
               width: rect.width + PAD * 2,
               height: rect.height + PAD * 2,
               borderRadius: "8px",
-              boxShadow: "0 0 0 9999px rgba(0,0,0,0.5), 0 0 0 2px var(--accent)",
+              boxShadow: "0 0 0 9999px rgba(12,18,28,0.34), 0 0 0 2px var(--accent), inset 0 0 0 1px rgba(255,255,255,0.2)",
               pointerEvents: "none",
             }}
           />
@@ -216,7 +253,7 @@ export function TourGuide() {
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             style={{
-              position: "absolute",
+              position: "fixed",
               zIndex: 902,
               ...calloutStyle,
               backgroundColor: "var(--bg-card)",

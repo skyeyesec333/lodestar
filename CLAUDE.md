@@ -89,9 +89,14 @@ docs/
 - All monetary/percentage values stored as integers (basis points or integer %) — no floats in DB
 
 ## Current build phase
-**Phase 0 — Foundation only.** No UI yet.
-Goals: finalized data model, Prisma schema written and validated,
-EXIM requirements taxonomy complete, seed script working,
-readiness scoring logic tested.
+**Phase 1 — Alpha product.**
+The repo is past pure foundation work. It now includes an authenticated dashboard,
+project detail workflows, meetings, documents, requirements tracking, timeline UI,
+and an embedded assistant.
 
-Do not scaffold UI components until Phase 0 is explicitly complete.
+Current planning stance:
+- Runtime product scope is still EXIM-first.
+- Strategy may broaden beyond EXIM, but that is a product-planning decision, not
+  an implemented domain abstraction yet.
+- Prefer strengthening the current readiness spine before introducing a multi-program
+  taxonomy layer.
