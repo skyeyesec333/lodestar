@@ -1,12 +1,18 @@
 {
   "permissions": {
     "allow": [
+      "WebSearch(*)",
+      "WebFetch(*)",
       "Bash(npx prisma:*)",
       "Bash(npx prisma@7.5.0 validate)",
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(npx tsx -e \":*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(node -e \":*)",
+      "Bash(npm test:*)",
+      "Bash(node -e \"const p = require\\(''./package.json''\\); console.log\\(JSON.stringify\\({...p.dependencies, ...p.devDependencies}, null, 2\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\(''''packages'''',{}\\).keys\\(\\)\\)[:30]\\)\")"
     ]
   }
 }

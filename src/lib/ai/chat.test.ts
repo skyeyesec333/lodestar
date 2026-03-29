@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildChatCitations,
+  buildFallbackChatAnswer,
   buildChatPrompt,
   searchKnowledgeBase,
   type ChatRetrievalBundle,
 } from "@/lib/ai/chat";
+
+vi.mock("@anthropic-ai/sdk", () => ({
+  default: class MockAnthropic {},
+}));
 
 const retrieval: ChatRetrievalBundle = {
   appContext: [
@@ -33,13 +38,34 @@ describe("buildChatPrompt", () => {
     const prompt = buildChatPrompt(
       {
         question: "What does the readiness score mean?",
-        pageContext: "Project detail page for Kivu Hydro.",
+        pageContext: "Project detail page for Kivu Hydro. Stage pre loi. Readiness 34.0%.",
+        context: {
+          page: "project_detail",
+          projectId: "project-1",
+          projectSlug: "kivu-hydro",
+        },
         messages: [{ role: "user", content: "Explain this page." }],
       },
-      retrieval
+      {
+        ...retrieval,
+        appContext: [
+          {
+            id: "project-summary",
+            title: "Kivu Hydro project summary",
+            snippet: "Stage pre loi. Country RW. Sector power. Readiness 34.0%. 3 LOI blockers remain.",
+            sourceType: "app",
+            url: "/projects/kivu-hydro",
+          },
+          ...retrieval.appContext,
+        ],
+      }
     );
 
     expect(prompt).toContain("Current page context: Project detail page for Kivu Hydro.");
+    expect(prompt).toContain("PROJECT CONTEXT");
+    expect(prompt).toContain("Slug: kivu-hydro");
+    expect(prompt).toContain("Stage: pre loi");
+    expect(prompt).toContain("Readiness score: 34.0%");
     expect(prompt).toContain("USER: Explain this page.");
     expect(prompt).toContain("APP CONTEXT");
     expect(prompt).toContain("OFFICIAL EXIM CONTEXT");
@@ -56,6 +82,7 @@ describe("buildChatPrompt", () => {
     );
 
     expect(prompt).toContain("Current page context: not provided.");
+    expect(prompt).toContain("PROJECT CONTEXT\n- None available.");
     expect(prompt).toContain("No previous messages.");
     expect(prompt).toContain("None available.");
   });
@@ -95,6 +122,37 @@ describe("buildChatCitations", () => {
 
     expect(citations).toEqual([]);
   });
+
+  it("deduplicates citations with the same url", () => {
+    const citations = buildChatCitations({
+      appContext: [
+        {
+          id: "app-1",
+          title: "Projects",
+          snippet: "App route for projects.",
+          sourceType: "app",
+          url: "/projects",
+        },
+      ],
+      officialContext: [
+        {
+          id: "app-2",
+          title: "Projects duplicate",
+          snippet: "Repeated route from another retrieval source.",
+          sourceType: "app",
+          url: "/projects",
+        },
+      ],
+    });
+
+    expect(citations).toHaveLength(1);
+    expect(citations[0]).toEqual({
+      title: "Projects",
+      url: "/projects",
+      sourceType: "app",
+      lastVerifiedAt: undefined,
+    });
+  });
 });
 
 describe("searchKnowledgeBase", () => {
@@ -119,5 +177,62 @@ describe("searchKnowledgeBase", () => {
 
     expect(docs.some((doc) => doc.title === "EPC Contract")).toBe(true);
     expect(docs.some((doc) => doc.title === "US Content Analysis & Certification")).toBe(true);
+  });
+});
+
+describe("buildFallbackChatAnswer", () => {
+  it("returns a conversational next-step answer instead of raw snippet concatenation", () => {
+    const answer = buildFallbackChatAnswer(
+      {
+        question: "What should I do next?",
+        pageContext: "Project detail page.",
+        messages: [],
+      },
+      {
+        appContext: [
+          {
+            id: "summary",
+            title: "Kisongo project summary",
+            snippet: "Stage pre loi. Country TZ. Sector power. Readiness 34.0%. 7 LOI blockers remain.",
+            sourceType: "app",
+          },
+          {
+            id: "blockers",
+            title: "Kisongo LOI blockers",
+            snippet:
+              "Current LOI blockers: EPC Contract, Host Government Implementation Agreement, Financial Model, US Content Analysis & Certification, Independent Engineer's Report.",
+            sourceType: "app",
+          },
+        ],
+        officialContext: [],
+      }
+    );
+
+    expect(answer).toContain("The next best action is to move EPC Contract");
+    expect(answer).toContain("34.0");
+    expect(answer).not.toContain("Stage pre loi. Country TZ. Sector power.");
+  });
+
+  it("explains score interpretation in a more operator-facing way", () => {
+    const answer = buildFallbackChatAnswer(
+      {
+        question: "How should I read this score?",
+        messages: [],
+      },
+      {
+        appContext: [
+          {
+            id: "summary",
+            title: "Delta project summary",
+            snippet: "Stage pre loi. Country TZ. Sector power. Readiness 34.0%. 7 LOI blockers remain.",
+            sourceType: "app",
+          },
+        ],
+        officialContext: [],
+      }
+    );
+
+    expect(answer).toContain("34.0% readiness should be read as a document-maturity signal");
+    expect(answer).toContain("not as proof the transaction is de-risked");
   });
 });

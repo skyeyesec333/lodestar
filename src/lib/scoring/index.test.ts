@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeReadiness } from "./index";
-import { EXIM_REQUIREMENTS, LOI_CRITICAL_IDS } from "../exim/requirements";
+import { EXIM_REQUIREMENTS, LOI_CRITICAL_IDS, TOTAL_WEIGHT } from "../exim/requirements";
 import type { RequirementStatusValue } from "../../types/requirements";
 
 const allWith = (status: RequirementStatusValue) =>
@@ -8,8 +8,10 @@ const allWith = (status: RequirementStatusValue) =>
 
 const LOI_CRITICAL_SET = new Set(LOI_CRITICAL_IDS);
 
-const TOTAL_WEIGHT = 3950;
-const LOI_CRITICAL_WEIGHT = 1750;
+const LOI_CRITICAL_WEIGHT = EXIM_REQUIREMENTS.filter((r) => r.isLoiCritical).reduce(
+  (sum, r) => sum + r.weight,
+  0
+);
 
 describe("computeReadiness", () => {
   describe("empty / default inputs", () => {
@@ -22,9 +24,9 @@ describe("computeReadiness", () => {
       expect(computeReadiness([]).loiReady).toBe(false);
     });
 
-    it("returns all 10 LOI-critical IDs as blockers for empty array", () => {
+    it("returns all LOI-critical IDs as blockers for empty array", () => {
       const result = computeReadiness([]);
-      expect(result.loiBlockers).toHaveLength(10);
+      expect(result.loiBlockers).toHaveLength(LOI_CRITICAL_IDS.length);
       expect(result.loiBlockers.sort()).toEqual([...LOI_CRITICAL_IDS].sort());
     });
 
@@ -56,8 +58,8 @@ describe("computeReadiness", () => {
       expect(computeReadiness(allWith("draft")).scoreBps).toBe(5000);
     });
 
-    it("only epc_contract executed → scoreBps reflects weight 200 / 3950", () => {
-      const expected = Math.round((200 / TOTAL_WEIGHT) * 10000); // 506
+    it("only epc_contract executed → scoreBps reflects weight 200 / TOTAL_WEIGHT", () => {
+      const expected = Math.round((200 / TOTAL_WEIGHT) * 10000);
       const result = computeReadiness([
         { requirementId: "epc_contract", status: "executed" },
       ]);
@@ -137,7 +139,7 @@ describe("computeReadiness", () => {
       }));
       const result = computeReadiness(statuses);
       expect(result.loiReady).toBe(false);
-      expect(result.loiBlockers).toHaveLength(10);
+      expect(result.loiBlockers).toHaveLength(LOI_CRITICAL_IDS.length);
     });
 
     it("loiBlockers only contains LOI-critical IDs", () => {
@@ -228,7 +230,7 @@ describe("computeReadiness", () => {
         { requirementId: "epc_contract", status: "not_started" as const },
         { requirementId: "epc_contract", status: "executed" as const },
       ];
-      const expected = Math.round((200 / TOTAL_WEIGHT) * 10000); // 506
+      const expected = Math.round((200 / TOTAL_WEIGHT) * 10000);
       expect(computeReadiness(statuses).scoreBps).toBe(expected);
     });
 
@@ -236,6 +238,35 @@ describe("computeReadiness", () => {
       const statuses = [
         { requirementId: "nonexistent_requirement", status: "executed" as const },
       ];
+      expect(computeReadiness(statuses).scoreBps).toBe(0);
+    });
+
+    it("not_applicable is excluded from both numerator and denominator", () => {
+      // Mark all as not_applicable except epc_contract which is executed.
+      // Score should be 10000 (100%) because epc_contract is the only applicable item.
+      const statuses = EXIM_REQUIREMENTS.map((r) => ({
+        requirementId: r.id,
+        status: (r.id === "epc_contract" ? "executed" : "not_applicable") as RequirementStatusValue,
+      }));
+      expect(computeReadiness(statuses).scoreBps).toBe(10000);
+    });
+
+    it("not_applicable LOI-critical items are not included in loiBlockers", () => {
+      // All requirements not_applicable except epc_contract which is executed.
+      const statuses = EXIM_REQUIREMENTS.map((r) => ({
+        requirementId: r.id,
+        status: (r.id === "epc_contract" ? "executed" : "not_applicable") as RequirementStatusValue,
+      }));
+      const result = computeReadiness(statuses);
+      expect(result.loiReady).toBe(true);
+      expect(result.loiBlockers).toHaveLength(0);
+    });
+
+    it("all not_applicable → scoreBps=0 (no applicable items)", () => {
+      const statuses = EXIM_REQUIREMENTS.map((r) => ({
+        requirementId: r.id,
+        status: "not_applicable" as const,
+      }));
       expect(computeReadiness(statuses).scoreBps).toBe(0);
     });
   });

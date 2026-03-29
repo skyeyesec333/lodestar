@@ -14,8 +14,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   studies: "Studies",
   permits: "Permits",
   corporate: "Corporate",
-  environmental_social: "E&S",
+  environmental_social: "Env & Social",
 };
+
+const CATEGORY_ORDER = [
+  "contracts",
+  "financial",
+  "studies",
+  "environmental_social",
+  "corporate",
+  "permits",
+] as const;
 
 function scoreColor(bps: number): string {
   if (bps >= 7500) return "var(--teal)";
@@ -51,6 +60,13 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
   const pct = displayed / 100;
   const finalPct = scoreBps / 100;
   const color = scoreColor(displayed);
+  const orderedCategoryScores = CATEGORY_ORDER
+    .map((key) => ({
+      key,
+      label: CATEGORY_LABELS[key],
+      scoreBps: categoryScores[key],
+    }))
+    .filter((entry) => typeof entry.scoreBps === "number");
 
   return (
     <div
@@ -76,7 +92,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
               margin: "0 0 8px",
             }}
           >
-            Readiness Score
+            EXIM Deal Readiness
           </p>
           <p
             style={{
@@ -111,12 +127,68 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
               {loiReady ? "LOI Ready" : "LOI Pending"}
             </span>
           </div>
+
+          {orderedCategoryScores.length > 0 ? (
+            <div style={{ marginTop: "24px", display: "grid", gap: "10px" }}>
+              {orderedCategoryScores.map((entry) => (
+                <div key={entry.key} style={{ display: "grid", gap: "5px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "10px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        letterSpacing: "0.10em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-muted)",
+                      }}
+                    >
+                      {entry.label}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        color: "var(--ink-mid)",
+                      }}
+                    >
+                      {(entry.scoreBps / 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: "3px",
+                      backgroundColor: "var(--border)",
+                      borderRadius: "2px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: mounted ? `${entry.scoreBps / 100}%` : "0%",
+                        backgroundColor: "var(--teal)",
+                        borderRadius: "2px",
+                        transition: "width 0.9s cubic-bezier(0.16, 1, 0.3, 1)",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
-        {/* Progress bar + category breakdown */}
+        {/* Progress bar */}
         <div style={{ flex: 1 }}>
           {/* Overall bar */}
-          <div style={{ marginBottom: "32px" }}>
+          <div>
             <div
               style={{
                 height: "6px",
@@ -136,71 +208,6 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
                 }}
               />
             </div>
-          </div>
-
-          {/* Category breakdown */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "20px 32px",
-            }}
-          >
-            {Object.entries(categoryScores).map(([cat, bps]) => {
-              const catPct = bps / 100;
-              const catColor = scoreColor(bps);
-              return (
-                <div key={cat}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "10px",
-                        letterSpacing: "0.10em",
-                        textTransform: "uppercase",
-                        color: "var(--ink-muted)",
-                      }}
-                    >
-                      {CATEGORY_LABELS[cat] ?? cat}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "10px",
-                        fontWeight: 500,
-                        color: catColor,
-                      }}
-                    >
-                      {catPct.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      height: "3px",
-                      backgroundColor: "var(--bg)",
-                      borderRadius: "2px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: mounted ? `${catPct}%` : "0%",
-                        backgroundColor: catColor,
-                        borderRadius: "2px",
-                        transition: "width 0.9s cubic-bezier(0.16, 1, 0.3, 1)",
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>

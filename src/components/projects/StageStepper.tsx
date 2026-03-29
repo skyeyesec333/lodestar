@@ -1,11 +1,11 @@
 const STAGES = [
-  { id: "concept",          label: "Concept"          },
-  { id: "pre_loi",          label: "Pre-LOI"          },
-  { id: "loi_submitted",    label: "LOI Submitted"    },
-  { id: "loi_approved",     label: "LOI Approved"     },
-  { id: "pre_commitment",   label: "Pre-Commitment"   },
-  { id: "final_commitment", label: "Final Commitment" },
-  { id: "financial_close",  label: "Financial Close"  },
+  { id: "concept",          label: "Concept"               },
+  { id: "pre_loi",          label: "Pre-EXIM LOI"          },
+  { id: "loi_submitted",    label: "EXIM LOI Submitted"    },
+  { id: "loi_approved",     label: "EXIM LOI Approved"     },
+  { id: "pre_commitment",   label: "Pre-Commitment"        },
+  { id: "final_commitment", label: "EXIM Final Commitment" },
+  { id: "financial_close",  label: "Financial Close"       },
 ] as const;
 
 type StageId = (typeof STAGES)[number]["id"];

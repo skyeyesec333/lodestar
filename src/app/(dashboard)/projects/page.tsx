@@ -11,6 +11,8 @@ import { getProjectsByUser } from "@/lib/db/projects";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { getProjectsListChatPresets } from "@/lib/ai/chat-presets";
 import { CreateDemoProjectButton } from "@/components/projects/CreateDemoProjectButton";
+import { DailyPriorityWidget } from "@/components/projects/DailyPriorityWidget";
+import { ProjectsStageGridClient } from "@/components/projects/ProjectsStageGridClient";
 
 const STAGE_OPTIONS = [
   { value: "all", label: "All stages" },
@@ -69,8 +71,12 @@ function parseProjectListQuery(searchParams: SearchParams): Required<ProjectList
 
   return {
     q,
-    sector: SECTOR_OPTIONS.some((option) => option.value === sector) ? (sector as Required<ProjectListQuery>["sector"]) : "all",
-    stage: STAGE_OPTIONS.some((option) => option.value === stage) ? (stage as Required<ProjectListQuery>["stage"]) : "all",
+    sector: SECTOR_OPTIONS.some((option) => option.value === sector)
+      ? (sector as Required<ProjectListQuery>["sector"])
+      : "all",
+    stage: STAGE_OPTIONS.some((option) => option.value === stage)
+      ? (stage as Required<ProjectListQuery>["stage"])
+      : "all",
     readiness: READINESS_OPTIONS.some((option) => option.value === readiness)
       ? (readiness as ProjectReadinessFilter)
       : "all",
@@ -80,49 +86,19 @@ function parseProjectListQuery(searchParams: SearchParams): Required<ProjectList
   };
 }
 
-function getActiveFilterCount(query: Required<ProjectListQuery>): number {
+function getActiveFilterCount(
+  query: Required<ProjectListQuery>,
+  options?: { includeStage?: boolean }
+): number {
+  const includeStage = options?.includeStage ?? true;
+
   return [
     query.q.length > 0,
     query.sector !== "all",
-    query.stage !== "all",
+    includeStage && query.stage !== "all",
     query.readiness !== "all",
     query.sort !== "created_desc",
   ].filter(Boolean).length;
-}
-
-function getLoiCountdown(targetLoiDate: Date | null): {
-  text: string;
-  subtext: string;
-  color: string;
-} | null {
-  if (!targetLoiDate) return null;
-
-  const days = Math.ceil(
-    (new Date(targetLoiDate).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000
-  );
-
-  return {
-    text: days < 0 ? "passed" : days === 0 ? "today" : `${days}d`,
-    subtext: new Date(targetLoiDate).toLocaleDateString("en-US", {
-      month: "short",
-      year: "2-digit",
-    }),
-    color:
-      days < 0
-        ? "var(--ink-muted)"
-        : days <= 30
-        ? "var(--accent)"
-        : days <= 90
-        ? "var(--gold)"
-        : "var(--teal)",
-  };
-}
-
-function getReadinessColor(score: number | null): string {
-  if (score == null) return "var(--ink-muted)";
-  if (score >= 7500) return "var(--teal)";
-  if (score >= 4000) return "var(--gold)";
-  return "var(--accent)";
 }
 
 export default async function ProjectsPage({
@@ -135,7 +111,7 @@ export default async function ProjectsPage({
 
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const query = parseProjectListQuery(resolvedSearchParams);
-  const result = await getProjectsByUser(userId, query);
+  const result = await getProjectsByUser(userId, { ...query, stage: "all" });
 
   if (!result.ok) {
     return (
@@ -147,7 +123,20 @@ export default async function ProjectsPage({
 
   const projects = result.value;
   const activeFilterCount = getActiveFilterCount(query);
+  const activeFilterCountWithoutStage = getActiveFilterCount(query, { includeStage: false });
   const chatPresets = getProjectsListChatPresets();
+  const serializedProjects = projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    countryCode: project.countryCode,
+    sector: project.sector,
+    stage: project.stage,
+    targetLoiDate: project.targetLoiDate?.toISOString() ?? null,
+    cachedReadinessScore: project.cachedReadinessScore,
+    capexUsdCents: project.capexUsdCents?.toString() ?? null,
+    lastActivityAt: project.lastActivityAt?.toISOString() ?? null,
+  }));
 
   return (
     <div>
@@ -155,7 +144,7 @@ export default async function ProjectsPage({
         presetQuestions={chatPresets}
         title="Portfolio Assistant"
         subtitle="Ask about filters, readiness bands, and portfolio triage."
-        pageContext={`Projects portfolio page. ${projects.length} projects visible. ${activeFilterCount} active filters. Sort is ${query.sort.replace(/_/g, " ")}.`}
+        pageContext={`Deals portfolio page. ${projects.length} deals loaded. ${activeFilterCount} active filters. Sort is ${query.sort.replace(/_/g, " ")}.`}
         context={{ page: "projects_list" }}
       />
 
@@ -182,7 +171,7 @@ export default async function ProjectsPage({
               margin: 0,
             }}
           >
-            Projects
+            Deals
           </h1>
         </div>
 
@@ -203,16 +192,18 @@ export default async function ProjectsPage({
               textDecoration: "none",
             }}
           >
-            New Project
+            New Deal
           </Link>
         </div>
       </div>
+
+      <DailyPriorityWidget projects={projects} />
 
       <form
         method="get"
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(220px, 1.4fr) repeat(4, minmax(140px, 1fr)) auto",
+          gridTemplateColumns: "minmax(220px, 1.4fr) repeat(3, minmax(140px, 1fr)) auto",
           gap: "12px",
           alignItems: "end",
           marginBottom: "24px",
@@ -230,7 +221,7 @@ export default async function ProjectsPage({
             type="search"
             name="q"
             defaultValue={query.q}
-            placeholder="Project, slug, or country"
+            placeholder="Deal, slug, or country"
             style={filterInputStyle}
           />
         </label>
@@ -241,19 +232,6 @@ export default async function ProjectsPage({
           </span>
           <select name="sector" defaultValue={query.sector} style={filterInputStyle}>
             {SECTOR_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label style={{ display: "block" }}>
-          <span className="label-mono" style={{ display: "block", marginBottom: "6px" }}>
-            Stage
-          </span>
-          <select name="stage" defaultValue={query.stage} style={filterInputStyle}>
-            {STAGE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -297,234 +275,11 @@ export default async function ProjectsPage({
         </div>
       </form>
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "18px",
-          gap: "16px",
-          flexWrap: "wrap",
-        }}
-      >
-        <p
-          style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: "11px",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--ink-muted)",
-            margin: 0,
-          }}
-        >
-          {projects.length} project{projects.length === 1 ? "" : "s"}
-          {activeFilterCount > 0 ? ` · ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : ""}
-        </p>
-      </div>
-
-      {projects.length === 0 ? (
-        <div
-          style={{
-            backgroundColor: "var(--bg-card)",
-            border: "1px dashed var(--border)",
-            borderRadius: "4px",
-            padding: "64px 32px",
-            textAlign: "center",
-          }}
-        >
-          <p
-            style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontSize: "20px",
-              color: "var(--ink)",
-              marginBottom: "8px",
-            }}
-          >
-            {activeFilterCount > 0 ? "No matching projects" : "No projects yet"}
-          </p>
-          <p
-            style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: "14px",
-              color: "var(--ink-muted)",
-              marginBottom: "24px",
-            }}
-          >
-            {activeFilterCount > 0
-              ? "Adjust the list filters or reset them to see the full portfolio."
-              : "Create your first project to start tracking EXIM readiness."}
-          </p>
-          <Link
-            href={activeFilterCount > 0 ? "/projects" : "/projects/new"}
-            style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "11px",
-              fontWeight: 500,
-              letterSpacing: "0.10em",
-              textTransform: "uppercase",
-              color: "#ffffff",
-              backgroundColor: "var(--accent)",
-              padding: "10px 20px",
-              borderRadius: "3px",
-              textDecoration: "none",
-            }}
-          >
-            {activeFilterCount > 0 ? "Reset Filters" : "Create Project"}
-          </Link>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.2fr 80px 120px 120px 90px 100px",
-              padding: "0 24px 10px",
-              gap: "16px",
-            }}
-          >
-            {["Project", "Country", "Sector", "Stage", "LOI", "Readiness"].map((heading) => (
-              <span
-                key={heading}
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "10px",
-                  fontWeight: 500,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "var(--ink-muted)",
-                }}
-              >
-                {heading}
-              </span>
-            ))}
-          </div>
-
-          {projects.map((project) => {
-            const loiCountdown = getLoiCountdown(project.targetLoiDate);
-            const readinessColor = getReadinessColor(project.cachedReadinessScore);
-
-            return (
-              <Link
-                key={project.id}
-                href={`/projects/${project.slug}`}
-                style={{ textDecoration: "none" }}
-              >
-                <div
-                  className="project-row"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.2fr 80px 120px 120px 90px 100px",
-                    alignItems: "center",
-                    padding: "18px 24px",
-                    gap: "16px",
-                    backgroundColor: "var(--bg-card)",
-                    border: "1px solid var(--border)",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: "block",
-                        fontFamily: "'Inter', sans-serif",
-                        fontSize: "15px",
-                        fontWeight: 500,
-                        color: "var(--ink)",
-                        marginBottom: "4px",
-                      }}
-                    >
-                      {project.name}
-                    </span>
-                    <span
-                      style={{
-                        display: "block",
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "10px",
-                        letterSpacing: "0.06em",
-                        color: "var(--ink-muted)",
-                      }}
-                    >
-                      {project.slug}
-                    </span>
-                  </div>
-
-                  <span style={monoValueStyle}>{project.countryCode}</span>
-                  <span style={{ ...monoValueStyle, textTransform: "capitalize" }}>{project.sector}</span>
-                  <span style={{ ...monoValueStyle, textTransform: "capitalize" }}>
-                    {project.stage.replace(/_/g, " ")}
-                  </span>
-
-                  {loiCountdown ? (
-                    <div>
-                      <span
-                        style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          color: loiCountdown.color,
-                          display: "block",
-                        }}
-                      >
-                        {loiCountdown.text}
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: "9px",
-                          color: "var(--ink-muted)",
-                          letterSpacing: "0.06em",
-                        }}
-                      >
-                        {loiCountdown.subtext}
-                      </span>
-                    </div>
-                  ) : (
-                    <span style={monoValueStyle}>-</span>
-                  )}
-
-                  <div>
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "12px",
-                        fontWeight: 500,
-                        color: readinessColor,
-                        display: "block",
-                        marginBottom: "5px",
-                      }}
-                    >
-                      {project.cachedReadinessScore == null
-                        ? "-"
-                        : `${(project.cachedReadinessScore / 100).toFixed(1)}%`}
-                    </span>
-                    {project.cachedReadinessScore != null && (
-                      <div
-                        style={{
-                          height: "3px",
-                          width: "80px",
-                          backgroundColor: "var(--border)",
-                          borderRadius: "2px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${project.cachedReadinessScore / 100}%`,
-                            backgroundColor: readinessColor,
-                            borderRadius: "2px",
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      )}
+      <ProjectsStageGridClient
+        projects={serializedProjects}
+        initialStage={query.stage}
+        activeFilterCountWithoutStage={activeFilterCountWithoutStage}
+      />
     </div>
   );
 }
@@ -568,12 +323,4 @@ const secondaryButtonStyle: CSSProperties = {
   borderRadius: "3px",
   padding: "10px 16px",
   textDecoration: "none",
-};
-
-const monoValueStyle: CSSProperties = {
-  fontFamily: "'DM Mono', monospace",
-  fontSize: "11px",
-  letterSpacing: "0.08em",
-  color: "var(--ink-muted)",
-  textTransform: "uppercase",
 };

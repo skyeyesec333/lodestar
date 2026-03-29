@@ -2,7 +2,7 @@ import type { ProjectSector, EximCoverType } from "@prisma/client";
 import { db } from "./index";
 import type {
   Project,
-  ProjectSummary,
+  ProjectListItem,
   ProjectListQuery,
   ProjectListSort,
   Result,
@@ -19,7 +19,17 @@ const projectSummarySelect = {
   stage: true,
   targetLoiDate: true,
   cachedReadinessScore: true,
+  capexUsdCents: true,
   createdAt: true,
+  activityEvents: {
+    select: {
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "desc" as const,
+    },
+    take: 1,
+  },
 } as const;
 
 const projectFullSelect = {
@@ -46,7 +56,7 @@ const projectFullSelect = {
 export async function getProjectsByUser(
   clerkUserId: string,
   query: ProjectListQuery = {}
-): Promise<Result<ProjectSummary[]>> {
+): Promise<Result<ProjectListItem[]>> {
   try {
     const sort = query.sort ?? "created_desc";
     const search = query.q?.trim();
@@ -72,7 +82,22 @@ export async function getProjectsByUser(
       select: projectSummarySelect,
       orderBy: getProjectListOrderBy(sort),
     });
-    return { ok: true, value: rows };
+    return {
+      ok: true,
+      value: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        countryCode: row.countryCode,
+        sector: row.sector,
+        stage: row.stage,
+        targetLoiDate: row.targetLoiDate,
+        cachedReadinessScore: row.cachedReadinessScore,
+        capexUsdCents: row.capexUsdCents,
+        createdAt: row.createdAt,
+        lastActivityAt: row.activityEvents[0]?.createdAt ?? null,
+      })),
+    };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown database error";

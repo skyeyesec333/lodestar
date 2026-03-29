@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import type { MeetingRow, ActionItemRow } from "@/lib/db/meetings";
 import type { StakeholderRow } from "@/lib/db/stakeholders";
 import { createMeeting, createActionItem, updateMeetingActionItemStatus } from "@/actions/meetings";
+import { updateRequirementStatus } from "@/actions/requirements";
+import type { MeetingExtractionResult, ExtractedActionItem, ExtractedCommitment } from "@/lib/ai/meeting-extraction";
 
 // ── Provider Connector Banner ─────────────────────────────────────────────────
 
@@ -234,11 +236,18 @@ function ProviderConnector() {
   );
 }
 
+type RequirementOption = {
+  requirementId: string;
+  name: string;
+  status: string;
+};
+
 type Props = {
   projectId: string;
   slug: string;
   initialMeetings: MeetingRow[];
   stakeholders: StakeholderRow[];
+  requirements?: RequirementOption[];
 };
 
 const MEETING_TYPE_LABELS: Record<string, string> = {
@@ -443,6 +452,7 @@ function AddActionItemForm({
   slug,
   meetingId,
   stakeholders,
+  requirements,
   onCreated,
   onCancel,
 }: {
@@ -450,6 +460,7 @@ function AddActionItemForm({
   slug: string;
   meetingId: string;
   stakeholders: StakeholderRow[];
+  requirements?: RequirementOption[];
   onCreated: (a: ActionItemRow) => void;
   onCancel: () => void;
 }) {
@@ -459,6 +470,7 @@ function AddActionItemForm({
   const [priority, setPriority] = useState("medium");
   const [dueDate, setDueDate] = useState("");
   const [assignedToId, setAssignedToId] = useState("");
+  const [linkedRequirementId, setLinkedRequirementId] = useState("");
 
   const inputStyle: React.CSSProperties = {
     fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--ink)",
@@ -482,7 +494,7 @@ function AddActionItemForm({
         dueDate: dueDate || null,
         assignedToId: assignedToId || null,
         description: null,
-        requirementId: null,
+        requirementId: linkedRequirementId || null,
       });
       if (!result.ok) { setError(result.error.message); return; }
       onCreated(result.value);
@@ -516,6 +528,17 @@ function AddActionItemForm({
             {stakeholders.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
+        {requirements && requirements.length > 0 && (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={labelStyle}>Link to Requirement</label>
+            <select style={inputStyle} value={linkedRequirementId} onChange={(e) => setLinkedRequirementId(e.target.value)}>
+              <option value="">— None —</option>
+              {requirements.map((r) => (
+                <option key={r.requirementId} value={r.requirementId}>{r.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       {error && <p style={{ fontSize: "12px", color: "var(--accent)", margin: "0 0 10px" }}>{error}</p>}
       <div style={{ display: "flex", gap: "8px" }}>
@@ -532,6 +555,15 @@ function AddActionItemForm({
 
 // ── Action Item Row ───────────────────────────────────────────────────────────
 
+const STATUS_NEXT: Record<string, string> = {
+  not_started: "in_progress",
+  in_progress: "draft",
+  draft: "substantially_final",
+  substantially_final: "executed",
+};
+
+const STATUS_TERMINAL = new Set(["executed", "waived", "not_applicable"]);
+
 function ActionItemCard({
   item,
   projectId,
@@ -542,67 +574,601 @@ function ActionItemCard({
   slug: string;
 }) {
   const [status, setStatus] = useState(item.status);
-  const [, startTransition] = useTransition();
+  const [showAdvancePrompt, setShowAdvancePrompt] = useState(false);
+  const [reqStatus, setReqStatus] = useState(item.requirementCurrentStatus);
+  const [advancePending, startAdvanceTransition] = useTransition();
+  const [, startToggleTransition] = useTransition();
 
   function toggle() {
     const next = status === "completed" ? "open" : "completed";
     setStatus(next);
-    startTransition(async () => {
+    startToggleTransition(async () => {
       await updateMeetingActionItemStatus({ projectId, slug, actionItemId: item.id, status: next });
+    });
+    // Show advance prompt when completing, if there's a linked requirement that can advance
+    if (
+      next === "completed" &&
+      item.requirementName &&
+      reqStatus &&
+      !STATUS_TERMINAL.has(reqStatus) &&
+      STATUS_NEXT[reqStatus]
+    ) {
+      setShowAdvancePrompt(true);
+    } else {
+      setShowAdvancePrompt(false);
+    }
+  }
+
+  function handleAdvance() {
+    if (!reqStatus || !STATUS_NEXT[reqStatus]) return;
+    const nextStatus = STATUS_NEXT[reqStatus];
+    startAdvanceTransition(async () => {
+      await updateRequirementStatus({
+        projectId,
+        requirementId: item.requirementId,
+        status: nextStatus,
+      });
+      setReqStatus(nextStatus);
+      setShowAdvancePrompt(false);
     });
   }
 
   const done = status === "completed" || status === "cancelled";
+  const canAdvance =
+    item.requirementName &&
+    reqStatus &&
+    !STATUS_TERMINAL.has(reqStatus) &&
+    !!STATUS_NEXT[reqStatus];
 
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "8px 0", borderBottom: "1px solid var(--border)" }}>
-      {/* Checkbox */}
-      <button
-        onClick={toggle}
-        style={{
-          width: "16px", height: "16px", borderRadius: "3px", flexShrink: 0, marginTop: "2px",
-          border: `1px solid ${done ? "var(--teal)" : "var(--border)"}`,
-          backgroundColor: done ? "var(--teal)" : "transparent",
-          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-      >
-        {done && <span style={{ color: "#fff", fontSize: "9px", lineHeight: 1 }}>✓</span>}
-      </button>
+    <div style={{ paddingBottom: "2px", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "8px 0" }}>
+        {/* Checkbox */}
+        <button
+          onClick={toggle}
+          style={{
+            width: "16px", height: "16px", borderRadius: "3px", flexShrink: 0, marginTop: "2px",
+            border: `1px solid ${done ? "var(--teal)" : "var(--border)"}`,
+            backgroundColor: done ? "var(--teal)" : "transparent",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          {done && <span style={{ color: "#fff", fontSize: "9px", lineHeight: 1 }}>✓</span>}
+        </button>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{
-          fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 500,
-          color: done ? "var(--ink-muted)" : "var(--ink)", margin: 0,
-          textDecoration: done ? "line-through" : "none",
-        }}>
-          {item.title}
-        </p>
-        <div style={{ display: "flex", gap: "12px", marginTop: "3px", flexWrap: "wrap" }}>
-          {item.assignedTo && (
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", letterSpacing: "0.04em" }}>
-              → {item.assignedTo.name}
-            </span>
-          )}
-          {item.dueDate && (
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", letterSpacing: "0.04em" }}>
-              Due {formatDate(item.dueDate)}
-            </span>
-          )}
-          {item.requirementName && (
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--gold)", letterSpacing: "0.04em" }}>
-              #{item.requirementName}
-            </span>
-          )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{
+            fontFamily: "'Inter', sans-serif", fontSize: "13px", fontWeight: 500,
+            color: done ? "var(--ink-muted)" : "var(--ink)", margin: 0,
+            textDecoration: done ? "line-through" : "none",
+          }}>
+            {item.title}
+          </p>
+          <div style={{ display: "flex", gap: "12px", marginTop: "3px", flexWrap: "wrap" }}>
+            {item.assignedTo && (
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", letterSpacing: "0.04em" }}>
+                → {item.assignedTo.name}
+              </span>
+            )}
+            {item.dueDate && (
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", letterSpacing: "0.04em" }}>
+                Due {formatDate(item.dueDate)}
+              </span>
+            )}
+            {item.requirementName && (
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--gold)", letterSpacing: "0.04em" }}>
+                #{item.requirementName}
+              </span>
+            )}
+          </div>
         </div>
+
+        <span style={{
+          fontFamily: "'DM Mono', monospace", fontSize: "9px", fontWeight: 600,
+          letterSpacing: "0.08em", textTransform: "uppercase",
+          color: PRIORITY_COLORS[item.priority] ?? "var(--ink-muted)", flexShrink: 0,
+        }}>
+          {item.priority}
+        </span>
       </div>
 
-      <span style={{
-        fontFamily: "'DM Mono', monospace", fontSize: "9px", fontWeight: 600,
-        letterSpacing: "0.08em", textTransform: "uppercase",
-        color: PRIORITY_COLORS[item.priority] ?? "var(--ink-muted)", flexShrink: 0,
-      }}>
-        {item.priority}
-      </span>
+      {/* Advance requirement prompt */}
+      {showAdvancePrompt && canAdvance && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flexWrap: "wrap",
+            padding: "8px 12px",
+            marginBottom: "6px",
+            backgroundColor: "var(--gold-soft)",
+            border: "1px solid var(--gold)",
+            borderRadius: "3px",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "12px",
+              color: "var(--ink-mid)",
+              flex: 1,
+              minWidth: "200px",
+            }}
+          >
+            Advance <strong>{item.requirementName}</strong> from{" "}
+            <em>{reqStatus?.replace(/_/g, " ")}</em> to{" "}
+            <em>{STATUS_NEXT[reqStatus!]?.replace(/_/g, " ")}</em>?
+          </span>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button
+              onClick={handleAdvance}
+              disabled={advancePending}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px",
+                fontWeight: 500,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "#fff",
+                backgroundColor: advancePending ? "var(--ink-muted)" : "var(--gold)",
+                border: "none",
+                borderRadius: "3px",
+                padding: "4px 10px",
+                cursor: advancePending ? "not-allowed" : "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {advancePending ? "Saving…" : "Advance"}
+            </button>
+            <button
+              onClick={() => setShowAdvancePrompt(false)}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px",
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                backgroundColor: "transparent",
+                border: "1px solid var(--border)",
+                borderRadius: "3px",
+                padding: "4px 10px",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Skip
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Extract Insights Panel ────────────────────────────────────────────────────
+
+const PRIORITY_BADGE_COLORS: Record<string, string> = {
+  low: "var(--ink-muted)",
+  medium: "var(--gold)",
+  high: "var(--accent)",
+};
+
+function ExtractInsightsPanel({
+  meetingId,
+  projectId,
+  slug,
+  requirements,
+  stakeholders,
+  onActionItemAdded,
+}: {
+  meetingId: string;
+  projectId: string;
+  slug: string;
+  requirements?: RequirementOption[];
+  stakeholders: StakeholderRow[];
+  onActionItemAdded: (item: ActionItemRow) => void;
+}) {
+  const [transcript, setTranscript] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<MeetingExtractionResult | null>(null);
+  const [addingIndex, setAddingIndex] = useState<number | null>(null);
+  const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
+  const [, startTransition] = useTransition();
+
+  async function handleExtract() {
+    if (!transcript.trim()) {
+      setError("Paste some meeting notes first.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/meetings/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript, projectId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+        const msg = typeof data.error === "string" ? data.error : `Error ${res.status}`;
+        setError(msg);
+        return;
+      }
+      const data = await res.json() as MeetingExtractionResult;
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Extraction failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleAddActionItem(item: ExtractedActionItem, index: number) {
+    setAddingIndex(index);
+    startTransition(async () => {
+      const result = await createActionItem({
+        projectId,
+        slug,
+        meetingId,
+        title: item.title,
+        description: item.description ?? null,
+        priority: item.priority,
+        dueDate: null,
+        assignedToId: null,
+        requirementId: item.requirementId ?? null,
+      });
+      if (result.ok) {
+        onActionItemAdded(result.value);
+        setAddedIndices((prev) => new Set([...prev, index]));
+      }
+      setAddingIndex(null);
+    });
+  }
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: "'Inter', sans-serif",
+    fontSize: "13px",
+    color: "var(--ink)",
+    backgroundColor: "var(--bg)",
+    border: "1px solid var(--border)",
+    borderRadius: "3px",
+    padding: "8px 10px",
+    width: "100%",
+    boxSizing: "border-box",
+    resize: "vertical",
+    minHeight: "100px",
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontFamily: "'DM Mono', monospace",
+    fontSize: "10px",
+    fontWeight: 500,
+    letterSpacing: "0.10em",
+    textTransform: "uppercase" as const,
+    color: "var(--ink-muted)",
+    display: "block",
+    marginBottom: "6px",
+  };
+
+  // Suppress unused variable warning — stakeholders prop reserved for future assignee matching
+  void stakeholders;
+  void requirements;
+
+  return (
+    <div
+      style={{
+        borderTop: "1px solid var(--border)",
+        padding: "16px 20px",
+        backgroundColor: "var(--bg)",
+      }}
+    >
+      <p
+        style={{
+          fontFamily: "'DM Mono', monospace",
+          fontSize: "10px",
+          fontWeight: 600,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--teal)",
+          margin: "0 0 14px",
+        }}
+      >
+        Extract Insights with AI
+      </p>
+
+      <div style={{ marginBottom: "12px" }}>
+        <label style={labelStyle}>Meeting Notes / Transcript</label>
+        <textarea
+          style={inputStyle}
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          placeholder="Paste meeting notes, transcript, or summary here..."
+          disabled={loading}
+        />
+      </div>
+
+      {error && (
+        <p
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: "12px",
+            color: "var(--accent)",
+            margin: "0 0 10px",
+          }}
+        >
+          {error}
+        </p>
+      )}
+
+      <button
+        onClick={handleExtract}
+        disabled={loading}
+        style={{
+          fontFamily: "'DM Mono', monospace",
+          fontSize: "10px",
+          fontWeight: 500,
+          letterSpacing: "0.10em",
+          textTransform: "uppercase",
+          color: "#fff",
+          backgroundColor: loading ? "var(--ink-muted)" : "var(--teal)",
+          border: "none",
+          borderRadius: "3px",
+          padding: "8px 18px",
+          cursor: loading ? "not-allowed" : "pointer",
+        }}
+      >
+        {loading ? "Extracting..." : "Extract with AI"}
+      </button>
+
+      {result && (
+        <div style={{ marginTop: "20px" }}>
+
+          {/* Summary */}
+          {result.summary && (
+            <div
+              style={{
+                backgroundColor: "var(--gold-soft)",
+                border: "1px solid var(--gold)",
+                borderRadius: "4px",
+                padding: "14px 16px",
+                marginBottom: "16px",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "15px",
+                  fontWeight: 400,
+                  color: "var(--ink)",
+                  margin: "0 0 8px",
+                }}
+              >
+                Meeting Summary
+              </p>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  lineHeight: 1.7,
+                  color: "var(--ink-mid)",
+                  margin: 0,
+                }}
+              >
+                {result.summary}
+              </p>
+            </div>
+          )}
+
+          {/* Action Items */}
+          {result.actionItems.length > 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <p
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-muted)",
+                  margin: "0 0 10px",
+                }}
+              >
+                Action Items Extracted
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {result.actionItems.map((item: ExtractedActionItem, i: number) => (
+                  <div
+                    key={i}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "3px",
+                      padding: "10px 12px",
+                      backgroundColor: "var(--bg-card)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p
+                          style={{
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "13px",
+                            fontWeight: 500,
+                            color: "var(--ink)",
+                            margin: "0 0 4px",
+                          }}
+                        >
+                          {item.title}
+                        </p>
+                        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                          {item.assigneeName && (
+                            <span
+                              style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: "10px",
+                                color: "var(--ink-muted)",
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              → {item.assigneeName}
+                            </span>
+                          )}
+                          {item.dueDateText && (
+                            <span
+                              style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: "10px",
+                                color: "var(--ink-muted)",
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              Due: {item.dueDateText}
+                            </span>
+                          )}
+                          {item.requirementName && (
+                            <span
+                              style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: "10px",
+                                color: "var(--gold)",
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              #{item.requirementName}
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              fontFamily: "'DM Mono', monospace",
+                              fontSize: "9px",
+                              fontWeight: 600,
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              color: PRIORITY_BADGE_COLORS[item.priority] ?? "var(--ink-muted)",
+                            }}
+                          >
+                            {item.priority}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAddActionItem(item, i)}
+                        disabled={addingIndex === i || addedIndices.has(i)}
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "9px",
+                          fontWeight: 500,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: addedIndices.has(i) ? "var(--teal)" : "#fff",
+                          backgroundColor: addedIndices.has(i)
+                            ? "transparent"
+                            : addingIndex === i
+                            ? "var(--ink-muted)"
+                            : "var(--accent)",
+                          border: addedIndices.has(i) ? "1px solid var(--teal)" : "none",
+                          borderRadius: "3px",
+                          padding: "5px 10px",
+                          cursor: addingIndex === i || addedIndices.has(i) ? "default" : "pointer",
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {addedIndices.has(i) ? "Added ✓" : addingIndex === i ? "Adding…" : "→ Add to Meeting"}
+                      </button>
+                    </div>
+                    {!item.requirementId && item.requirementName && (
+                      <p
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "9px",
+                          color: "var(--ink-muted)",
+                          margin: "6px 0 0",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Link requirement manually after saving.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Commitments */}
+          {result.commitments.length > 0 && (
+            <div>
+              <p
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-muted)",
+                  margin: "0 0 10px",
+                }}
+              >
+                Commitments
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {result.commitments.map((c: ExtractedCommitment, i: number) => (
+                  <div
+                    key={i}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "3px",
+                      padding: "10px 12px",
+                      backgroundColor: "var(--teal-soft)",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: "13px",
+                        color: "var(--ink)",
+                        margin: "0 0 4px",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {c.text}
+                    </p>
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                      {c.party && (
+                        <span
+                          style={{
+                            fontFamily: "'DM Mono', monospace",
+                            fontSize: "10px",
+                            color: "var(--teal)",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          {c.party}
+                        </span>
+                      )}
+                      {c.requirementName && (
+                        <span
+                          style={{
+                            fontFamily: "'DM Mono', monospace",
+                            fontSize: "10px",
+                            color: "var(--gold)",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          #{c.requirementName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -614,15 +1180,18 @@ function MeetingCard({
   projectId,
   slug,
   stakeholders,
+  requirements,
 }: {
   meeting: MeetingRow;
   projectId: string;
   slug: string;
   stakeholders: StakeholderRow[];
+  requirements?: RequirementOption[];
 }) {
   const [expanded, setExpanded] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItemRow[]>(meeting.actionItems);
   const [showAddAction, setShowAddAction] = useState(false);
+  const [showExtract, setShowExtract] = useState(false);
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: "4px", marginBottom: "12px", overflow: "hidden" }}>
@@ -687,12 +1256,20 @@ function MeetingCard({
               <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 500, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--ink-muted)", margin: 0 }}>
                 Action Items
               </p>
-              <button
-                onClick={() => setShowAddAction((v) => !v)}
-                style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-              >
-                + Add
-              </button>
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                <button
+                  onClick={() => setShowExtract((v) => !v)}
+                  style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--teal)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                >
+                  ✦ Extract Insights
+                </button>
+                <button
+                  onClick={() => setShowAddAction((v) => !v)}
+                  style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                >
+                  + Add
+                </button>
+              </div>
             </div>
 
             {actionItems.length === 0 && !showAddAction && (
@@ -709,6 +1286,7 @@ function MeetingCard({
                 slug={slug}
                 meetingId={meeting.id}
                 stakeholders={stakeholders}
+                requirements={requirements}
                 onCreated={(a) => { setActionItems((prev) => [...prev, a]); setShowAddAction(false); }}
                 onCancel={() => setShowAddAction(false)}
               />
@@ -716,13 +1294,25 @@ function MeetingCard({
           </div>
         </div>
       )}
+
+      {/* Extract Insights Panel */}
+      {expanded && showExtract && (
+        <ExtractInsightsPanel
+          meetingId={meeting.id}
+          projectId={projectId}
+          slug={slug}
+          requirements={requirements}
+          stakeholders={stakeholders}
+          onActionItemAdded={(a) => setActionItems((prev) => [...prev, a])}
+        />
+      )}
     </div>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders }: Props) {
+export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, requirements }: Props) {
   const [meetings, setMeetings] = useState<MeetingRow[]>(initialMeetings);
   const [showForm, setShowForm] = useState(false);
 
@@ -732,7 +1322,7 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders }: 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
         <div>
           <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)", margin: "0 0 2px" }}>
-            Meetings
+            Deal Meetings
           </p>
           <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink-muted)", margin: 0 }}>
             {meetings.length} logged
@@ -768,9 +1358,63 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders }: 
 
       {/* Meeting list */}
       {meetings.length === 0 && !showForm && (
-        <div style={{ border: "1px solid var(--border)", borderRadius: "4px", padding: "40px 24px", textAlign: "center" }}>
-          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--ink-muted)", margin: 0 }}>
-            No meetings logged yet. Log a meeting to track attendees and action items.
+        <div
+          style={{
+            backgroundColor: "var(--gold-soft)",
+            border: "1px solid var(--gold)",
+            borderRadius: "4px",
+            padding: "20px 24px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--gold)",
+              margin: "0 0 8px",
+            }}
+          >
+            Why Log Meetings
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "18px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 10px",
+            }}
+          >
+            Build your EXIM engagement record from day one
+          </p>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              color: "var(--ink-mid)",
+              margin: "0 0 10px",
+              lineHeight: 1.6,
+              maxWidth: "560px",
+            }}
+          >
+            EXIM due diligence reviewers assess how actively the sponsor has engaged with EXIM
+            staff, legal counsel, and deal counterparties. Logging deal meetings here creates a
+            timestamped record of every EXIM-related conversation, and each meeting can carry
+            action items that drive workplan progress forward.
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "11px",
+              color: "var(--ink-mid)",
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            Log your first meeting above — include attendees, summary, and any open action items.
           </p>
         </div>
       )}
@@ -782,6 +1426,7 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders }: 
           projectId={projectId}
           slug={slug}
           stakeholders={stakeholders}
+          requirements={requirements}
         />
       ))}
     </div>

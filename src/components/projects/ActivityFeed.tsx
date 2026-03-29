@@ -1,142 +1,223 @@
-import type { ActivityEventRow } from "@/lib/db/activity";
+import { getProjectActivity, type ActivityEventRow } from "@/lib/db/activity";
 
-const EVENT_ICONS: Record<string, string> = {
-  requirement_status_changed: "◆",
-  stage_advanced:             "▲",
-  project_updated:            "✎",
-  project_created:            "★",
-  stakeholder_added:          "●",
-  stakeholder_removed:        "○",
-  stakeholder_updated:        "✎",
-  document_request_added:     "↗",
-  document_request_updated:   "◆",
-};
-
-const EVENT_COLORS: Record<string, string> = {
-  requirement_status_changed: "var(--ink-muted)",
-  stage_advanced:             "var(--teal)",
-  project_updated:            "var(--gold)",
-  project_created:            "var(--accent)",
-  stakeholder_added:          "var(--teal)",
-  stakeholder_removed:        "var(--ink-muted)",
-  stakeholder_updated:        "var(--gold)",
-  document_request_added:     "var(--accent)",
-  document_request_updated:   "var(--teal)",
-};
-
-function timeAgo(date: Date): string {
-  const now = Date.now();
-  const diff = now - new Date(date).getTime();
-  const mins = Math.floor(diff / 60_000);
-  const hours = Math.floor(diff / 3_600_000);
-  const days = Math.floor(diff / 86_400_000);
-
-  if (mins < 1)   return "just now";
-  if (mins < 60)  return `${mins}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7)   return `${days}d ago`;
-  return new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function formatTimestamp(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(date));
 }
 
-type Props = {
-  events: ActivityEventRow[];
+function formatEventType(eventType: string): string {
+  return eventType.replace(/_/g, " ");
+}
+
+type ActivityFeedProps = {
+  projectId?: string;
+  events?: ActivityEventRow[];
 };
 
-export function ActivityFeed({ events }: Props) {
-  return (
-    <div style={{ marginBottom: "32px" }}>
-      <p className="eyebrow" style={{ marginBottom: "20px" }}>Activity</p>
+const PREVIEW_COUNT = 4;
 
-      {events.length === 0 ? (
-        <p
+function ActivityRow({ event }: { event: ActivityEventRow }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "6px",
+        padding: "10px 0",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "10px",
+          flexWrap: "wrap",
+        }}
+      >
+        <span
           style={{
             fontFamily: "'DM Mono', monospace",
-            fontSize: "11px",
+            fontSize: "10px",
             letterSpacing: "0.08em",
             color: "var(--ink-muted)",
-            textTransform: "uppercase",
           }}
         >
-          No activity yet — changes will appear here
+          {formatTimestamp(event.createdAt)}
+        </span>
+        <span
+          style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "9px",
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--ink-muted)",
+            border: "1px solid var(--border)",
+            borderRadius: "999px",
+            padding: "3px 8px",
+            backgroundColor: "color-mix(in srgb, var(--teal) 6%, var(--bg-card))",
+          }}
+        >
+          {formatEventType(event.eventType)}
+        </span>
+      </div>
+      <p
+        style={{
+          margin: 0,
+          fontFamily: "'Inter', sans-serif",
+          fontSize: "13px",
+          lineHeight: 1.55,
+          color: "var(--ink)",
+        }}
+      >
+        {event.summary}
+      </p>
+    </div>
+  );
+}
+
+export async function ActivityFeed({ projectId, events }: ActivityFeedProps) {
+  let resolvedEvents = events ?? [];
+  let errorMessage: string | null = null;
+
+  if (!events && projectId) {
+    const result = await getProjectActivity(projectId);
+    if (result.ok) {
+      resolvedEvents = result.value;
+    } else {
+      errorMessage = result.error.message;
+    }
+  }
+
+  const previewEvents = resolvedEvents.slice(0, PREVIEW_COUNT);
+  const overflowEvents = resolvedEvents.slice(PREVIEW_COUNT);
+  const hasOverflow = overflowEvents.length > 0;
+  const totalLabel = resolvedEvents.length === 1 ? "1 event" : `${resolvedEvents.length} events`;
+
+  return (
+    <div style={{ marginBottom: "32px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "space-between",
+          gap: "16px",
+          flexWrap: "wrap",
+          marginBottom: "16px",
+        }}
+      >
+        <div style={{ display: "grid", gap: "4px" }}>
+          <p className="eyebrow" style={{ marginBottom: 0 }}>
+            Deal Activity
+          </p>
+          <p
+            style={{
+              margin: 0,
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+            }}
+          >
+            {totalLabel} loaded · latest {previewEvents.length} shown
+          </p>
+        </div>
+      </div>
+
+      {errorMessage ? (
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "'Inter', sans-serif",
+            fontSize: "13px",
+            lineHeight: 1.6,
+            color: "var(--accent)",
+          }}
+        >
+          Failed to load activity: {errorMessage}
+        </p>
+      ) : resolvedEvents.length === 0 ? (
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "'Inter', sans-serif",
+            fontSize: "13px",
+            lineHeight: 1.6,
+            color: "var(--ink-muted)",
+          }}
+        >
+          No activity yet. Actions you take on this deal will appear here.
         </p>
       ) : (
-        <div style={{ position: "relative" }}>
-          {/* Vertical line */}
-          <div
-            style={{
-              position: "absolute",
-              left: "7px",
-              top: "8px",
-              bottom: "8px",
-              width: "1px",
-              backgroundColor: "var(--border)",
-            }}
-          />
+        <div
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "12px 16px",
+          }}
+        >
+          <div style={{ display: "grid" }}>
+            {previewEvents.map((event, index) => (
+              <div
+                key={event.id}
+                style={{
+                  borderTop: index === 0 ? "none" : "1px solid var(--border)",
+                }}
+              >
+                <ActivityRow event={event} />
+              </div>
+            ))}
+          </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
-            {events.map((event, i) => {
-              const icon = EVENT_ICONS[event.eventType] ?? "·";
-              const color = EVENT_COLORS[event.eventType] ?? "var(--ink-muted)";
+          {hasOverflow ? (
+            <details
+              style={{
+                marginTop: "2px",
+                borderTop: "1px solid var(--border)",
+                paddingTop: "10px",
+              }}
+            >
+              <summary
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "10px",
+                  cursor: "pointer",
+                  listStyle: "none",
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "9px",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-muted)",
+                }}
+              >
+                <span>Show {overflowEvents.length} more</span>
+                <span aria-hidden="true" style={{ fontSize: "12px", lineHeight: 1 }}>
+                  ▾
+                </span>
+              </summary>
 
-              return (
-                <div
-                  key={event.id}
-                  style={{
-                    display: "flex",
-                    gap: "16px",
-                    alignItems: "flex-start",
-                    paddingBottom: i < events.length - 1 ? "16px" : "0",
-                  }}
-                >
-                  {/* Dot */}
+              <div style={{ display: "grid", marginTop: "2px" }}>
+                {overflowEvents.map((event, index) => (
                   <div
+                    key={event.id}
                     style={{
-                      width: "15px",
-                      height: "15px",
-                      borderRadius: "50%",
-                      backgroundColor: "var(--bg-card)",
-                      border: "1px solid var(--border)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                      marginTop: "1px",
-                      position: "relative",
-                      zIndex: 1,
+                      borderTop: index === 0 ? "none" : "1px solid var(--border)",
                     }}
                   >
-                    <span style={{ fontSize: "6px", color, lineHeight: 1 }}>{icon}</span>
+                    <ActivityRow event={event} />
                   </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        fontFamily: "'Inter', sans-serif",
-                        fontSize: "13px",
-                        color: "var(--ink)",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {event.label}
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "10px",
-                        letterSpacing: "0.06em",
-                        color: "var(--ink-muted)",
-                        marginLeft: "10px",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {timeAgo(event.createdAt)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
         </div>
       )}
     </div>

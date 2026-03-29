@@ -2,8 +2,8 @@
  * Database seed script.
  *
  * Populates:
- *   1. All 36 EximRequirement rows from the taxonomy source of truth.
- *   2. One demo Organization and Project with all 36 requirement statuses
+ *   1. All 43 EximRequirement rows from the taxonomy source of truth.
+ *   2. One demo Organization and Project with all 43 requirement statuses
  *      initialized to not_started.
  *
  * Run with: npx prisma db seed

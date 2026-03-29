@@ -4,6 +4,7 @@ import {
   CSSProperties,
   FormEvent,
   KeyboardEvent as ReactKeyboardEvent,
+  UIEvent as ReactUIEvent,
   useEffect,
   useRef,
   useState,
@@ -135,6 +136,33 @@ function CloseGlyph() {
   );
 }
 
+function ChevronGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ width: "16px", height: "16px" }}>
+      <path
+        d="m6 9 6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LoadingEllipsis() {
+  return (
+    <motion.span
+      animate={{ opacity: [0.25, 1, 0.25] }}
+      transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+      style={{ display: "inline-block" }}
+      aria-hidden="true"
+    >
+      …
+    </motion.span>
+  );
+}
+
 export function ChatWidget({
   presetQuestions,
   title = "Lodestar Assistant",
@@ -146,21 +174,52 @@ export function ChatWidget({
   context,
 }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isPresetQuestionsExpanded, setIsPresetQuestionsExpanded] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+  const [viewportWidth, setViewportWidth] = useState(0);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    function updateViewportWidth() {
+      setViewportWidth(window.innerWidth);
+    }
+
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  const isCompactViewport = viewportWidth > 0 && viewportWidth < 640;
 
   useEffect(() => {
     if (!isOpen) return;
+
     const node = messagesRef.current;
     if (!node) return;
+
     node.scrollTop = node.scrollHeight;
-  }, [isOpen, messages]);
+    setIsPinnedToBottom(true);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!isPinnedToBottom) return;
+
+    const node = messagesRef.current;
+    if (!node) return;
+
+    node.scrollTop = node.scrollHeight;
+  }, [isOpen, isPinnedToBottom, isStreaming, messages]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -187,7 +246,15 @@ export function ChatWidget({
     return () => abortRef.current?.abort();
   }, []);
 
-  async function sendMessage(question: string) {
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
+
+  async function sendMessage(question: string, collapsePresets = false) {
     const trimmed = question.trim();
     if (!trimmed || isStreaming) return;
 
@@ -207,6 +274,10 @@ export function ChatWidget({
     setError(null);
     setInput("");
     setIsOpen(true);
+    if (collapsePresets) setIsPresetQuestionsExpanded(false);
+    setExpandedSources({});
+    setCopiedMessageId(null);
+    setIsPinnedToBottom(true);
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setIsStreaming(true);
 
@@ -290,6 +361,7 @@ export function ChatWidget({
           }
 
           if (event.type === "sources") {
+            setExpandedSources({});
             setMessages((current) =>
               current.map((message) =>
                 message.id === assistantMessageId
@@ -347,6 +419,34 @@ export function ChatWidget({
       event.preventDefault();
       void sendMessage(input);
     }
+  }
+
+  function toggleSources(messageId: string) {
+    setExpandedSources((current) => ({
+      ...current,
+      [messageId]: !current[messageId],
+    }));
+  }
+
+  async function copyMessage(messageId: string, content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(messageId);
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedMessageId((current) => (current === messageId ? null : current));
+      }, 1400);
+    } catch {
+      setCopiedMessageId(null);
+    }
+  }
+
+  function handleMessagesScroll(event: ReactUIEvent<HTMLDivElement>) {
+    const node = event.currentTarget;
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    setIsPinnedToBottom(distanceFromBottom <= 24);
   }
 
   return (
@@ -445,54 +545,101 @@ export function ChatWidget({
               </div>
             </div>
 
-            <div
-              className="chat-widget-chip-row"
-              style={{
-                display: "flex",
-                gap: "8px",
-                padding: "12px 14px",
-                overflowX: "auto",
-                overflowY: "hidden",
-                borderBottom: "1px solid var(--border)",
-                backgroundColor: "color-mix(in srgb, var(--accent) 3%, var(--bg-card))",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                maskImage: "linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%)",
-                WebkitMaskImage: "linear-gradient(to right, transparent 0, black 12px, black calc(100% - 12px), transparent 100%)",
-              }}
-            >
-              {presetQuestions.map((preset) => (
+            {presetQuestions.length > 0 ? (
+              <div
+                style={{
+                  borderBottom: "1px solid var(--border)",
+                  backgroundColor: "color-mix(in srgb, var(--accent) 3%, var(--bg-card))",
+                }}
+              >
                 <button
-                  key={preset.id}
                   type="button"
-                  onClick={() => void sendMessage(preset.question)}
-                  disabled={isStreaming}
+                  onClick={() => setIsPresetQuestionsExpanded((current) => !current)}
                   style={{
-                    flexShrink: 0,
-                    borderRadius: "999px",
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--bg-card)",
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    padding: "10px 14px",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
                     color: "var(--ink)",
-                    padding: "8px 12px",
-                    fontSize: "12px",
-                    lineHeight: 1.3,
-                    cursor: isStreaming ? "not-allowed" : "pointer",
-                    opacity: isStreaming ? 0.6 : 1,
-                    whiteSpace: "nowrap",
                   }}
                 >
-                  {preset.label}
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      letterSpacing: "0.10em",
+                      textTransform: "uppercase",
+                      color: "var(--ink-muted)",
+                    }}
+                  >
+                    Preset questions ({presetQuestions.length})
+                  </span>
+                  <motion.span
+                    animate={{ rotate: isPresetQuestionsExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    style={{ display: "inline-flex", color: "var(--ink-muted)" }}
+                  >
+                    <ChevronGlyph />
+                  </motion.span>
                 </button>
-              ))}
-            </div>
-            <style>{`
-              .chat-widget-chip-row::-webkit-scrollbar {
-                display: none;
-              }
-            `}</style>
+
+                <AnimatePresence initial={false}>
+                  {isPresetQuestionsExpanded ? (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.18, ease: "easeOut" }}
+                      style={{ overflow: "hidden" }}
+                    >
+                      <div
+                        className="chat-widget-chip-row"
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "8px",
+                          padding: "0 14px 12px",
+                        }}
+                      >
+                        {presetQuestions.map((preset) => (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => void sendMessage(preset.question, true)}
+                            disabled={isStreaming}
+                            style={{
+                              borderRadius: "999px",
+                              border: "1px solid var(--border)",
+                              backgroundColor: "var(--bg-card)",
+                              color: "var(--ink)",
+                              padding: "7px 11px",
+                              fontSize: "12px",
+                              lineHeight: 1.35,
+                              cursor: isStreaming ? "not-allowed" : "pointer",
+                              opacity: isStreaming ? 0.6 : 1,
+                              whiteSpace: "normal",
+                              textAlign: "left",
+                              maxWidth: "100%",
+                            }}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  ) : null}
+                </AnimatePresence>
+              </div>
+            ) : null}
 
             <div
               ref={messagesRef}
+              onScroll={handleMessagesScroll}
               style={{
                 overflowY: "auto",
                 padding: "16px 14px",
@@ -521,32 +668,86 @@ export function ChatWidget({
               ) : (
                 messages.map((message) => {
                   const isUser = message.role === "user";
+                  const isSourcesExpanded = expandedSources[message.id] ?? false;
+                  const canCopy = !isUser && message.content.length > 0;
                   return (
                     <div
                       key={message.id}
                       style={{
                         alignSelf: isUser ? "flex-end" : "flex-start",
-                        maxWidth: "88%",
+                        maxWidth: isUser
+                          ? isCompactViewport
+                            ? "92%"
+                            : "88%"
+                          : isCompactViewport
+                          ? "100%"
+                          : "88%",
+                        minWidth: isUser ? (isCompactViewport ? "0" : "180px") : isCompactViewport ? "0" : "220px",
                         borderRadius: isUser
                           ? "16px 16px 4px 16px"
                           : "16px 16px 16px 4px",
                         border: `1px solid ${
                           isUser
-                            ? "color-mix(in srgb, var(--accent) 25%, var(--border))"
-                            : "var(--border)"
+                            ? "color-mix(in srgb, var(--accent) 40%, var(--border))"
+                            : "color-mix(in srgb, var(--accent) 18%, var(--border))"
                         }`,
                         backgroundColor: isUser
-                          ? "color-mix(in srgb, var(--accent) 10%, var(--bg-card))"
-                          : "var(--bg-card)",
+                          ? "color-mix(in srgb, var(--accent) 14%, var(--bg-card))"
+                          : "color-mix(in srgb, var(--accent) 4%, var(--bg-card))",
                         padding: "10px 12px",
                         color: "var(--ink)",
                         fontSize: "13px",
                         lineHeight: 1.65,
                         whiteSpace: "pre-wrap",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+                        overflowWrap: "anywhere",
+                        boxShadow: isUser
+                          ? "0 10px 24px rgba(0,0,0,0.08)"
+                          : "0 8px 18px rgba(0,0,0,0.05)",
                       }}
                     >
-                      {message.content || (isStreaming && !isUser ? "Thinking..." : "")}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: "10px",
+                        }}
+                      >
+                        <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                          {message.content ? (
+                            message.content
+                          ) : isStreaming && !isUser ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <span>Thinking</span>
+                              <LoadingEllipsis />
+                            </span>
+                          ) : (
+                            ""
+                          )}
+                        </div>
+
+                        {canCopy ? (
+                          <button
+                            type="button"
+                            onClick={() => void copyMessage(message.id, message.content)}
+                            style={{
+                              flexShrink: 0,
+                              borderRadius: "999px",
+                              border: "1px solid var(--border)",
+                              backgroundColor: "transparent",
+                              color: copiedMessageId === message.id ? "var(--accent)" : "var(--ink-muted)",
+                              padding: "4px 8px",
+                              fontFamily: "'DM Mono', monospace",
+                              fontSize: "9px",
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {copiedMessageId === message.id ? "Copied" : "Copy"}
+                          </button>
+                        ) : null}
+                      </div>
 
                       {!isUser && message.citations && message.citations.length > 0 && (
                         <div
@@ -558,8 +759,18 @@ export function ChatWidget({
                             gap: "6px",
                           }}
                         >
-                          <div
+                          <button
+                            type="button"
+                            onClick={() => toggleSources(message.id)}
                             style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "8px",
+                              padding: 0,
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
                               fontFamily: "'DM Mono', monospace",
                               fontSize: "10px",
                               letterSpacing: "0.08em",
@@ -567,27 +778,83 @@ export function ChatWidget({
                               color: "var(--ink-muted)",
                             }}
                           >
-                            Sources
-                          </div>
-                          {message.citations.map((citation) => (
-                            <a
-                              key={`${message.id}-${citation.url}`}
-                              href={citation.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                color: "var(--accent)",
-                                textDecoration: "none",
-                                fontSize: "12px",
-                                lineHeight: 1.5,
-                              }}
+                            <span>Sources ({message.citations.length})</span>
+                            <motion.span
+                              animate={{ rotate: isSourcesExpanded ? 180 : 0 }}
+                              transition={{ duration: 0.18, ease: "easeOut" }}
+                              style={{ display: "inline-flex" }}
                             >
-                              {citation.title}
-                              {citation.sourceType === "official_exim"
-                                ? " · Official EXIM"
-                                : " · App"}
-                            </a>
-                          ))}
+                              <ChevronGlyph />
+                            </motion.span>
+                          </button>
+
+                          <AnimatePresence initial={false}>
+                            {isSourcesExpanded ? (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.18, ease: "easeOut" }}
+                                style={{ overflow: "hidden" }}
+                              >
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gap: "6px",
+                                  }}
+                                >
+                                  {message.citations.map((citation, citationIndex) => (
+                                    <a
+                                      key={`${message.id}-${citation.url}-${citationIndex}`}
+                                      href={citation.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        display: "grid",
+                                        gridTemplateColumns: isCompactViewport ? "1fr" : "minmax(0, 1fr) auto",
+                                        alignItems: "center",
+                                        gap: "8px",
+                                        color: "var(--accent)",
+                                        textDecoration: "none",
+                                        fontSize: "11px",
+                                        lineHeight: 1.35,
+                                        padding: "6px 8px",
+                                        borderRadius: "8px",
+                                        border: "1px solid var(--border)",
+                                        backgroundColor: "color-mix(in srgb, var(--accent) 3%, var(--bg-card))",
+                                        overflowWrap: "anywhere",
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          minWidth: 0,
+                                          overflow: "hidden",
+                                          textOverflow: isCompactViewport ? "clip" : "ellipsis",
+                                          whiteSpace: isCompactViewport ? "normal" : "nowrap",
+                                          wordBreak: "break-word",
+                                        }}
+                                      >
+                                        {citation.title}
+                                      </span>
+                                      <span
+                                        style={{
+                                          fontFamily: "'DM Mono', monospace",
+                                          fontSize: "8px",
+                                          letterSpacing: "0.08em",
+                                          textTransform: "uppercase",
+                                          color: "var(--ink-muted)",
+                                          flexShrink: 0,
+                                          justifySelf: isCompactViewport ? "start" : "end",
+                                        }}
+                                      >
+                                        {citation.sourceType === "official_exim" ? "EXIM" : "App"}
+                                      </span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            ) : null}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>
@@ -633,9 +900,19 @@ export function ChatWidget({
                     minHeight: "18px",
                     fontSize: "11px",
                     color: error ? "var(--accent)" : "var(--ink-muted)",
+                    fontFamily: error ? "'Inter', sans-serif" : "'DM Mono', monospace",
                   }}
                 >
-                  {error ?? (isStreaming ? "Streaming response..." : "Enter to send, Shift+Enter for a new line.")}
+                  {error ? (
+                    error
+                  ) : isStreaming ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <span>Streaming response</span>
+                      <LoadingEllipsis />
+                    </span>
+                  ) : (
+                    "Enter to send, Shift+Enter for a new line."
+                  )}
                 </div>
 
                 <button

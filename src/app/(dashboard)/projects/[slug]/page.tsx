@@ -20,6 +20,15 @@ import { DocumentPanel } from "@/components/documents/DocumentPanel";
 import { getProjectDocuments } from "@/lib/db/documents";
 import { MeetingsLog } from "@/components/meetings/MeetingsLog";
 import { getProjectMeetings } from "@/lib/db/meetings";
+import { EpcBidsPanel } from "@/components/projects/EpcBidsPanel";
+import { getProjectEpcBids } from "@/lib/db/epc-bids";
+import { FunderWorkspace } from "@/components/projects/FunderWorkspace";
+import { getProjectFunders } from "@/lib/db/funders";
+import { getProjectDealParties } from "@/lib/db/deal-parties";
+import { getProjectMilestones } from "@/lib/db/milestones";
+import { MilestonePanel } from "@/components/projects/MilestonePanel";
+import { CollaboratorsPanel } from "@/components/projects/CollaboratorsPanel";
+import { getProjectMembers } from "@/lib/db/members";
 import { GanttChart } from "@/components/projects/GanttChart";
 import { ProjectNav } from "@/components/projects/ProjectNav";
 import { TourGuide } from "@/components/projects/TourGuide";
@@ -47,16 +56,26 @@ export default async function ProjectPage({
   }
   const rows = reqResult.value;
 
-  const [activityResult, stakeholdersResult, documentsResult, meetingsResult] = await Promise.all([
+  const [activityResult, stakeholdersResult, documentsResult, meetingsResult, epcBidsResult, fundersResult, membersResult, dealPartiesResult, milestonesResult] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
     getProjectDocuments(project.id),
     getProjectMeetings(project.id),
+    getProjectEpcBids(project.id),
+    getProjectFunders(project.id),
+    getProjectMembers(project.id),
+    getProjectDealParties(project.id),
+    getProjectMilestones(project.id),
   ]);
   const activityEvents = activityResult.ok ? activityResult.value : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
   const documents = documentsResult.ok ? documentsResult.value : [];
   const meetings = meetingsResult.ok ? meetingsResult.value : [];
+  const epcBids = epcBidsResult.ok ? epcBidsResult.value : [];
+  const funders = fundersResult.ok ? fundersResult.value : [];
+  const members = membersResult.ok ? membersResult.value : [];
+  const dealParties = dealPartiesResult.ok ? dealPartiesResult.value : [];
+  const milestones = milestonesResult.ok ? milestonesResult.value : [];
 
   const serializableProject: SerializableProject = {
     id: project.id,
@@ -98,9 +117,9 @@ export default async function ProjectPage({
       <TourGuide />
       <ChatWidget
         presetQuestions={chatPresets}
-        title="Project Assistant"
-        subtitle="Ask about this project page, readiness, or EXIM terms in context."
-        pageContext={`Project detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. Readiness ${(scoreBps / 100).toFixed(1)}%. LOI blockers ${loiBlockers.length}.`}
+        title="Deal Assistant"
+        subtitle="Ask about this deal page, readiness, or EXIM terms in context."
+        pageContext={`Deal detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. EXIM readiness ${(scoreBps / 100).toFixed(1)}%. EXIM LOI blockers ${loiBlockers.length}.`}
         context={{ page: "project_detail", projectId: project.id, projectSlug: project.slug }}
       />
 
@@ -117,9 +136,18 @@ export default async function ProjectPage({
             textDecoration: "none",
           }}
         >
-          ← Projects
+          ← Deals
         </Link>
       </div>
+
+      {/* Collaborators */}
+      <CollaboratorsPanel
+        projectId={project.id}
+        slug={project.slug}
+        ownerClerkId={project.ownerClerkId}
+        currentUserId={userId}
+        initialMembers={members}
+      />
 
       {/* Project header */}
       <section id="section-overview" style={{ marginBottom: "40px" }}>
@@ -271,6 +299,24 @@ export default async function ProjectPage({
         projectId={project.id}
         slug={project.slug}
         initialStakeholders={stakeholders}
+        initialDealParties={dealParties}
+      />
+
+      {/* EPC Qualification */}
+      <div id="section-epc" />
+      <EpcBidsPanel
+        projectId={project.id}
+        slug={project.slug}
+        initialBids={epcBids}
+      />
+
+      {/* Funder Workspace */}
+      <FunderWorkspace
+        projectId={project.id}
+        slug={project.slug}
+        initialFunders={funders}
+        requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
+        capexUsdCents={project.capexUsdCents != null ? Number(project.capexUsdCents) : null}
       />
 
       {/* Edit / advance controls */}
@@ -293,7 +339,7 @@ export default async function ProjectPage({
         }}
       >
         {[
-          { label: "Stage", value: project.stage.replace(/_/g, " ") },
+          { label: "Deal Phase", value: project.stage.replace(/_/g, " ") },
           { label: "Country", value: project.countryCode },
           { label: "Sector", value: project.sector },
           {
@@ -361,6 +407,14 @@ export default async function ProjectPage({
       {/* LOI blockers */}
       {!loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
 
+      {/* Deal Milestones */}
+      <MilestonePanel
+        projectId={project.id}
+        slug={project.slug}
+        initialMilestones={milestones}
+        anchorDate={project.targetLoiDate?.toISOString() ?? project.createdAt.toISOString()}
+      />
+
       {/* Timeline / Gantt chart */}
       <section
         id="section-timeline"
@@ -372,12 +426,18 @@ export default async function ProjectPage({
           marginBottom: "24px",
         }}
       >
-        <p className="eyebrow" style={{ marginBottom: "20px" }}>Timeline</p>
+        <p className="eyebrow" style={{ marginBottom: "20px" }}>Deal Timeline</p>
         <GanttChart
           rows={rows}
           projectCreatedAt={project.createdAt}
           targetLoiDate={project.targetLoiDate}
           targetCloseDate={project.targetCloseDate}
+          milestones={milestones.map((m) => ({
+            id: m.id,
+            name: m.name,
+            targetDate: m.targetDate,
+            completedAt: m.completedAt,
+          }))}
         />
       </section>
 
@@ -430,7 +490,7 @@ export default async function ProjectPage({
               lineHeight: 1.3,
             }}
           >
-            Begin building your EXIM data room
+            Begin building your deal data room
           </p>
           <p
             style={{
@@ -442,9 +502,9 @@ export default async function ProjectPage({
               maxWidth: "560px",
             }}
           >
-            Your readiness score starts at 0%. Work through the requirements below — focus
-            on the <strong>LOI</strong>-flagged items first, as those are gating for your
-            Letter of Interest submission. Mark each item as it progresses from
+            Your EXIM deal readiness score starts at 0%. Work through the deal workplan items below — focus
+            on the <strong>EXIM LOI</strong>-flagged items first, as those are gating for your
+            EXIM Letter of Interest submission. Mark each item as it progresses from
             In Progress → Draft → Substantially Final → Executed.
           </p>
           <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
@@ -482,7 +542,22 @@ export default async function ProjectPage({
 
       {/* Requirements checklist */}
       <section id="section-requirements">
-        <RequirementsChecklist projectId={project.id} slug={project.slug} rows={rows} documents={documents} />
+        <RequirementsChecklist
+          projectId={project.id}
+          slug={project.slug}
+          rows={rows}
+          documents={documents}
+          stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
+          organizations={Array.from(
+            new Map(
+              stakeholders
+                .filter((s): s is typeof s & { organizationId: string; organizationName: string } =>
+                  s.organizationId !== null && s.organizationName !== null
+                )
+                .map((s) => [s.organizationId, { id: s.organizationId, name: s.organizationName }])
+            ).values()
+          )}
+        />
       </section>
 
       {/* Meetings log */}
@@ -492,6 +567,11 @@ export default async function ProjectPage({
           slug={project.slug}
           initialMeetings={meetings}
           stakeholders={stakeholders}
+          requirements={rows.map((r) => ({
+            requirementId: r.requirementId,
+            name: r.name,
+            status: r.status,
+          }))}
         />
       </section>
 

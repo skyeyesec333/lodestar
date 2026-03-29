@@ -5,40 +5,43 @@ import type { Result } from "@/types";
 export type ActivityEventRow = {
   id: string;
   eventType: string;
-  label: string;
-  metadata: Record<string, unknown> | null;
+  summary: string;
   createdAt: Date;
+  clerkUserId: string;
 };
 
 export async function recordActivity(
   projectId: string,
   clerkUserId: string,
   eventType: string,
-  label: string,
+  summary: string,
   metadata?: Prisma.InputJsonObject
 ): Promise<void> {
   await db.activityEvent.create({
-    data: { projectId, clerkUserId, eventType, label, metadata: metadata ?? undefined },
+    data: { projectId, clerkUserId, eventType, label: summary, metadata: metadata ?? undefined },
     select: { id: true },
   });
 }
 
 export async function getProjectActivity(
   projectId: string,
-  limit = 40
+  limit = 50
 ): Promise<Result<ActivityEventRow[]>> {
   try {
     const rows = await db.activityEvent.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
       take: limit,
-      select: { id: true, eventType: true, label: true, metadata: true, createdAt: true },
+      select: { id: true, eventType: true, label: true, createdAt: true, clerkUserId: true },
     });
     return {
       ok: true,
-      value: rows.map((r) => ({
-        ...r,
-        metadata: (r.metadata as Record<string, unknown>) ?? null,
+      value: rows.map((row) => ({
+        id: row.id,
+        eventType: row.eventType,
+        summary: row.label,
+        createdAt: row.createdAt,
+        clerkUserId: row.clerkUserId,
       })),
     };
   } catch (err) {

@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
+import { SearchBar } from "@/components/ui/SearchBar";
 
-const VALID_THEMES = ["parchment", "minimal", "navy", "forest", "slate"] as const;
+const VALID_THEMES = ["parchment", "minimal", "navy", "forest", "slate", "obsidian", "midnight", "ember", "sky_blue"] as const;
 type ThemeId = (typeof VALID_THEMES)[number];
 
 export default async function DashboardLayout({
@@ -49,8 +50,7 @@ export default async function DashboardLayout({
             </span>
           </Link>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
-            <ThemeSwitcher current={theme} />
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
             <Link
               href="/projects"
               style={{
@@ -65,6 +65,22 @@ export default async function DashboardLayout({
             >
               Projects
             </Link>
+            <Link
+              href="/experts"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                fontWeight: 500,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "var(--nav-link)",
+                textDecoration: "none",
+              }}
+            >
+              Expert Network
+            </Link>
+            <SearchBar />
+            <ThemeSwitcher current={theme} />
           </div>
         </div>
       </header>

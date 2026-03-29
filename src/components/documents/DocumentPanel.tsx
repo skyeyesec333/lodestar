@@ -3,6 +3,7 @@
 import { useState, useRef, useTransition } from "react";
 import type { DocumentRow } from "@/lib/db/documents";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
+import type { DocumentReviewResult } from "@/lib/ai/document-review";
 
 type Props = {
   projectId: string;
@@ -46,6 +47,12 @@ export function DocumentPanel({
   const [dragOver, setDragOver] = useState(false);
   const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // AI Review state
+  const [reviewOpenId, setReviewOpenId] = useState<string | null>(null);
+  const [reviewContexts, setReviewContexts] = useState<Record<string, string>>({});
+  const [reviewResults, setReviewResults] = useState<Record<string, DocumentReviewResult>>({});
+  const [reviewLoading, setReviewLoading] = useState<string | null>(null);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -97,7 +104,28 @@ export function DocumentPanel({
     a.click();
   }
 
-  const title = requirementName ? `Documents · ${requirementName}` : "Documents";
+  async function handleRunReview(docId: string) {
+    setReviewLoading(docId);
+    try {
+      const res = await fetch("/api/documents/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: docId,
+          projectId,
+          additionalContext: reviewContexts[docId] ?? "",
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json() as DocumentReviewResult;
+        setReviewResults((prev) => ({ ...prev, [docId]: result }));
+      }
+    } finally {
+      setReviewLoading(null);
+    }
+  }
+
+  const title = requirementName ? `Data Room · ${requirementName}` : "Data Room";
 
   return (
     <div
@@ -179,42 +207,91 @@ export function DocumentPanel({
 
       {/* Drop zone — shown when empty */}
       {documents.length === 0 && (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-          onClick={() => inputRef.current?.click()}
-          style={{
-            padding: "40px 24px",
-            textAlign: "center",
-            cursor: "pointer",
-            backgroundColor: dragOver ? "var(--accent-soft)" : "transparent",
-            border: dragOver ? "1px dashed var(--accent)" : "none",
-            transition: "background-color 0.15s",
-          }}
-        >
-          <p
+        <>
+          <div
             style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: "13px",
-              color: "var(--ink-muted)",
-              margin: 0,
+              backgroundColor: "var(--gold-soft)",
+              borderBottom: "1px solid var(--gold)",
+              padding: "18px 24px",
             }}
           >
-            Drag & drop a file here, or click to browse
-          </p>
-          <p
+            <p
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px",
+                fontWeight: 500,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--gold)",
+                margin: "0 0 7px",
+              }}
+            >
+              EXIM Data Room Files
+            </p>
+            <p
+              style={{
+                fontFamily: "'DM Serif Display', Georgia, serif",
+                fontSize: "17px",
+                fontWeight: 400,
+                color: "var(--ink)",
+                margin: "0 0 8px",
+              }}
+            >
+              Link every data room file to its workplan item
+            </p>
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "13px",
+                color: "var(--ink-mid)",
+                margin: "0 0 8px",
+                lineHeight: 1.6,
+                maxWidth: "520px",
+              }}
+            >
+              EXIM data room files include executed contracts, feasibility studies,
+              environmental impact assessments, and financial models. Upload each file and
+              link it to the corresponding workplan item so reviewers can trace every
+              data room file directly to its EXIM requirement.
+            </p>
+            <p
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                color: "var(--ink-mid)",
+                margin: 0,
+                lineHeight: 1.5,
+              }}
+            >
+              Accepted: PDF · DOC · XLS · PPT · images · up to 50 MB
+            </p>
+          </div>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+            onClick={() => inputRef.current?.click()}
             style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "10px",
-              color: "var(--ink-muted)",
-              margin: "6px 0 0",
-              letterSpacing: "0.06em",
+              padding: "32px 24px",
+              textAlign: "center",
+              cursor: "pointer",
+              backgroundColor: dragOver ? "var(--accent-soft)" : "transparent",
+              border: dragOver ? "1px dashed var(--accent)" : "none",
+              transition: "background-color 0.15s",
             }}
           >
-            PDF · DOC · XLS · PPT · images · up to 50 MB
-          </p>
-        </div>
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "13px",
+                color: "var(--ink-muted)",
+                margin: 0,
+              }}
+            >
+              Drag & drop a file here, or click to browse
+            </p>
+          </div>
+        </>
       )}
 
       {/* File list */}
@@ -227,15 +304,15 @@ export function DocumentPanel({
             onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
           >
             {documents.map((doc, i) => (
+              <div key={doc.id}>
               <div
-                key={doc.id}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "12px",
                   padding: "12px 24px",
                   borderBottom:
-                    i < documents.length - 1 ? "1px solid var(--border)" : undefined,
+                    i < documents.length - 1 && reviewOpenId !== doc.id ? "1px solid var(--border)" : undefined,
                 }}
               >
                 {/* Icon badge */}
@@ -327,6 +404,26 @@ export function DocumentPanel({
                     Download
                   </button>
                   <button
+                    onClick={() =>
+                      setReviewOpenId((prev) => (prev === doc.id ? null : doc.id))
+                    }
+                    title="AI Review"
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "var(--ink-muted)",
+                      backgroundColor: "transparent",
+                      border: "1px solid var(--border)",
+                      borderRadius: "3px",
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    AI Review
+                  </button>
+                  <button
                     onClick={() => handleDelete(doc.id)}
                     title="Delete"
                     style={{
@@ -344,6 +441,69 @@ export function DocumentPanel({
                     Delete
                   </button>
                 </div>
+              </div>
+
+              {/* Inline AI Review panel */}
+              {reviewOpenId === doc.id && (
+
+                <div
+                  style={{
+                    padding: "16px 24px",
+                    borderTop: "1px solid var(--border)",
+                    backgroundColor: "var(--bg-card)",
+                  }}
+                >
+                  <textarea
+                    placeholder="Additional context (optional)"
+                    value={reviewContexts[doc.id] ?? ""}
+                    onChange={(e) =>
+                      setReviewContexts((prev) => ({
+                        ...prev,
+                        [doc.id]: e.target.value,
+                      }))
+                    }
+                    rows={2}
+                    style={{
+                      width: "100%",
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "13px",
+                      color: "var(--ink)",
+                      backgroundColor: "var(--bg-card)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "3px",
+                      padding: "8px 10px",
+                      resize: "vertical",
+                      boxSizing: "border-box",
+                      marginBottom: "10px",
+                    }}
+                  />
+                  <button
+                    onClick={() => handleRunReview(doc.id)}
+                    disabled={reviewLoading === doc.id}
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "#fff",
+                      backgroundColor:
+                        reviewLoading === doc.id ? "var(--teal-soft)" : "var(--teal)",
+                      border: "none",
+                      borderRadius: "3px",
+                      padding: "6px 14px",
+                      cursor: reviewLoading === doc.id ? "not-allowed" : "pointer",
+                      opacity: reviewLoading === doc.id ? 0.7 : 1,
+                    }}
+                  >
+                    {reviewLoading === doc.id ? "Reviewing..." : "Run AI Review"}
+                  </button>
+
+                  {/* Review results */}
+                  {reviewResults[doc.id] && (
+                    <ReviewResultDisplay result={reviewResults[doc.id]} />
+                  )}
+                </div>
+              )}
               </div>
             ))}
           </div>
@@ -368,6 +528,236 @@ export function DocumentPanel({
           >
             {uploadError}
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ReviewResultDisplay — shown inline below the AI Review run button
+// ---------------------------------------------------------------------------
+
+type AssessmentMeta = {
+  label: string;
+  color: string;
+  bg: string;
+};
+
+function assessmentMeta(
+  value: DocumentReviewResult["overallAssessment"]
+): AssessmentMeta {
+  switch (value) {
+    case "substantially_final":
+      return { label: "Substantially Final", color: "var(--teal)", bg: "var(--teal-soft)" };
+    case "needs_work":
+      return { label: "Needs Work", color: "var(--gold)", bg: "var(--gold-soft)" };
+    case "early_draft":
+      return { label: "Early Draft", color: "var(--accent)", bg: "var(--accent-soft)" };
+    case "cannot_assess":
+      return { label: "Cannot Assess", color: "var(--ink-muted)", bg: "var(--bg-card)" };
+  }
+}
+
+function severityColor(severity: "blocking" | "major" | "minor"): string {
+  switch (severity) {
+    case "blocking":
+      return "var(--accent)";
+    case "major":
+      return "var(--gold)";
+    case "minor":
+      return "var(--ink-muted)";
+  }
+}
+
+function ReviewResultDisplay({ result }: { result: DocumentReviewResult }) {
+  const meta = assessmentMeta(result.overallAssessment);
+
+  return (
+    <div style={{ marginTop: "16px" }}>
+      {/* Assessment badge */}
+      <div style={{ marginBottom: "10px" }}>
+        <span
+          style={{
+            fontFamily: "'DM Mono', monospace",
+            fontSize: "10px",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: meta.color,
+            backgroundColor: meta.bg,
+            border: `1px solid ${meta.color}`,
+            borderRadius: "3px",
+            padding: "3px 10px",
+          }}
+        >
+          {meta.label}
+        </span>
+      </div>
+
+      {/* Summary */}
+      <p
+        style={{
+          fontFamily: "'Inter', sans-serif",
+          fontSize: "14px",
+          color: "var(--ink-mid)",
+          margin: "0 0 14px",
+          lineHeight: 1.6,
+        }}
+      >
+        {result.summary}
+      </p>
+
+      {/* Gaps */}
+      {result.gaps.length > 0 && (
+        <div style={{ marginBottom: "14px" }}>
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              margin: "0 0 8px",
+            }}
+          >
+            GAPS IDENTIFIED
+          </p>
+          {result.gaps.map((gap, idx) => (
+            <div
+              key={idx}
+              style={{
+                marginBottom: "10px",
+                paddingLeft: "10px",
+                borderLeft: `2px solid ${severityColor(gap.severity)}`,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                <span
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "9px",
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: severityColor(gap.severity),
+                  }}
+                >
+                  {gap.severity}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "var(--ink)",
+                  }}
+                >
+                  {gap.issue}
+                </span>
+              </div>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "12px",
+                  color: "var(--ink-mid)",
+                  margin: "0 0 2px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {gap.recommendation}
+              </p>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "11px",
+                  color: "var(--ink-muted)",
+                  fontStyle: "italic",
+                  margin: 0,
+                }}
+              >
+                {gap.eximStandard}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Strengths */}
+      {result.strengths.length > 0 && (
+        <div style={{ marginBottom: "14px" }}>
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              margin: "0 0 8px",
+            }}
+          >
+            STRENGTHS
+          </p>
+          {result.strengths.map((strength, idx) => (
+            <div key={idx} style={{ display: "flex", gap: "6px", marginBottom: "4px" }}>
+              <span
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "12px",
+                  color: "var(--teal)",
+                  flexShrink: 0,
+                }}
+              >
+                ✓
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink-mid)",
+                }}
+              >
+                {strength}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Next steps */}
+      {result.nextSteps.length > 0 && (
+        <div>
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              margin: "0 0 8px",
+            }}
+          >
+            NEXT STEPS
+          </p>
+          <ol style={{ margin: 0, paddingLeft: "18px" }}>
+            {result.nextSteps.map((step, idx) => (
+              <li
+                key={idx}
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink-mid)",
+                  marginBottom: "4px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {step}
+              </li>
+            ))}
+          </ol>
         </div>
       )}
     </div>

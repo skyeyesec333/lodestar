@@ -53,6 +53,11 @@ export type ProjectSummary = Pick<
   | "createdAt"
 >;
 
+export type ProjectListItem = ProjectSummary & {
+  capexUsdCents: bigint | null;
+  lastActivityAt: Date | null;
+};
+
 export type ProjectListSort =
   | "created_desc"
   | "name_asc"

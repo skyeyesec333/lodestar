@@ -41,6 +41,7 @@ export type StakeholderRow = {
   email: string | null;
   phone: string | null;
   title: string | null;
+  organizationId: string | null;
   organizationName: string | null;
   organizationWebsite: string | null;
   organizationCountryCode: string | null;
@@ -81,6 +82,7 @@ export async function getProjectStakeholders(
             title: true,
             organization: {
               select: {
+                id: true,
                 name: true,
                 website: true,
                 countryCode: true,
@@ -213,6 +215,7 @@ export async function getProjectStakeholders(
         email: r.stakeholder.email,
         phone: r.stakeholder.phone,
         title: r.stakeholder.title,
+        organizationId: r.stakeholder.organization?.id ?? null,
         organizationName: r.stakeholder.organization?.name ?? null,
         organizationWebsite: r.stakeholder.organization?.website ?? null,
         organizationCountryCode: r.stakeholder.organization?.countryCode ?? null,

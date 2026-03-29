@@ -33,6 +33,12 @@ export interface EximRequirementDef {
   readonly isLoiCritical: boolean;
   readonly weight: number;
   readonly sortOrder: number;
+  /**
+   * Sectors this requirement applies to. Null = applies to all sectors.
+   * When a project's sector is not in this list, the requirement should be
+   * automatically marked not_applicable and excluded from scoring.
+   */
+  readonly applicableSectors?: readonly string[];
 }
 
 // ─── Contracts ───────────────────────────────────────────────
@@ -98,11 +104,12 @@ const contracts: readonly EximRequirementDef[] = [
     category: "contracts",
     name: "Fuel / Feedstock Supply Agreement",
     description:
-      "Long-term supply contract for project inputs (gas, coal, feedstock). Applicable to thermal power and industrial projects. Can be waived for renewables.",
+      "Long-term supply contract for project inputs (gas, coal, feedstock). Applicable to thermal power and industrial projects. Not applicable to renewable energy projects.",
     phaseRequired: "final_commitment",
     isLoiCritical: false,
     weight: 100,
     sortOrder: 6,
+    applicableSectors: ["power", "mining"],
   },
   {
     id: "interconnection_agreement",
@@ -114,6 +121,7 @@ const contracts: readonly EximRequirementDef[] = [
     isLoiCritical: false,
     weight: 75,
     sortOrder: 7,
+    applicableSectors: ["power"],
   },
   {
     id: "insurance_program",
@@ -230,6 +238,39 @@ const financial: readonly EximRequirementDef[] = [
     weight: 50,
     sortOrder: 7,
   },
+  {
+    id: "independent_model_audit",
+    category: "financial",
+    name: "Independent Financial Model Audit",
+    description:
+      "Third-party audit of the sponsor's financial model by an acceptable financial advisor. EXIM's credit team builds their own model but requires an independent audit for large transactions to verify model integrity, formula accuracy, and assumption consistency. Distinct from the sponsor's financial model.",
+    phaseRequired: "final_commitment",
+    isLoiCritical: false,
+    weight: 100,
+    sortOrder: 8,
+  },
+  {
+    id: "tax_structure_opinion",
+    category: "financial",
+    name: "Tax Structure Memorandum",
+    description:
+      "Host-country and cross-border tax analysis covering withholding taxes on debt service, dividends, and capital gains; VAT/GST implications; transfer pricing; and applicable tax treaties. Required for financial close. Typically prepared by a tax advisor or local counsel.",
+    phaseRequired: "final_commitment",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 9,
+  },
+  {
+    id: "intercreditor_agreement",
+    category: "financial",
+    name: "Intercreditor / Co-Financing Agreement",
+    description:
+      "Agreement governing the rights, rankings, and remedies of all project lenders (EXIM, DFI, commercial bank) relative to one another. Addresses voting thresholds, waterfall priority, step-in rights, and subordination. Required when more than one lender is participating in the financing.",
+    phaseRequired: "final_commitment",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 10,
+  },
 ] as const;
 
 // ─── Studies ─────────────────────────────────────────────────
@@ -301,11 +342,34 @@ const studies: readonly EximRequirementDef[] = [
     weight: 75,
     sortOrder: 6,
   },
+  {
+    id: "resource_assessment",
+    category: "studies",
+    name: "Independent Resource Assessment (P50/P90)",
+    description:
+      "Independent energy yield or resource assessment for renewable energy projects, providing P50 (median expected production) and P90 (conservative 90th-percentile) estimates. Required for solar, wind, hydro, and geothermal projects. Prepared by an independent resource assessor (DNV, 3E, Black & Veatch, etc.). EXIM's IE and lenders size debt using P90 production levels.",
+    phaseRequired: "loi",
+    isLoiCritical: false,
+    weight: 100,
+    sortOrder: 7,
+    applicableSectors: ["power"],
+  },
 ] as const;
 
 // ─── Permits ─────────────────────────────────────────────────
 
 const permits: readonly EximRequirementDef[] = [
+  {
+    id: "cls_eligibility",
+    category: "permits",
+    name: "Country Limitation Schedule (CLS) Clearance",
+    description:
+      "Verification that the project country is 'open for cover' on EXIM's Country Limitation Schedule. A closed or prohibited country is an absolute eligibility bar — no further work should advance until CLS clearance is confirmed. The CLS is updated periodically; sponsors must confirm the current status.",
+    phaseRequired: "loi",
+    isLoiCritical: true,
+    weight: 100,
+    sortOrder: 1,
+  },
   {
     id: "host_government_approval",
     category: "permits",
@@ -315,7 +379,7 @@ const permits: readonly EximRequirementDef[] = [
     phaseRequired: "loi",
     isLoiCritical: true,
     weight: 150,
-    sortOrder: 1,
+    sortOrder: 2,
   },
   {
     id: "environmental_permits",
@@ -326,7 +390,7 @@ const permits: readonly EximRequirementDef[] = [
     phaseRequired: "final_commitment",
     isLoiCritical: false,
     weight: 100,
-    sortOrder: 2,
+    sortOrder: 3,
   },
   {
     id: "construction_permits",
@@ -337,7 +401,7 @@ const permits: readonly EximRequirementDef[] = [
     phaseRequired: "final_commitment",
     isLoiCritical: false,
     weight: 75,
-    sortOrder: 3,
+    sortOrder: 4,
   },
   {
     id: "operating_license",
@@ -348,7 +412,7 @@ const permits: readonly EximRequirementDef[] = [
     phaseRequired: "final_commitment",
     isLoiCritical: false,
     weight: 75,
-    sortOrder: 4,
+    sortOrder: 5,
   },
   {
     id: "fx_approval",
@@ -359,7 +423,7 @@ const permits: readonly EximRequirementDef[] = [
     phaseRequired: "final_commitment",
     isLoiCritical: false,
     weight: 75,
-    sortOrder: 5,
+    sortOrder: 6,
   },
 ] as const;
 
@@ -393,11 +457,33 @@ const corporate: readonly EximRequirementDef[] = [
     category: "corporate",
     name: "KYC / AML / Sanctions Screening",
     description:
-      "Know Your Customer, Anti-Money Laundering, and OFAC sanctions screening on all project parties. EXIM conducts its own review but expects sponsors to perform initial due diligence.",
+      "Know Your Customer, Anti-Money Laundering, and OFAC/SDN sanctions screening on all project parties (sponsors, obligors, guarantors, key counterparties). EXIM conducts its own review but expects sponsors to perform and document initial due diligence including beneficial ownership disclosure.",
     phaseRequired: "loi",
     isLoiCritical: false,
-    weight: 100,
+    weight: 75,
     sortOrder: 3,
+  },
+  {
+    id: "fcpa_compliance",
+    category: "corporate",
+    name: "FCPA / Anti-Corruption Due Diligence",
+    description:
+      "Foreign Corrupt Practices Act compliance review covering all agents, intermediaries, government officials, and third parties involved in the transaction. EXIM's policies explicitly require FCPA compliance certification. Typically conducted by US legal counsel.",
+    phaseRequired: "loi",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 4,
+  },
+  {
+    id: "loi_application",
+    category: "corporate",
+    name: "EXIM LOI Application & Preliminary Information Memo",
+    description:
+      "The formal Letter of Interest application submitted to EXIM, including the Preliminary Information Memo (PIM). The PIM summarizes the project, sponsor, transaction structure, US-content breakdown, and financing request. EXIM's LOI guidelines specify the required content. This item tracks assembly and submission readiness of the application package itself.",
+    phaseRequired: "loi",
+    isLoiCritical: true,
+    weight: 150,
+    sortOrder: 5,
   },
   {
     id: "corporate_authorizations",
@@ -408,7 +494,7 @@ const corporate: readonly EximRequirementDef[] = [
     phaseRequired: "final_commitment",
     isLoiCritical: false,
     weight: 50,
-    sortOrder: 4,
+    sortOrder: 6,
   },
 ] as const;
 
@@ -464,9 +550,12 @@ const environmental_social: readonly EximRequirementDef[] = [
 // ─── Combined taxonomy ──────────────────────────────────────
 
 /**
- * The complete EXIM requirements taxonomy. 36 items across 6 categories.
+ * The complete EXIM requirements taxonomy. 43 items across 6 categories.
  * This array is the source of truth — the seed script and scoring logic
  * both read from here.
+ *
+ * Items with `applicableSectors` should be automatically marked not_applicable
+ * for projects whose sector is not in the list. See scoring/index.ts.
  */
 export const EXIM_REQUIREMENTS: readonly EximRequirementDef[] = [
   ...contracts,
