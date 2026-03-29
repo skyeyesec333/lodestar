@@ -18,6 +18,7 @@ import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
 import type { Result, AppError } from "@/types";
 import type { RequirementStatusValue } from "@/types/requirements";
+import { assertProjectAccess } from "@/lib/db/project-access";
 
 const STATUS_VALUES = [
   "not_started",
@@ -60,17 +61,8 @@ export async function updateRequirementStatus(
   const { projectId, requirementId, status, note } = parsed.data;
 
   // Verify ownership and get slug for revalidation
-  const project = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true, slug: true },
-  });
-
-  if (!project) {
-    return {
-      ok: false,
-      error: { code: "NOT_FOUND", message: "Project not found." },
-    };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const updateResult = await updateRequirementStatusInDb(
     projectId,
@@ -107,7 +99,7 @@ export async function updateRequirementStatus(
     await addRequirementNote(projectId, requirementId, userId, note.trim(), status);
   }
 
-  revalidatePath(`/projects/${project.slug}`);
+  revalidatePath(`/projects/${access.value.slug}`);
 
   return { ok: true, value: { scoreBps } };
 }
@@ -142,22 +134,13 @@ export async function updateRequirementNotes(
 
   const { projectId, requirementId, notes } = parsed.data;
 
-  const project = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true, slug: true },
-  });
-
-  if (!project) {
-    return {
-      ok: false,
-      error: { code: "NOT_FOUND", message: "Project not found." },
-    };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await updateRequirementNotesInDb(projectId, requirementId, notes);
   if (!result.ok) return result;
 
-  revalidatePath(`/projects/${project.slug}`);
+  revalidatePath(`/projects/${access.value.slug}`);
 
   return { ok: true, value: undefined };
 }
@@ -193,22 +176,13 @@ export async function addRequirementNoteAction(
 
   const { projectId, requirementId, note, statusSnapshot } = parsed.data;
 
-  const project = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true, slug: true },
-  });
-
-  if (!project) {
-    return {
-      ok: false,
-      error: { code: "NOT_FOUND", message: "Project not found." },
-    };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await addRequirementNote(projectId, requirementId, userId, note, statusSnapshot);
   if (!result.ok) return result;
 
-  revalidatePath(`/projects/${project.slug}`);
+  revalidatePath(`/projects/${access.value.slug}`);
 
   return result;
 }
@@ -248,17 +222,8 @@ export async function updateRequirementResponsibilityAction(
 
   const { projectId, requirementId, slug, responsibleOrganizationId, responsibleStakeholderId, targetDate, isApplicable, applicabilityReason } = parsed.data;
 
-  const project = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true },
-  });
-
-  if (!project) {
-    return {
-      ok: false,
-      error: { code: "NOT_FOUND", message: "Project not found." },
-    };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await updateRequirementResponsibility(projectId, requirementId, {
     responsibleOrganizationId: responsibleOrganizationId ?? null,
@@ -269,7 +234,7 @@ export async function updateRequirementResponsibilityAction(
   });
   if (!result.ok) return result;
 
-  revalidatePath(`/projects/${slug}`);
+  revalidatePath(`/projects/${slug || access.value.slug}`);
 
   return { ok: true, value: undefined };
 }

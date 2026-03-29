@@ -1,11 +1,18 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import {
+  detailMicroMonoStyle,
+  detailMonoLabelStyle,
+  detailSerifTitleStyle,
+  detailSurfaceCardStyle,
+} from "./projectDetailStyles";
 
 type Props = {
   scoreBps: number;
   loiReady: boolean;
   categoryScores: Record<string, number>;
+  dealType?: string;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -34,7 +41,8 @@ function scoreColor(bps: number): string {
 
 const DURATION = 900; // ms
 
-export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Props) {
+export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealType }: Props) {
+  const isExim = !dealType || dealType === "exim_project_finance";
   const [displayed, setDisplayed] = useState(0);
   const [mounted, setMounted] = useState(false);
   const startTime = useRef<number | null>(null);
@@ -67,38 +75,45 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
       scoreBps: categoryScores[key],
     }))
     .filter((entry) => typeof entry.scoreBps === "number");
+  const strongestCategory =
+    orderedCategoryScores.length > 0
+      ? [...orderedCategoryScores].sort((a, b) => b.scoreBps - a.scoreBps)[0]
+      : null;
+  const weakestCategory =
+    orderedCategoryScores.length > 0
+      ? [...orderedCategoryScores].sort((a, b) => a.scoreBps - b.scoreBps)[0]
+      : null;
 
   return (
     <div
       style={{
-        backgroundColor: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: "4px",
-        padding: "40px 48px",
+        ...detailSurfaceCardStyle("4px"),
+        padding: "32px 36px",
         marginBottom: "32px",
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "64px" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(180px, 280px) minmax(0, 1fr)",
+          alignItems: "start",
+          gap: "24px",
+        }}
+      >
         {/* Score */}
-        <div style={{ minWidth: "180px" }}>
+        <div style={{ minWidth: 0 }}>
           <p
             style={{
-              fontFamily: "'DM Mono', monospace",
+              ...detailMonoLabelStyle,
               fontSize: "10px",
-              fontWeight: 500,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "var(--ink-muted)",
               margin: "0 0 8px",
             }}
           >
-            EXIM Deal Readiness
+            {isExim ? "EXIM Deal Readiness" : "Deal Readiness"}
           </p>
           <p
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontSize: "72px",
-              fontWeight: 400,
+              ...detailSerifTitleStyle("64px"),
               color,
               margin: "0 0 4px",
               lineHeight: 1,
@@ -113,11 +128,9 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
           <div style={{ marginTop: "16px" }}>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
+                ...detailMonoLabelStyle,
                 fontSize: "10px",
-                fontWeight: 500,
                 letterSpacing: "0.10em",
-                textTransform: "uppercase",
                 color: loiReady ? "var(--teal)" : "var(--gold)",
                 backgroundColor: loiReady ? "var(--teal-soft)" : "var(--gold-soft)",
                 padding: "4px 10px",
@@ -129,7 +142,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
           </div>
 
           {orderedCategoryScores.length > 0 ? (
-            <div style={{ marginTop: "24px", display: "grid", gap: "10px" }}>
+            <div style={{ marginTop: "20px", display: "grid", gap: "10px" }}>
               {orderedCategoryScores.map((entry) => (
                 <div key={entry.key} style={{ display: "grid", gap: "5px" }}>
                   <div
@@ -142,19 +155,17 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
                   >
                     <span
                       style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "9px",
+                        ...detailMonoLabelStyle,
                         letterSpacing: "0.10em",
-                        textTransform: "uppercase",
-                        color: "var(--ink-muted)",
                       }}
                     >
                       {entry.label}
                     </span>
                     <span
                       style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "9px",
+                        ...detailMicroMonoStyle,
+                        fontWeight: 400,
+                        textTransform: "none",
                         color: "var(--ink-mid)",
                       }}
                     >
@@ -186,8 +197,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
         </div>
 
         {/* Progress bar */}
-        <div style={{ flex: 1 }}>
-          {/* Overall bar */}
+        <div style={{ display: "grid", gap: "14px", alignContent: "start" }}>
           <div>
             <div
               style={{
@@ -208,6 +218,63 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores }: Pro
                 }}
               />
             </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: "12px",
+            }}
+          >
+            {[
+              {
+                label: "Gate status",
+                value: loiReady ? "LOI ready" : "LOI pending",
+                tone: loiReady ? "var(--teal)" : "var(--gold)",
+              },
+              {
+                label: "Strongest category",
+                value: strongestCategory ? `${strongestCategory.label} ${(strongestCategory.scoreBps / 100).toFixed(0)}%` : "—",
+                tone: strongestCategory ? "var(--teal)" : "var(--ink-muted)",
+              },
+              {
+                label: "Weakest category",
+                value: weakestCategory ? `${weakestCategory.label} ${(weakestCategory.scoreBps / 100).toFixed(0)}%` : "—",
+                tone: weakestCategory ? "var(--accent)" : "var(--ink-muted)",
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "color-mix(in srgb, var(--bg) 68%, var(--bg-card))",
+                }}
+              >
+                <p
+                  style={{
+                    ...detailMonoLabelStyle,
+                    margin: "0 0 8px",
+                  }}
+                >
+                  {item.label}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    lineHeight: 1.45,
+                    color: item.tone,
+                    margin: 0,
+                  }}
+                >
+                  {item.value}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

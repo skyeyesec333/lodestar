@@ -6,6 +6,10 @@ import type { StakeholderRow } from "@/lib/db/stakeholders";
 import { createMeeting, createActionItem, updateMeetingActionItemStatus } from "@/actions/meetings";
 import { updateRequirementStatus } from "@/actions/requirements";
 import type { MeetingExtractionResult, ExtractedActionItem, ExtractedCommitment } from "@/lib/ai/meeting-extraction";
+import type { CommentRow } from "@/lib/db/comments";
+import type { TeamMember } from "@/types/collaboration";
+import { CommentThread } from "@/components/collaboration/CommentThread";
+import { WatchButton } from "@/components/collaboration/WatchButton";
 
 // ── Provider Connector Banner ─────────────────────────────────────────────────
 
@@ -248,6 +252,12 @@ type Props = {
   initialMeetings: MeetingRow[];
   stakeholders: StakeholderRow[];
   requirements?: RequirementOption[];
+  // Collaboration
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
+  actorName?: string;
+  commentsByMeetingId?: Record<string, CommentRow[]>;
+  watchedMeetingIds?: Set<string>;
 };
 
 const MEETING_TYPE_LABELS: Record<string, string> = {
@@ -1181,12 +1191,22 @@ function MeetingCard({
   slug,
   stakeholders,
   requirements,
+  teamMembers = [],
+  currentUserId,
+  actorName,
+  initialComments = [],
+  initialWatching = false,
 }: {
   meeting: MeetingRow;
   projectId: string;
   slug: string;
   stakeholders: StakeholderRow[];
   requirements?: RequirementOption[];
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
+  actorName?: string;
+  initialComments?: CommentRow[];
+  initialWatching?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [actionItems, setActionItems] = useState<ActionItemRow[]>(meeting.actionItems);
@@ -1214,6 +1234,19 @@ function MeetingCard({
           {actionItems.length > 0 && (
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.06em", color: "var(--gold)" }}>
               {actionItems.filter((a) => a.status === "open" || a.status === "in_progress").length} open
+            </span>
+          )}
+          {/* Watch toggle — stop propagation so click doesn't toggle expand */}
+          {currentUserId && (
+            <span onClick={(e) => e.stopPropagation()}>
+              <WatchButton
+                projectId={projectId}
+                targetType="meeting"
+                targetId={meeting.id}
+                initialWatching={initialWatching}
+                actorName={actorName}
+                variant="icon"
+              />
             </span>
           )}
           <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "12px", color: "var(--ink-muted)" }}>
@@ -1306,13 +1339,33 @@ function MeetingCard({
           onActionItemAdded={(a) => setActionItems((prev) => [...prev, a])}
         />
       )}
+
+      {/* Collaboration comment thread */}
+      {expanded && currentUserId && (
+        <div style={{ borderTop: "1px solid var(--border)", padding: "12px 20px", background: "var(--bg)" }}>
+          <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)", margin: "0 0 10px" }}>
+            Team Comments
+          </p>
+          <CommentThread
+            projectId={projectId}
+            slug={slug}
+            targetType="meeting"
+            targetId={meeting.id}
+            initialComments={initialComments}
+            currentUserId={currentUserId}
+            teamMembers={teamMembers}
+            actorName={actorName}
+            compact
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, requirements }: Props) {
+export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, requirements, teamMembers = [], currentUserId, actorName, commentsByMeetingId = {}, watchedMeetingIds = new Set() }: Props) {
   const [meetings, setMeetings] = useState<MeetingRow[]>(initialMeetings);
   const [showForm, setShowForm] = useState(false);
 
@@ -1427,6 +1480,11 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, re
           slug={slug}
           stakeholders={stakeholders}
           requirements={requirements}
+          teamMembers={teamMembers}
+          currentUserId={currentUserId}
+          actorName={actorName}
+          initialComments={commentsByMeetingId[m.id] ?? []}
+          initialWatching={watchedMeetingIds.has(m.id)}
         />
       ))}
     </div>

@@ -95,6 +95,7 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
       name: data.get("name") as string,
       countryCode: data.get("countryCode") as string,
       sector,
+      dealType: "exim_project_finance",
       capexUsd: capexRaw ? Number(capexRaw) : null,
       eximCoverType: coverType || null,
       targetLoiDate: targetLoiRaw ? new Date(targetLoiRaw) : null,

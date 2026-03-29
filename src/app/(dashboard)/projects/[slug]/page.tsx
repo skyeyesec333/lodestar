@@ -32,9 +32,63 @@ import { getProjectMembers } from "@/lib/db/members";
 import { GanttChart } from "@/components/projects/GanttChart";
 import { ProjectNav } from "@/components/projects/ProjectNav";
 import { TourGuide } from "@/components/projects/TourGuide";
-import { ChatWidget } from "@/components/chat/ChatWidget";
 import { getProjectDetailChatPresets } from "@/lib/ai/chat-presets";
+import { BeaconProvider } from "@/components/beacon/BeaconProvider";
+import { BeaconPanel } from "@/components/beacon/BeaconPanel";
+import { CriticalPathBoard } from "@/components/projects/CriticalPathBoard";
+import { DocumentCoverageMap } from "@/components/projects/DocumentCoverageMap";
+import { OwnershipLoadBoard } from "@/components/projects/OwnershipLoadBoard";
+import { WeeklyDriftPanel } from "@/components/projects/WeeklyDriftPanel";
 import type { RequirementStatusValue } from "@/types/requirements";
+import { getCommentsByProject } from "@/lib/db/comments";
+import { getApprovalsByProject } from "@/lib/db/approvals";
+import { getUserWatchList } from "@/lib/db/watchers";
+import type { TeamMember } from "@/types/collaboration";
+import type { ProjectMemberRow } from "@/lib/db/members";
+
+function roleLabel(role: TeamMember["role"]): string {
+  switch (role) {
+    case "owner":
+      return "Owner";
+    case "editor":
+      return "Editor";
+    case "viewer":
+    default:
+      return "Viewer";
+  }
+}
+
+function fallbackMemberName(clerkUserId: string, role: TeamMember["role"]): string {
+  return `${roleLabel(role)} ${clerkUserId.slice(-4).toUpperCase()}`;
+}
+
+function buildTeamMembers(
+  ownerClerkId: string,
+  members: ProjectMemberRow[]
+): TeamMember[] {
+  const deduped = new Map<string, TeamMember>();
+  deduped.set(ownerClerkId, {
+    clerkUserId: ownerClerkId,
+    name: fallbackMemberName(ownerClerkId, "owner"),
+    email: null,
+    imageUrl: null,
+    role: "owner",
+  });
+
+  for (const member of members) {
+    const role = member.role === "editor" ? "editor" : "viewer";
+    if (member.clerkUserId === ownerClerkId) continue;
+    deduped.set(member.clerkUserId, {
+      clerkUserId: member.clerkUserId,
+      name: fallbackMemberName(member.clerkUserId, role),
+      email: null,
+      imageUrl: null,
+      role,
+    });
+  }
+
+  return Array.from(deduped.values());
+}
 
 export default async function ProjectPage({
   params,
@@ -56,7 +110,20 @@ export default async function ProjectPage({
   }
   const rows = reqResult.value;
 
-  const [activityResult, stakeholdersResult, documentsResult, meetingsResult, epcBidsResult, fundersResult, membersResult, dealPartiesResult, milestonesResult] = await Promise.all([
+  const [
+    activityResult,
+    stakeholdersResult,
+    documentsResult,
+    meetingsResult,
+    epcBidsResult,
+    fundersResult,
+    membersResult,
+    dealPartiesResult,
+    milestonesResult,
+    commentsResult,
+    approvalsResult,
+    watchListResult,
+  ] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
     getProjectDocuments(project.id),
@@ -66,6 +133,9 @@ export default async function ProjectPage({
     getProjectMembers(project.id),
     getProjectDealParties(project.id),
     getProjectMilestones(project.id),
+    getCommentsByProject(project.id),
+    getApprovalsByProject(project.id),
+    getUserWatchList(userId, project.id),
   ]);
   const activityEvents = activityResult.ok ? activityResult.value : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
@@ -76,6 +146,60 @@ export default async function ProjectPage({
   const members = membersResult.ok ? membersResult.value : [];
   const dealParties = dealPartiesResult.ok ? dealPartiesResult.value : [];
   const milestones = milestonesResult.ok ? milestonesResult.value : [];
+  const comments = commentsResult.ok ? commentsResult.value : [];
+  const approvals = approvalsResult.ok ? approvalsResult.value : [];
+  const watchList = watchListResult.ok ? watchListResult.value : [];
+  const teamMembers = buildTeamMembers(project.ownerClerkId, members);
+  const actorName = teamMembers.find((member) => member.clerkUserId === userId)?.name;
+  const teamMemberNamesById = Object.fromEntries(
+    teamMembers.map((member) => [member.clerkUserId, member.name])
+  );
+
+  const commentsByRequirementId: Record<string, typeof comments> = {};
+  const commentsByDocumentId: Record<string, typeof comments> = {};
+  const commentsByMeetingId: Record<string, typeof comments> = {};
+
+  for (const comment of comments) {
+    if (comment.projectRequirementId) {
+      commentsByRequirementId[comment.projectRequirementId] ??= [];
+      commentsByRequirementId[comment.projectRequirementId].push(comment);
+    }
+    if (comment.documentId) {
+      commentsByDocumentId[comment.documentId] ??= [];
+      commentsByDocumentId[comment.documentId].push(comment);
+    }
+    if (comment.meetingId) {
+      commentsByMeetingId[comment.meetingId] ??= [];
+      commentsByMeetingId[comment.meetingId].push(comment);
+    }
+  }
+
+  const approvalsByRequirementId = Object.fromEntries(
+    approvals
+      .filter((approval) => approval.projectRequirementId)
+      .map((approval) => [approval.projectRequirementId!, approval])
+  );
+  const approvalsByDocumentId = Object.fromEntries(
+    approvals
+      .filter((approval) => approval.documentId)
+      .map((approval) => [approval.documentId!, approval])
+  );
+
+  const watchedRequirementIds = new Set(
+    watchList
+      .filter((watch) => watch.targetType === "requirement" && watch.targetId)
+      .map((watch) => watch.targetId!)
+  );
+  const watchedDocumentIds = new Set(
+    watchList
+      .filter((watch) => watch.targetType === "document" && watch.targetId)
+      .map((watch) => watch.targetId!)
+  );
+  const watchedMeetingIds = new Set(
+    watchList
+      .filter((watch) => watch.targetType === "meeting" && watch.targetId)
+      .map((watch) => watch.targetId!)
+  );
 
   const serializableProject: SerializableProject = {
     id: project.id,
@@ -84,6 +208,7 @@ export default async function ProjectPage({
     description: project.description,
     countryCode: project.countryCode,
     sector: project.sector,
+    dealType: project.dealType,
     capexUsdCents: project.capexUsdCents != null ? Number(project.capexUsdCents) : null,
     eximCoverType: project.eximCoverType,
     stage: project.stage,
@@ -104,6 +229,8 @@ export default async function ProjectPage({
       status: r.status as RequirementStatusValue,
     }))
   );
+  const isExim = project.dealType === "exim_project_finance";
+
   const chatPresets = getProjectDetailChatPresets({
     projectName: project.name,
     scoreBps,
@@ -112,16 +239,11 @@ export default async function ProjectPage({
   });
 
   return (
-    <div>
+    <BeaconProvider>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
+    <div style={{ flex: 1, minWidth: 0 }}>
       <ProjectNav />
-      <TourGuide />
-      <ChatWidget
-        presetQuestions={chatPresets}
-        title="Deal Assistant"
-        subtitle="Ask about this deal page, readiness, or EXIM terms in context."
-        pageContext={`Deal detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. EXIM readiness ${(scoreBps / 100).toFixed(1)}%. EXIM LOI blockers ${loiBlockers.length}.`}
-        context={{ page: "project_detail", projectId: project.id, projectSlug: project.slug }}
-      />
+      <TourGuide dealType={project.dealType} />
 
       {/* Breadcrumb */}
       <div style={{ marginBottom: "32px" }}>
@@ -183,8 +305,8 @@ export default async function ProjectPage({
             )}
           </div>
 
-          {/* LOI countdown badge */}
-          {loiDaysRemaining !== null && (
+          {/* LOI countdown badge — EXIM only */}
+          {isExim && loiDaysRemaining !== null && (
             <div
               style={{
                 textAlign: "right",
@@ -260,8 +382,8 @@ export default async function ProjectPage({
           )}
         </div>
 
-        {/* Urgency banner — ≤30 days and not LOI ready */}
-        {loiDaysRemaining !== null && loiDaysRemaining >= 0 && loiDaysRemaining <= 30 && !loiReady && (
+        {/* Urgency banner — EXIM only, ≤30 days and not LOI ready */}
+        {isExim && loiDaysRemaining !== null && loiDaysRemaining >= 0 && loiDaysRemaining <= 30 && !loiReady && (
           <div
             style={{
               display: "flex",
@@ -302,13 +424,17 @@ export default async function ProjectPage({
         initialDealParties={dealParties}
       />
 
-      {/* EPC Qualification */}
-      <div id="section-epc" />
-      <EpcBidsPanel
-        projectId={project.id}
-        slug={project.slug}
-        initialBids={epcBids}
-      />
+      {/* EPC Qualification — EXIM only */}
+      {isExim && (
+        <>
+          <div id="section-epc" />
+          <EpcBidsPanel
+            projectId={project.id}
+            slug={project.slug}
+            initialBids={epcBids}
+          />
+        </>
+      )}
 
       {/* Funder Workspace */}
       <FunderWorkspace
@@ -325,13 +451,13 @@ export default async function ProjectPage({
       </div>
 
       {/* Stage stepper */}
-      <StageStepper current={project.stage} />
+      <StageStepper current={project.stage} dealType={project.dealType} />
 
       {/* Metadata row */}
       <div
         style={{
           display: "flex",
-          gap: "40px",
+          gap: "28px 32px",
           marginBottom: "40px",
           paddingBottom: "32px",
           borderBottom: "1px solid var(--border)",
@@ -349,16 +475,16 @@ export default async function ProjectPage({
                 ? `$${(Number(project.capexUsdCents) / 100_000_000).toFixed(0)}M`
                 : "—",
           },
-          {
+          ...(isExim ? [{
             label: "EXIM Cover",
             value: project.eximCoverType
               ? project.eximCoverType.replace(/_/g, " ")
               : "—",
-          },
+          }] : []),
           {
-            label: "Target LOI",
-            value: project.targetLoiDate
-              ? new Date(project.targetLoiDate).toLocaleDateString("en-US", {
+            label: isExim ? "Target LOI" : "Target Close",
+            value: (isExim ? project.targetLoiDate : (project.targetCloseDate ?? project.targetLoiDate))
+              ? new Date((isExim ? project.targetLoiDate : (project.targetCloseDate ?? project.targetLoiDate))!).toLocaleDateString("en-US", {
                   month: "short",
                   year: "numeric",
                 })
@@ -395,17 +521,104 @@ export default async function ProjectPage({
         ))}
       </div>
 
+      <section style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "16px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Execution</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "24px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            Meetings and recent activity
+          </h2>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: "20px",
+            alignItems: "start",
+          }}
+        >
+          <section id="section-meetings">
+            <MeetingsLog
+              projectId={project.id}
+              slug={project.slug}
+              initialMeetings={meetings}
+              stakeholders={stakeholders}
+              requirements={rows.map((r) => ({
+                requirementId: r.requirementId,
+                name: r.name,
+                status: r.status,
+              }))}
+              teamMembers={teamMembers}
+              currentUserId={userId}
+              actorName={actorName}
+              commentsByMeetingId={commentsByMeetingId}
+              watchedMeetingIds={watchedMeetingIds}
+            />
+          </section>
+
+          <section id="section-activity">
+            <ActivityFeed events={activityEvents} teamMemberNamesById={teamMemberNamesById} />
+          </section>
+        </div>
+      </section>
+
+      <section style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "18px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>PM Signal Layer</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "26px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            Operational visuals for the next gate
+          </h2>
+        </div>
+
+        <WeeklyDriftPanel
+          events={activityEvents}
+          asOf={new Date()}
+          projectCreatedAt={project.createdAt}
+          targetLoiDate={project.targetLoiDate}
+          targetCloseDate={project.targetCloseDate}
+        />
+
+        <CriticalPathBoard
+          rows={rows}
+          referenceDate={new Date()}
+          subtitle="Focus on the requirements most likely to slip the next milestone, with ownership and timing pressure shown inline."
+        />
+
+        <OwnershipLoadBoard
+          requirements={rows}
+          stakeholders={stakeholders}
+          subtitle="Surface owner pressure before coordination debt turns into schedule slip."
+        />
+      </section>
+
       {/* Readiness gauge */}
       <section id="section-readiness">
         <ReadinessGauge
           scoreBps={scoreBps}
           loiReady={loiReady}
           categoryScores={categoryScores}
+          dealType={project.dealType}
         />
       </section>
 
-      {/* LOI blockers */}
-      {!loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
+      {/* LOI blockers — EXIM only */}
+      {isExim && !loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
 
       {/* Deal Milestones */}
       <MilestonePanel
@@ -443,11 +656,22 @@ export default async function ProjectPage({
 
       {/* Documents */}
       <section id="section-documents">
+        <DocumentCoverageMap
+          projectName={project.name}
+          requirementRows={rows}
+          documents={documents}
+        />
         <DocumentPanel
           projectId={project.id}
           slug={project.slug}
           initialDocuments={documents}
           requirementRows={rows}
+          teamMembers={teamMembers}
+          currentUserId={userId}
+          actorName={actorName}
+          commentsByDocumentId={commentsByDocumentId}
+          approvalsByDocumentId={approvalsByDocumentId}
+          watchedDocumentIds={watchedDocumentIds}
         />
       </section>
 
@@ -502,17 +726,21 @@ export default async function ProjectPage({
               maxWidth: "560px",
             }}
           >
-            Your EXIM deal readiness score starts at 0%. Work through the deal workplan items below — focus
-            on the <strong>EXIM LOI</strong>-flagged items first, as those are gating for your
-            EXIM Letter of Interest submission. Mark each item as it progresses from
-            In Progress → Draft → Substantially Final → Executed.
+            {isExim
+              ? <>Your EXIM deal readiness score starts at 0%. Work through the deal workplan items below — focus on the <strong>EXIM LOI</strong>-flagged items first, as those are gating for your EXIM Letter of Interest submission. Mark each item as it progresses from In Progress → Draft → Substantially Final → Executed.</>
+              : <>Your deal readiness score starts at 0%. Work through the workplan items below and mark each as it progresses. Focus on the items flagged as gating for your next milestone first.</>
+            }
           </p>
           <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
-            {[
+            {(isExim ? [
               { step: "01", label: "Set LOI requirements to In Progress" },
               { step: "02", label: "Attach notes to track open questions" },
               { step: "03", label: "Advance items to Substantially Final form" },
-            ].map(({ step, label }) => (
+            ] : [
+              { step: "01", label: "Set workplan items to In Progress" },
+              { step: "02", label: "Attach notes and documents to each item" },
+              { step: "03", label: "Advance items through Draft to Executed" },
+            ]).map(({ step, label }) => (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span
                   style={{
@@ -545,6 +773,7 @@ export default async function ProjectPage({
         <RequirementsChecklist
           projectId={project.id}
           slug={project.slug}
+          dealType={project.dealType}
           rows={rows}
           documents={documents}
           stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
@@ -557,28 +786,24 @@ export default async function ProjectPage({
                 .map((s) => [s.organizationId, { id: s.organizationId, name: s.organizationName }])
             ).values()
           )}
+          teamMembers={teamMembers}
+          currentUserId={userId}
+          actorName={actorName}
+          commentsByRequirementId={commentsByRequirementId}
+          approvalsByRequirementId={approvalsByRequirementId}
+          watchedRequirementIds={watchedRequirementIds}
         />
       </section>
-
-      {/* Meetings log */}
-      <section id="section-meetings" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
-        <MeetingsLog
-          projectId={project.id}
-          slug={project.slug}
-          initialMeetings={meetings}
-          stakeholders={stakeholders}
-          requirements={rows.map((r) => ({
-            requirementId: r.requirementId,
-            name: r.name,
-            status: r.status,
-          }))}
-        />
-      </section>
-
-      {/* Activity feed */}
-      <div id="section-activity" style={{ marginTop: "48px", paddingTop: "40px", borderTop: "1px solid var(--border)" }}>
-        <ActivityFeed events={activityEvents} />
-      </div>
     </div>
+    </div>
+    <BeaconPanel
+      presetQuestions={chatPresets}
+      pageContext={`Deal detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. Deal type ${project.dealType.replace(/_/g, " ")}. Readiness ${(scoreBps / 100).toFixed(1)}%.${isExim ? ` EXIM LOI blockers ${loiBlockers.length}.` : ""}`}
+      context={{ page: "project_detail", projectId: project.id, projectSlug: project.slug }}
+      projectName={project.name}
+      readinessPct={scoreBps / 100}
+      loiBlockerCount={loiBlockers.length}
+    />
+    </BeaconProvider>
   );
 }

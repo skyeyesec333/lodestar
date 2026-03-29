@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import type { ProjectSector, EximCoverType, ProjectPhase } from "@prisma/client";
+import type { ProjectSector, EximCoverType, ProjectPhase, DealType } from "@prisma/client";
 import { createProjectRecord, updateProjectRecord } from "@/lib/db/projects";
 import { recordActivity } from "@/lib/db/activity";
 import { createDemoPortfolioForUser, createDemoProjectForUser } from "@/lib/db/demo";
@@ -35,8 +35,17 @@ const SECTOR_VALUES = [
 
 const COVER_VALUES = ["comprehensive", "political_only"] as const;
 
+const DEAL_TYPE_VALUES = [
+  "exim_project_finance",
+  "commercial_finance",
+  "development_finance",
+  "private_equity",
+  "other",
+] as const;
+
 const createProjectSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(120),
+  dealType: z.enum(DEAL_TYPE_VALUES).default("exim_project_finance"),
   countryCode: z
     .string()
     .length(2, "Country code must be exactly 2 characters")
@@ -105,7 +114,7 @@ export async function createProject(
     };
   }
 
-  const { name, countryCode, sector, capexUsd, eximCoverType, targetLoiDate, description } =
+  const { name, countryCode, sector, dealType, capexUsd, eximCoverType, targetLoiDate, description } =
     parsed.data;
 
   const capexUsdCents =
@@ -117,6 +126,7 @@ export async function createProject(
     description: description ?? null,
     countryCode,
     sector: sector as ProjectSector,
+    dealType: dealType as DealType,
     capexUsdCents,
     eximCoverType: (eximCoverType ?? null) as EximCoverType | null,
     targetLoiDate: targetLoiDate ?? null,

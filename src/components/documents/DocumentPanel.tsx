@@ -4,6 +4,12 @@ import { useState, useRef, useTransition } from "react";
 import type { DocumentRow } from "@/lib/db/documents";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import type { DocumentReviewResult } from "@/lib/ai/document-review";
+import type { CommentRow } from "@/lib/db/comments";
+import type { ApprovalRow } from "@/lib/db/approvals";
+import type { TeamMember } from "@/types/collaboration";
+import { CommentThread } from "@/components/collaboration/CommentThread";
+import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
+import { WatchButton } from "@/components/collaboration/WatchButton";
 
 type Props = {
   projectId: string;
@@ -12,6 +18,13 @@ type Props = {
   requirementName?: string;
   initialDocuments: DocumentRow[];
   requirementRows?: ProjectRequirementRow[];
+  // Collaboration
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
+  actorName?: string;
+  commentsByDocumentId?: Record<string, CommentRow[]>;
+  approvalsByDocumentId?: Record<string, ApprovalRow>;
+  watchedDocumentIds?: Set<string>;
 };
 
 function formatBytes(bytes: number): string {
@@ -36,6 +49,12 @@ export function DocumentPanel({
   requirementName,
   initialDocuments,
   requirementRows,
+  teamMembers = [],
+  currentUserId,
+  actorName,
+  commentsByDocumentId = {},
+  approvalsByDocumentId = {},
+  watchedDocumentIds = new Set(),
 }: Props) {
   // Build a lookup: projectRequirementId (UUID) → requirement name
   const reqNameById = requirementRows
@@ -385,7 +404,30 @@ export function DocumentPanel({
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                <div style={{ display: "flex", gap: "8px", flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
+                  {/* Collaboration: approval + watch */}
+                  {currentUserId && (
+                    <>
+                      <ApprovalBadge
+                        projectId={projectId}
+                        slug={slug}
+                        targetType="document"
+                        targetId={doc.id}
+                        approval={approvalsByDocumentId[doc.id] ?? null}
+                        currentUserId={currentUserId}
+                        actorName={actorName}
+                        canAct
+                      />
+                      <WatchButton
+                        projectId={projectId}
+                        targetType="document"
+                        targetId={doc.id}
+                        initialWatching={watchedDocumentIds.has(doc.id)}
+                        actorName={actorName}
+                        variant="icon"
+                      />
+                    </>
+                  )}
                   <button
                     onClick={() => handleDownload(doc.id, doc.filename)}
                     title="Download"
@@ -502,6 +544,36 @@ export function DocumentPanel({
                   {reviewResults[doc.id] && (
                     <ReviewResultDisplay result={reviewResults[doc.id]} />
                   )}
+                </div>
+              )}
+
+              {/* Collaboration comment thread */}
+              {currentUserId && (
+                <div style={{ borderTop: "1px solid var(--border)", padding: "12px 24px", background: "var(--bg)" }}>
+                  <p
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px",
+                      fontWeight: 500,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: "var(--ink-muted)",
+                      margin: "0 0 10px",
+                    }}
+                  >
+                    Team Comments
+                  </p>
+                  <CommentThread
+                    projectId={projectId}
+                    slug={slug}
+                    targetType="document"
+                    targetId={doc.id}
+                    initialComments={commentsByDocumentId[doc.id] ?? []}
+                    currentUserId={currentUserId}
+                    teamMembers={teamMembers}
+                    actorName={actorName}
+                    compact
+                  />
                 </div>
               )}
               </div>

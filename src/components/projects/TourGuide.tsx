@@ -13,50 +13,58 @@ type TourStep = {
   scrollTo?: boolean;
 };
 
-const PROJECT_TOUR: TourStep[] = [
-  {
-    target: "#section-overview",
-    title: "Project header",
-    body: "Your LOI countdown and urgency alerts live here. The closer to your target date, the more it changes color — red means act now.",
-    placement: "bottom",
-    scrollTo: true,
-  },
-  {
-    target: "#section-readiness",
-    title: "Readiness score",
-    body: "This score reflects how much of EXIM's required data room is in substantially final or executed form. It updates in real-time as you mark requirements.",
-    placement: "bottom",
-    scrollTo: true,
-  },
-  {
-    target: "#section-timeline",
-    title: "Timeline chart",
-    body: "Solid bars show confirmed progress. Dashed bands are AI-predicted completion windows based on current status and your LOI target. Expand it to full screen for all controls.",
-    placement: "bottom",
-    scrollTo: true,
-  },
-  {
-    target: "#section-documents",
-    title: "Documents",
-    body: "Upload project-wide files here, or attach documents directly to individual requirements in the checklist below. Requirement-linked docs show a teal badge.",
-    placement: "bottom",
-    scrollTo: true,
-  },
-  {
-    target: "#section-requirements",
-    title: "Requirements checklist",
-    body: "36 EXIM-required items across 6 categories. Red-left-border items are LOI-critical — they must reach Substantially Final before you can submit. Click the paperclip on any row to attach supporting documents.",
-    placement: "bottom",
-    scrollTo: true,
-  },
-  {
-    target: "#section-meetings",
-    title: "Meetings log",
-    body: "Log every stakeholder meeting, extract action items, and link them to specific requirements. Nothing falls through the cracks.",
-    placement: "top",
-    scrollTo: true,
-  },
-];
+function buildTour(isExim: boolean): TourStep[] {
+  return [
+    {
+      target: "#section-overview",
+      title: "Deal header",
+      body: isExim
+        ? "Your LOI countdown and urgency alerts live here. The closer to your target date, the more it changes color — red means act now."
+        : "Your deal timeline and key milestones live here. Set a target financial close date to activate the countdown.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-readiness",
+      title: "Readiness score",
+      body: isExim
+        ? "This score reflects how much of EXIM's required data room is in substantially final or executed form. It updates in real-time as you mark requirements."
+        : "This score reflects how much of your deal workplan is complete. It updates as you mark items through their stages.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-timeline",
+      title: "Timeline chart",
+      body: "Solid bars show confirmed progress. Dashed bands are AI-predicted completion windows based on current status and your target date. Expand it to full screen for all controls.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-documents",
+      title: "Documents",
+      body: "Upload deal-wide files here, or attach documents directly to individual workplan items below. Requirement-linked docs show a teal badge.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-requirements",
+      title: isExim ? "Requirements checklist" : "Deal workplan",
+      body: isExim
+        ? "36 EXIM-required items across 6 categories. Red-left-border items are LOI-critical — they must reach Substantially Final before you can submit. Click the paperclip on any row to attach supporting documents."
+        : "Your deal workplan tracks all items needed for financing. Click any row to update status, attach documents, or add notes.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-meetings",
+      title: "Meetings log",
+      body: "Log every stakeholder meeting, extract action items, and link them to specific workplan items. Nothing falls through the cracks.",
+      placement: "top",
+      scrollTo: true,
+    },
+  ];
+}
 
 // ─── Spotlight helpers ────────────────────────────────────────────────────────
 
@@ -120,28 +128,37 @@ function calloutPosition(
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "lodestar_tour_done_v1";
 const PAD = 10;
+const TOUR_TRIGGER_TOP = "12px";
 
-export function TourGuide() {
-  const [step, setStep]   = useState<number>(-1);
-  const [rect, setRect]   = useState<Rect | null>(null);
-  const [vpW, setVpW]     = useState(0);
-  const [vpH, setVpH]     = useState(0);
-  const tour              = PROJECT_TOUR;
+export function TourGuide({ dealType }: { dealType?: string }) {
+  const [step, setStep] = useState<number | null>(null);
+  const [rect, setRect] = useState<Rect | null>(null);
+  const [vpW, setVpW] = useState(0);
+  const [vpH, setVpH] = useState(0);
+  const [ganttFullscreen, setGanttFullscreen] = useState(false);
+  const isExim = !dealType || dealType === "exim_project_finance";
+  const tour = buildTour(isExim);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     setVpW(window.innerWidth);
     setVpH(window.innerHeight);
-    const done = localStorage.getItem(STORAGE_KEY);
-    if (!done) {
-      const t = setTimeout(() => setStep(0), 800);
-      return () => clearTimeout(t);
-    }
   }, []);
 
-  const currentStep = step >= 0 && step < tour.length ? tour[step] : null;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleGanttFullscreen = (event: Event) => {
+      const customEvent = event as CustomEvent<{ active?: boolean }>;
+      setGanttFullscreen(Boolean(customEvent.detail?.active));
+    };
+    window.addEventListener("lodestar:gantt-fullscreen", handleGanttFullscreen as EventListener);
+    return () => {
+      window.removeEventListener("lodestar:gantt-fullscreen", handleGanttFullscreen as EventListener);
+    };
+  }, []);
+
+  const currentStep = step !== null && step >= 0 && step < tour.length ? tour[step] : null;
 
   const measureAndScroll = useCallback((s: TourStep) => {
     if (s.scrollTo) {
@@ -167,30 +184,36 @@ export function TourGuide() {
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [step, currentStep, measureAndScroll]);
+  }, [currentStep, measureAndScroll]);
+
+  function startTour() {
+    setRect(null);
+    setStep(0);
+  }
 
   function advance() {
+    if (step === null) return;
     if (step >= tour.length - 1) finish();
-    else { setRect(null); setStep((s) => s + 1); }
+    else {
+      setRect(null);
+      setStep((s) => (s === null ? 0 : s + 1));
+    }
   }
 
   function finish() {
-    localStorage.setItem(STORAGE_KEY, "1");
-    setStep(-1);
+    setStep(null);
     setRect(null);
   }
 
   function restart() {
-    localStorage.removeItem(STORAGE_KEY);
-    setRect(null);
-    setStep(0);
+    startTour();
   }
 
   useEffect(() => {
     (window as Window & { restartTour?: () => void }).restartTour = restart;
   }, []);
 
-  const isActive = step >= 0 && !!currentStep;
+  const isActive = step !== null && !!currentStep;
   const calloutStyle = rect && currentStep
     ? calloutPosition(rect, currentStep.placement, vpW, vpH)
     : { top: "50%", left: "50%", width: 320, transform: "translate(-50%,-50%)" };
@@ -359,7 +382,7 @@ export function TourGuide() {
 
       {/* ── Restart button (shown when tour is inactive) ────────────────────── */}
       <AnimatePresence>
-        {!isActive && (
+        {!isActive && !ganttFullscreen && (
           <motion.button
             key="tour-restart-btn"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -370,9 +393,9 @@ export function TourGuide() {
             title="Start page tour"
             style={{
               position: "fixed",
-              top: "84px",
-              right: "24px",
-              zIndex: 200,
+              top: TOUR_TRIGGER_TOP,
+              right: "16px",
+              zIndex: 1100,
               minHeight: "34px",
               borderRadius: "999px",
               backgroundColor: "var(--bg-card)",

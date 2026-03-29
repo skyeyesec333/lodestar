@@ -8,6 +8,12 @@ import { IFC_REQUIREMENTS } from "@/lib/ifc/requirements";
 import type { IfcRequirementDef } from "@/lib/ifc/requirements";
 import type { ProjectRequirementRow, RequirementNoteRow } from "@/lib/db/requirements";
 import type { DocumentRow } from "@/lib/db/documents";
+import type { CommentRow } from "@/lib/db/comments";
+import type { ApprovalRow } from "@/lib/db/approvals";
+import type { TeamMember } from "@/types/collaboration";
+import { CommentThread } from "@/components/collaboration/CommentThread";
+import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
+import { WatchButton } from "@/components/collaboration/WatchButton";
 
 type StakeholderOption = { id: string; name: string };
 type OrganizationOption = { id: string; name: string };
@@ -40,14 +46,19 @@ const CATEGORY_LABELS: Record<string, string> = {
   environmental_social: "Environmental & Social",
 };
 
-const PHASE_LABELS: Record<string, string> = {
+const EXIM_PHASE_LABELS: Record<string, string> = {
   loi: "EXIM LOI",
   final_commitment: "EXIM Final Commitment",
 };
 
 const IFC_PHASE_LABELS: Record<string, string> = {
-  loi: "IFC LOI",
+  loi: "IFC Board Approval",
   final_commitment: "IFC Financial Close",
+};
+
+const GENERIC_PHASE_LABELS: Record<string, string> = {
+  loi: "Initial Approval",
+  final_commitment: "Financial Close",
 };
 
 const IFC_CATEGORY_LABELS: Record<string, string> = {
@@ -837,11 +848,20 @@ type RequirementsChecklistProps = {
   documents: DocumentRow[];
   stakeholders: StakeholderOption[];
   organizations: OrganizationOption[];
+  dealType?: string;
   program?: ProgramId;
   onProgramChange?: (program: ProgramId) => void;
+  // Collaboration layer
+  teamMembers?: TeamMember[];
+  currentUserId?: string;
+  actorName?: string;
+  commentsByRequirementId?: Record<string, CommentRow[]>;
+  approvalsByRequirementId?: Record<string, ApprovalRow>;
+  watchedRequirementIds?: Set<string>;
 };
 
-export function RequirementsChecklist({ projectId, slug, rows, documents, stakeholders, organizations, program: programProp, onProgramChange }: RequirementsChecklistProps) {
+export function RequirementsChecklist({ projectId, slug, rows, documents, stakeholders, organizations, dealType, program: programProp, onProgramChange, teamMembers = [], currentUserId, actorName, commentsByRequirementId = {}, approvalsByRequirementId = {}, watchedRequirementIds = new Set() }: RequirementsChecklistProps) {
+  const isExim = !dealType || dealType === "exim_project_finance";
   const [activeProgram, setActiveProgram] = useState<ProgramId>(programProp ?? "exim");
 
   function handleProgramChange(p: ProgramId) {
@@ -1034,7 +1054,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
           marginBottom: "24px",
         }}
       >
-        <p className="eyebrow">EXIM Deal Workplan</p>
+        <p className="eyebrow">{isExim ? "EXIM Deal Workplan" : "Deal Workplan"}</p>
         <button
           onClick={() => setCompact((c) => !c)}
           style={{
@@ -1374,6 +1394,11 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
               const isExpandedDocs = expandedDocs.has(row.projectRequirementId);
               const isExpandedResponsibility = expandedResponsibility.has(row.requirementId);
               const threadNotes = noteThreads[row.requirementId] ?? [];
+              // Collaboration
+              const reqComments = commentsByRequirementId[row.projectRequirementId] ?? [];
+              const reqApproval = approvalsByRequirementId[row.projectRequirementId] ?? null;
+              const isWatched = watchedRequirementIds.has(row.projectRequirementId);
+              const showCollab = !!(currentUserId && row.projectRequirementId);
               const hasNote = threadNotes.length > 0;
               const reqDocs = docsByReq[row.projectRequirementId] ?? [];
               const docCount = reqDocs.length;
@@ -1460,7 +1485,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                               borderRadius: "2px",
                             }}
                           >
-                            {PHASE_LABELS[row.phaseRequired]}
+                            {(isExim ? EXIM_PHASE_LABELS : GENERIC_PHASE_LABELS)[row.phaseRequired]}
                           </span>
                         )}
 
@@ -1565,6 +1590,32 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                             <span style={{ textTransform: "uppercase" }}>owner</span>
                           )}
                         </button>
+
+                        {/* Collaboration: approval badge + watch (LOI-critical or applicable items) */}
+                        {showCollab && row.isApplicable && (
+                          <>
+                            {row.isLoiCritical && (
+                              <ApprovalBadge
+                                projectId={projectId}
+                                slug={slug}
+                                targetType="requirement"
+                                targetId={row.projectRequirementId}
+                                approval={reqApproval}
+                                currentUserId={currentUserId!}
+                                actorName={actorName}
+                                canAct
+                              />
+                            )}
+                            <WatchButton
+                              projectId={projectId}
+                              targetType="requirement"
+                              targetId={row.projectRequirementId}
+                              initialWatching={isWatched}
+                              actorName={actorName}
+                              variant="icon"
+                            />
+                          </>
+                        )}
                       </div>
                       {!compact && (
                         <p
@@ -1629,6 +1680,26 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         }));
                       }}
                     />
+                  )}
+
+                  {/* Collaboration comment thread */}
+                  {showCollab && isExpandedNotes && (
+                    <div style={{ borderTop: "1px solid var(--border)", padding: "12px 24px" }}>
+                      <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)", margin: "0 0 10px" }}>
+                        Team Comments
+                      </p>
+                      <CommentThread
+                        projectId={projectId}
+                        slug={slug}
+                        targetType="requirement"
+                        targetId={row.projectRequirementId}
+                        initialComments={reqComments}
+                        currentUserId={currentUserId!}
+                        teamMembers={teamMembers}
+                        actorName={actorName}
+                        compact={false}
+                      />
+                    </div>
                   )}
 
                   {/* Responsibility panel */}

@@ -331,6 +331,8 @@ function ControlBar({
     color: "var(--ink-muted)",
     borderColor: "var(--border)",
   };
+  const hasCollapsedLanes = ctrl.collapsedCats.size > 0;
+  const allLanesCollapsed = ctrl.collapsedCats.size === CATEGORY_ORDER.length;
 
   return (
     <div
@@ -413,6 +415,42 @@ function ControlBar({
       <div style={{ flex: 1 }} />
 
       {/* Expand/collapse */}
+      <button
+        onClick={() => setCtrl((c) => ({ ...c, collapsedCats: new Set() }))}
+        title="Expand all swim lanes"
+        disabled={!hasCollapsedLanes}
+        style={{
+          ...btnBase,
+          ...(hasCollapsedLanes ? inactive : { ...inactive, opacity: 0.45, cursor: "default" }),
+          display: "flex",
+          alignItems: "center",
+          gap: "5px",
+          padding: "4px 12px",
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        Expand all
+      </button>
+      <button
+        onClick={() => setCtrl((c) => ({ ...c, collapsedCats: new Set(CATEGORY_ORDER) }))}
+        title="Collapse all swim lanes"
+        disabled={allLanesCollapsed}
+        style={{
+          ...btnBase,
+          ...(allLanesCollapsed ? { ...inactive, opacity: 0.45, cursor: "default" } : inactive),
+          display: "flex",
+          alignItems: "center",
+          gap: "5px",
+          padding: "4px 12px",
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M1 5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        Collapse all
+      </button>
       <button
         data-tour="gantt-collapse"
         onClick={onToggleFullscreen}
@@ -1028,6 +1066,22 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
   useEffect(() => {
     document.body.style.overflow = fullscreen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
+  }, [fullscreen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("lodestar:gantt-fullscreen", {
+        detail: { active: fullscreen },
+      })
+    );
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("lodestar:gantt-fullscreen", {
+          detail: { active: false },
+        })
+      );
+    };
   }, [fullscreen]);
 
   // ESC to exit fullscreen

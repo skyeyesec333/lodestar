@@ -115,6 +115,7 @@ const initialState: WizardState = {
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface OnboardingWizardProps {
+  dealType?: string;
   initialSector?: string;
   onComplete: (projectSlug: string) => void;
   onBack: () => void;
@@ -175,7 +176,7 @@ const errorStyle: React.CSSProperties = {
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-function EximContextBox({ children }: { children: React.ReactNode }) {
+function ContextBox({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <div
       style={{
@@ -196,7 +197,7 @@ function EximContextBox({ children }: { children: React.ReactNode }) {
           margin: "0 0 8px 0",
         }}
       >
-        EXIM Context
+        {label ?? "Context"}
       </p>
       <p
         style={{
@@ -368,7 +369,9 @@ function Field({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function OnboardingWizard({ initialSector, onComplete, onBack }: OnboardingWizardProps) {
+export function OnboardingWizard({ dealType, initialSector, onComplete, onBack }: OnboardingWizardProps) {
+  const isExim = !dealType || dealType === "exim_project_finance";
+
   const resolvedInitialSector: SectorValue | "" =
     initialSector && SECTOR_OPTIONS.some((o) => o.value === initialSector)
       ? (initialSector as SectorValue)
@@ -444,6 +447,7 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
         name: state.name.trim(),
         countryCode: state.countryCode,
         sector: state.sector as SectorValue,
+        dealType: (dealType ?? "exim_project_finance") as "exim_project_finance" | "commercial_finance" | "development_finance" | "private_equity" | "other",
         capexUsd: capexUsd && !isNaN(capexUsd) && capexUsd > 0 ? capexUsd : null,
         eximCoverType: (state.eximCoverType as CoverValue) || null,
         targetLoiDate: state.targetLoiDate ? new Date(state.targetLoiDate) : null,
@@ -598,11 +602,11 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
                 </div>
               </div>
 
-              {/* EXIM context */}
-              <EximContextBox>
-                EXIM finances infrastructure deals in eligible countries. The sector determines which
-                requirements apply — power deals need a PPA, mining deals need an offtake agreement.
-              </EximContextBox>
+              <ContextBox label={isExim ? "EXIM Context" : "Context"}>
+                {isExim
+                  ? "EXIM finances infrastructure deals in eligible countries. The sector determines which requirements apply — power deals need a PPA, mining deals need an offtake agreement."
+                  : "The deal name, country, and sector help Lodestar organize your workplan and surface the right counterparties and documents for your financing type."}
+              </ContextBox>
             </div>
           </div>
         )}
@@ -658,48 +662,52 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
                   />
                 </Field>
 
-                <Field id="eximCoverType" label="EXIM Cover Type">
-                  <select
-                    id="eximCoverType"
-                    value={state.eximCoverType}
-                    onChange={(e) => set("eximCoverType", e.target.value as CoverValue)}
-                    style={{ ...selectStyle, ...getFocusStyle("eximCoverType") }}
-                    onFocus={() => setFocusedField("eximCoverType")}
-                    onBlur={() => setFocusedField(null)}
-                  >
-                    <option value="">Not yet determined</option>
-                    {COVER_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                {isExim && (
+                  <>
+                    <Field id="eximCoverType" label="EXIM Cover Type">
+                      <select
+                        id="eximCoverType"
+                        value={state.eximCoverType}
+                        onChange={(e) => set("eximCoverType", e.target.value as CoverValue)}
+                        style={{ ...selectStyle, ...getFocusStyle("eximCoverType") }}
+                        onFocus={() => setFocusedField("eximCoverType")}
+                        onBlur={() => setFocusedField(null)}
+                      >
+                        <option value="">Not yet determined</option>
+                        {COVER_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
 
-                <Field id="envCategory" label="Environmental Category">
-                  <select
-                    id="envCategory"
-                    value={state.envCategory}
-                    onChange={(e) => set("envCategory", e.target.value as EnvCategoryValue)}
-                    style={{ ...selectStyle, ...getFocusStyle("envCategory") }}
-                    onFocus={() => setFocusedField("envCategory")}
-                    onBlur={() => setFocusedField(null)}
-                  >
-                    <option value="">Not yet determined</option>
-                    {ENV_CATEGORY_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                    <Field id="envCategory" label="Environmental Category">
+                      <select
+                        id="envCategory"
+                        value={state.envCategory}
+                        onChange={(e) => set("envCategory", e.target.value as EnvCategoryValue)}
+                        style={{ ...selectStyle, ...getFocusStyle("envCategory") }}
+                        onFocus={() => setFocusedField("envCategory")}
+                        onBlur={() => setFocusedField(null)}
+                      >
+                        <option value="">Not yet determined</option>
+                        {ENV_CATEGORY_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </>
+                )}
               </div>
 
-              <EximContextBox>
-                EXIM typically covers 85% of US export content. Comprehensive cover includes commercial
-                risk; political-only is available for stronger off-takers. Environmental category
-                determines your ESIA scope and EXIM&apos;s disclosure timeline.
-              </EximContextBox>
+              <ContextBox label={isExim ? "EXIM Context" : "Context"}>
+                {isExim
+                  ? "EXIM typically covers 85% of US export content. Comprehensive cover includes commercial risk; political-only is available for stronger off-takers. Environmental category determines your ESIA scope and EXIM\u2019s disclosure timeline."
+                  : "CAPEX sets the deal size, which Lodestar uses to contextualize your data room and funder workspace. You can update this at any time from deal settings."}
+              </ContextBox>
             </div>
           </div>
         )}
@@ -741,17 +749,19 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
             >
               <div>
                 <div style={twoColGrid}>
-                  <Field id="targetLoiDate" label="Target LOI Date">
-                    <input
-                      id="targetLoiDate"
-                      type="date"
-                      value={state.targetLoiDate}
-                      onChange={(e) => set("targetLoiDate", e.target.value)}
-                      style={{ ...inputStyle, ...getFocusStyle("targetLoiDate") }}
-                      onFocus={() => setFocusedField("targetLoiDate")}
-                      onBlur={() => setFocusedField(null)}
-                    />
-                  </Field>
+                  {isExim && (
+                    <Field id="targetLoiDate" label="Target LOI Date">
+                      <input
+                        id="targetLoiDate"
+                        type="date"
+                        value={state.targetLoiDate}
+                        onChange={(e) => set("targetLoiDate", e.target.value)}
+                        style={{ ...inputStyle, ...getFocusStyle("targetLoiDate") }}
+                        onFocus={() => setFocusedField("targetLoiDate")}
+                        onBlur={() => setFocusedField(null)}
+                      />
+                    </Field>
+                  )}
 
                   <Field id="targetCloseDate" label="Target Financial Close">
                     <input
@@ -785,11 +795,11 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
                 </Field>
               </div>
 
-              <EximContextBox>
-                The LOI (Letter of Interest) is EXIM&apos;s first formal milestone. Most sponsors target
-                LOI 12–18 months before financial close. Setting a target date activates the countdown
-                timer and urgency alerts.
-              </EximContextBox>
+              <ContextBox label={isExim ? "EXIM Context" : "Context"}>
+                {isExim
+                  ? "The LOI (Letter of Interest) is EXIM\u2019s first formal milestone. Most sponsors target LOI 12\u201318 months before financial close. Setting a target date activates the countdown timer and urgency alerts."
+                  : "Setting a target financial close date activates the deal countdown and helps Lodestar surface timing pressure across your workplan."}
+              </ContextBox>
             </div>
           </div>
         )}
@@ -889,13 +899,13 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
                   {state.capexMillions && (
                     <ReviewRow label="CAPEX" value={`$${parseFloat(state.capexMillions).toLocaleString()}M`} />
                   )}
-                  {state.eximCoverType && (
+                  {isExim && state.eximCoverType && (
                     <ReviewRow label="Cover Type" value={coverLabel(state.eximCoverType)} />
                   )}
-                  {state.envCategory && (
+                  {isExim && state.envCategory && (
                     <ReviewRow label="Env. Category" value={envLabel(state.envCategory)} />
                   )}
-                  {state.targetLoiDate && (
+                  {isExim && state.targetLoiDate && (
                     <ReviewRow label="Target LOI" value={new Date(state.targetLoiDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} />
                   )}
                   {state.targetCloseDate && (
@@ -907,10 +917,11 @@ export function OnboardingWizard({ initialSector, onComplete, onBack }: Onboardi
                 </div>
               </div>
 
-              <EximContextBox>
-                A clear deal description helps your EXIM officer understand the transaction at a
-                glance. Include the technology type, capacity, and key counterparties.
-              </EximContextBox>
+              <ContextBox label={isExim ? "EXIM Context" : "Context"}>
+                {isExim
+                  ? "A clear deal description helps your EXIM officer understand the transaction at a glance. Include the technology type, capacity, and key counterparties."
+                  : "A clear description helps your team and advisors understand the deal at a glance. Include the asset type, capacity, and key counterparties."}
+              </ContextBox>
             </div>
 
           </div>

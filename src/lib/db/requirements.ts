@@ -97,19 +97,19 @@ function buildRows(
  */
 type RawNoteRow = {
   id: string;
-  requirement_id: string;
-  clerk_user_id: string;
+  requirementId: string;
+  clerkUserId: string;
   note: string;
-  status_snapshot: string;
-  created_at: Date;
+  statusSnapshot: string;
+  createdAt: Date;
 };
 
 async function fetchNotesMap(projectId: string): Promise<Map<string, RequirementNoteRow[]>> {
   const allNotes = await db.$queryRaw<RawNoteRow[]>`
-    SELECT id, requirement_id, clerk_user_id, note, status_snapshot, created_at
+    SELECT id, "requirementId", "clerkUserId", note, "statusSnapshot", "createdAt"
     FROM requirement_notes
-    WHERE project_id = ${projectId}
-    ORDER BY created_at DESC
+    WHERE "projectId" = ${projectId}
+    ORDER BY "createdAt" DESC
     LIMIT 200
   `;
 
@@ -117,14 +117,14 @@ async function fetchNotesMap(projectId: string): Promise<Map<string, Requirement
   for (const n of allNotes) {
     const shaped: RequirementNoteRow = {
       id: n.id,
-      clerkUserId: n.clerk_user_id,
+      clerkUserId: n.clerkUserId,
       note: n.note,
-      statusSnapshot: n.status_snapshot,
-      createdAt: n.created_at,
+      statusSnapshot: n.statusSnapshot,
+      createdAt: n.createdAt,
     };
-    const existing = map.get(n.requirement_id);
+    const existing = map.get(n.requirementId);
     if (!existing) {
-      map.set(n.requirement_id, [shaped]);
+      map.set(n.requirementId, [shaped]);
     } else if (existing.length < 5) {
       existing.push(shaped);
     }
@@ -181,9 +181,9 @@ export async function addRequirementNote(
 ): Promise<Result<RequirementNoteRow>> {
   try {
     const rows = await db.$queryRaw<RawNoteRow[]>`
-      INSERT INTO requirement_notes (id, project_id, requirement_id, clerk_user_id, note, status_snapshot)
+      INSERT INTO requirement_notes (id, "projectId", "requirementId", "clerkUserId", note, "statusSnapshot")
       VALUES (gen_random_uuid()::text, ${projectId}, ${requirementId}, ${clerkUserId}, ${note}, ${statusSnapshot})
-      RETURNING id, requirement_id, clerk_user_id, note, status_snapshot, created_at
+      RETURNING id, "requirementId", "clerkUserId", note, "statusSnapshot", "createdAt"
     `;
     const r = rows[0];
     if (!r) throw new Error("Insert returned no rows");
@@ -191,10 +191,10 @@ export async function addRequirementNote(
       ok: true,
       value: {
         id: r.id,
-        clerkUserId: r.clerk_user_id,
+        clerkUserId: r.clerkUserId,
         note: r.note,
-        statusSnapshot: r.status_snapshot,
-        createdAt: r.created_at,
+        statusSnapshot: r.statusSnapshot,
+        createdAt: r.createdAt,
       },
     };
   } catch (err) {
@@ -209,19 +209,19 @@ export async function getRequirementNotes(
 ): Promise<Result<RequirementNoteRow[]>> {
   try {
     const rows = await db.$queryRaw<RawNoteRow[]>`
-      SELECT id, requirement_id, clerk_user_id, note, status_snapshot, created_at
+      SELECT id, "requirementId", "clerkUserId", note, "statusSnapshot", "createdAt"
       FROM requirement_notes
-      WHERE project_id = ${projectId} AND requirement_id = ${requirementId}
-      ORDER BY created_at DESC
+      WHERE "projectId" = ${projectId} AND "requirementId" = ${requirementId}
+      ORDER BY "createdAt" DESC
     `;
     return {
       ok: true,
       value: rows.map((r) => ({
         id: r.id,
-        clerkUserId: r.clerk_user_id,
+        clerkUserId: r.clerkUserId,
         note: r.note,
-        statusSnapshot: r.status_snapshot,
-        createdAt: r.created_at,
+        statusSnapshot: r.statusSnapshot,
+        createdAt: r.createdAt,
       })),
     };
   } catch (err) {
