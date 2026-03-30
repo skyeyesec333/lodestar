@@ -2,10 +2,11 @@ import type {
   ProjectSector,
   EximCoverType,
   ProjectPhase,
+  DealType,
 } from "@prisma/client";
 
 // Re-export Prisma enums — the rest of the app imports enums from here, not @prisma/client
-export type { ProjectSector, EximCoverType, ProjectPhase };
+export type { ProjectSector, EximCoverType, ProjectPhase, DealType };
 
 // ── Result / error types ──────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export type Project = {
   countryCode: string;
   sector: ProjectSector;
   capexUsdCents: bigint | null;
+  dealType: DealType;
   eximCoverType: EximCoverType | null;
   stage: ProjectPhase;
   targetLoiDate: Date | null;
@@ -52,6 +54,11 @@ export type ProjectSummary = Pick<
   | "cachedReadinessScore"
   | "createdAt"
 >;
+
+export type ProjectListItem = ProjectSummary & {
+  capexUsdCents: bigint | null;
+  lastActivityAt: Date | null;
+};
 
 export type ProjectListSort =
   | "created_desc"
@@ -82,3 +89,7 @@ export type {
   ChatRole,
   ChatRuntimeContext,
 } from "@/types/chat";
+
+export type {
+  TeamMember,
+} from "@/types/collaboration";

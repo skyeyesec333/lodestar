@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateProject, advanceProjectStage } from "@/actions/projects";
-import type { ProjectSector, EximCoverType, ProjectPhase } from "@prisma/client";
+import type { ProjectSector, EximCoverType, ProjectPhase, DealType } from "@prisma/client";
 
 // Serializable version of Project — capexUsdCents as number (BigInt can't cross server/client boundary)
 export type SerializableProject = {
@@ -12,6 +12,7 @@ export type SerializableProject = {
   description: string | null;
   countryCode: string;
   sector: ProjectSector;
+  dealType: DealType;
   capexUsdCents: number | null;
   eximCoverType: EximCoverType | null;
   stage: ProjectPhase;
@@ -61,6 +62,7 @@ const labelStyle = {
 };
 
 export function ProjectEditForm({ project }: Props) {
+  const isExim = project.dealType === "exim_project_finance";
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -252,29 +254,33 @@ export function ProjectEditForm({ project }: Props) {
               />
             </div>
 
-            {/* EXIM Cover */}
-            <div>
-              <label style={labelStyle}>EXIM Cover Type</label>
-              <select name="eximCoverType" defaultValue={project.eximCoverType ?? ""} style={inputStyle}>
-                <option value="">— Not set —</option>
-                {COVER_TYPES.map((c) => (
-                  <option key={c} value={c}>
-                    {c === "comprehensive" ? "Comprehensive" : "Political Only"}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* EXIM Cover — EXIM only */}
+            {isExim && (
+              <div>
+                <label style={labelStyle}>EXIM Cover Type</label>
+                <select name="eximCoverType" defaultValue={project.eximCoverType ?? ""} style={inputStyle}>
+                  <option value="">— Not set —</option>
+                  {COVER_TYPES.map((c) => (
+                    <option key={c} value={c}>
+                      {c === "comprehensive" ? "Comprehensive" : "Political Only"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
-            {/* Target LOI date */}
-            <div>
-              <label style={labelStyle}>Target LOI Date</label>
-              <input
-                name="targetLoiDate"
-                type="date"
-                defaultValue={loiDisplay}
-                style={inputStyle}
-              />
-            </div>
+            {/* Target LOI date — EXIM only */}
+            {isExim && (
+              <div>
+                <label style={labelStyle}>Target LOI Date</label>
+                <input
+                  name="targetLoiDate"
+                  type="date"
+                  defaultValue={loiDisplay}
+                  style={inputStyle}
+                />
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>

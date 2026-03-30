@@ -3,6 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { addStakeholder, removeStakeholder, updateStakeholder } from "@/actions/stakeholders";
 import type { StakeholderRow } from "@/lib/db/stakeholders";
+import { StakeholderGraph } from "@/components/stakeholders/StakeholderGraph";
+import { DealPartyChecklist } from "@/components/stakeholders/DealPartyChecklist";
+import type { DealPartyRow } from "@/lib/db/deal-parties";
 
 const ROLE_OPTIONS = [
   { value: "epc_contact",        label: "EPC Contact" },
@@ -170,6 +173,7 @@ type Props = {
   projectId: string;
   slug: string;
   initialStakeholders: StakeholderRow[];
+  initialDealParties?: DealPartyRow[];
 };
 
 type StakeholderEditDraft = {
@@ -192,7 +196,7 @@ function buildEditDraft(stakeholder: StakeholderRow): StakeholderEditDraft {
   };
 }
 
-export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props) {
+export function StakeholderPanel({ projectId, slug, initialStakeholders, initialDealParties = [] }: Props) {
   const [stakeholders, setStakeholders] = useState(initialStakeholders);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +209,7 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
   const [editDraft, setEditDraft] = useState<StakeholderEditDraft | null>(null);
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState<"all" | "follow_up" | "primary">("all");
+  const [view, setView] = useState<"list" | "graph">("list");
 
   const selectedStakeholder =
     stakeholders.find((stakeholder) => stakeholder.roleId === selectedRoleId) ?? null;
@@ -300,6 +305,7 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
             email: (fd.get("email") as string) || null,
             phone: (fd.get("phone") as string) || null,
             title: (fd.get("title") as string) || null,
+            organizationId: null,
             organizationName: (fd.get("organizationName") as string) || null,
             roleType: fd.get("roleType") as StakeholderRow["roleType"],
             roleId: "__pending__",
@@ -413,10 +419,24 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
 
   return (
     <div style={{ marginBottom: "40px" }}>
+      {/* Deal Party Checklist */}
+      <DealPartyChecklist
+        projectId={projectId}
+        slug={slug}
+        initialDealParties={initialDealParties}
+      />
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-        <p className="eyebrow">Stakeholders</p>
+        <p className="eyebrow">Deal Parties</p>
         <button
-          onClick={() => setShowForm((v) => !v)}
+          onClick={() => {
+            if (view === "graph") {
+              setView("list");
+              setShowForm(true);
+            } else {
+              setShowForm((v) => !v);
+            }
+          }}
           style={{
             fontFamily: "'DM Mono', monospace",
             fontSize: "10px",
@@ -435,13 +455,45 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
         </button>
       </div>
 
+      {/* View toggle: List / Graph */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "16px" }}>
+        {(["list", "graph"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              fontWeight: 500,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: view === v ? "var(--teal)" : "var(--ink-muted)",
+              backgroundColor: view === v ? "var(--teal-soft)" : "transparent",
+              border: view === v ? "1px solid var(--teal)" : "1px solid var(--border)",
+              borderRadius: "3px",
+              padding: "5px 12px",
+              cursor: "pointer",
+            }}
+          >
+            {v === "list" ? "List" : "Graph"}
+          </button>
+        ))}
+      </div>
+
       {error && (
         <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--accent)", marginBottom: "12px" }}>
           {error}
         </p>
       )}
 
-      {(stakeholders.length > 0 || search.length > 0) && (
+      {view === "graph" && (
+        <div>
+          <StakeholderGraph stakeholders={stakeholders} projectName="Project" />
+        </div>
+      )}
+
+      {view === "list" && (stakeholders.length > 0 || search.length > 0) && (
         <div
           style={{
             display: "flex",
@@ -561,7 +613,7 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
                 opacity: isPending ? 0.6 : 1,
               }}
             >
-              {isPending ? "Adding…" : "Add Stakeholder"}
+              {isPending ? "Adding…" : "Add Deal Party"}
             </button>
             <button
               type="button"
@@ -586,19 +638,67 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
         </form>
       )}
 
-      {/* Stakeholder grid */}
-      {stakeholders.length === 0 && !showForm ? (
-        <p
+      {/* Stakeholder grid — list view only */}
+      {view === "list" && stakeholders.length === 0 && !showForm ? (
+        <div
           style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: "11px",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--ink-muted)",
+            backgroundColor: "var(--gold-soft)",
+            border: "1px solid var(--gold)",
+            borderRadius: "4px",
+            padding: "20px 24px",
           }}
         >
-          No stakeholders added yet
-        </p>
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "var(--gold)",
+              margin: "0 0 8px",
+            }}
+          >
+            Getting Started
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "18px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 10px",
+            }}
+          >
+            Name every transaction party before you proceed
+          </p>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              color: "var(--ink-mid)",
+              margin: "0 0 10px",
+              lineHeight: 1.6,
+              maxWidth: "560px",
+            }}
+          >
+            EXIM requires named contacts for every party in the transaction — the EPC contractor,
+            off-taker, host government liaison, legal counsel, and your assigned EXIM officer.
+            Adding deal parties here enables meeting attendance tracking, action item assignment,
+            and document routing throughout due diligence.
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "11px",
+              color: "var(--ink-mid)",
+              margin: 0,
+              lineHeight: 1.5,
+            }}
+          >
+            Suggested roles: EPC Contact · Off-taker Contact · Government Liaison · Legal Counsel · EXIM Officer
+          </p>
+        </div>
       ) : filteredStakeholders.length === 0 ? (
         <div
           style={{
@@ -616,7 +716,7 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders }: Props
               margin: 0,
             }}
           >
-            No stakeholders match the current search or filter.
+            No deal parties match the current search or filter.
           </p>
         </div>
       ) : (

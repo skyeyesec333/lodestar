@@ -104,6 +104,86 @@
   --nav-link:     #8a8880;
 }
 
+[data-theme="obsidian"] {
+  --bg:           #0f1113;
+  --bg-card:      #171b1f;
+  --bg-dark:      #090a0c;
+  --ink:          #edf0ea;
+  --ink-mid:      #c3c9c0;
+  --ink-muted:    #8d948c;
+  --accent:       #d26a3d;
+  --accent-soft:  #2b1813;
+  --gold:         #c6973b;
+  --gold-soft:    #30250d;
+  --teal:         #4ea6a1;
+  --teal-soft:    #112928;
+  --border:       #2b3137;
+  --border-strong:#414851;
+  --nav-bg:       #090a0c;
+  --nav-text:     #edf0ea;
+  --nav-link:     #74807a;
+}
+
+[data-theme="midnight"] {
+  --bg:           #101626;
+  --bg-card:      #171f33;
+  --bg-dark:      #090e18;
+  --ink:          #eef2fb;
+  --ink-mid:      #c6d1ea;
+  --ink-muted:    #8c99b5;
+  --accent:       #d28743;
+  --accent-soft:  #312113;
+  --gold:         #d1a048;
+  --gold-soft:    #34270f;
+  --teal:         #59a8b8;
+  --teal-soft:    #122c32;
+  --border:       #2b3550;
+  --border-strong:#445174;
+  --nav-bg:       #090e18;
+  --nav-text:     #eef2fb;
+  --nav-link:     #7885a3;
+}
+
+[data-theme="ember"] {
+  --bg:           #181311;
+  --bg-card:      #221a17;
+  --bg-dark:      #0d0908;
+  --ink:          #f3ece4;
+  --ink-mid:      #d2c3b8;
+  --ink-muted:    #9b8d83;
+  --accent:       #db6f2d;
+  --accent-soft:  #381b10;
+  --gold:         #d1a14f;
+  --gold-soft:    #34260f;
+  --teal:         #5f9b92;
+  --teal-soft:    #132725;
+  --border:       #3a2d28;
+  --border-strong:#57453e;
+  --nav-bg:       #0d0908;
+  --nav-text:     #f3ece4;
+  --nav-link:     #8f7d73;
+}
+
+[data-theme="sky_blue"] {
+  --bg:           #eef8ff;
+  --bg-card:      #ffffff;
+  --bg-dark:      #12324b;
+  --ink:          #16344b;
+  --ink-mid:      #315b79;
+  --ink-muted:    #6a8aa3;
+  --accent:       #2f89c7;
+  --accent-soft:  #dff1fb;
+  --gold:         #d39a3d;
+  --gold-soft:    #fdf0da;
+  --teal:         #3aa3b8;
+  --teal-soft:    #dff6f8;
+  --border:       #cfe2ef;
+  --border-strong:#a9c5d8;
+  --nav-bg:       #12324b;
+  --nav-text:     #f2f9ff;
+  --nav-link:     #8eb7d6;
+}
+
 /* ── Tailwind theme tokens ──────────────────────────────────────────────────── */
 
 @theme {

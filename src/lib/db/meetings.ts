@@ -24,7 +24,9 @@ export type ActionItemRow = {
   dueDate: Date | null;
   completedAt: Date | null;
   projectRequirementId: string | null;
+  requirementId: string | null;
   requirementName: string | null;
+  requirementCurrentStatus: string | null;
   assignedTo: { id: string; name: string } | null;
 };
 
@@ -55,7 +57,10 @@ const meetingSelect = {
       projectRequirementId: true,
       assignedTo: { select: { id: true, name: true } },
       projectRequirement: {
-        select: { requirement: { select: { name: true } } },
+        select: {
+          status: true,
+          requirement: { select: { id: true, name: true } },
+        },
       },
     },
     orderBy: { createdAt: "asc" as const },
@@ -82,7 +87,7 @@ function shapeMeeting(row: {
     completedAt: Date | null;
     projectRequirementId: string | null;
     assignedTo: { id: string; name: string } | null;
-    projectRequirement: { requirement: { name: string } } | null;
+    projectRequirement: { status: string; requirement: { id: string; name: string } } | null;
   }[];
 }): MeetingRow {
   return {
@@ -104,7 +109,9 @@ function shapeMeeting(row: {
       dueDate: a.dueDate,
       completedAt: a.completedAt,
       projectRequirementId: a.projectRequirementId,
+      requirementId: a.projectRequirement?.requirement.id ?? null,
       requirementName: a.projectRequirement?.requirement.name ?? null,
+      requirementCurrentStatus: a.projectRequirement?.status ?? null,
       assignedTo: a.assignedTo,
     })),
   };
@@ -197,7 +204,10 @@ export async function createActionItemRecord(input: {
         projectRequirementId: true,
         assignedTo: { select: { id: true, name: true } },
         projectRequirement: {
-          select: { requirement: { select: { name: true } } },
+          select: {
+            status: true,
+            requirement: { select: { id: true, name: true } },
+          },
         },
       },
     });
@@ -212,7 +222,9 @@ export async function createActionItemRecord(input: {
         dueDate: row.dueDate,
         completedAt: row.completedAt,
         projectRequirementId: row.projectRequirementId,
+        requirementId: row.projectRequirement?.requirement.id ?? null,
         requirementName: row.projectRequirement?.requirement.name ?? null,
+        requirementCurrentStatus: row.projectRequirement?.status ?? null,
         assignedTo: row.assignedTo,
       },
     };

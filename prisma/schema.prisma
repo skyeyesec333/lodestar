@@ -34,6 +34,21 @@ enum EximCoverType {
   political_only
 }
 
+/// The financing program this project is pursuing.
+/// Drives which requirements taxonomy, scoring logic, and UI labels apply.
+enum DealType {
+  /// US EXIM Bank project finance guarantee or direct loan.
+  exim_project_finance
+  /// Commercial bank / private credit — no export credit agency.
+  commercial_finance
+  /// Multilateral or bilateral DFI (IFC, AfDB, OPIC, DFC, etc.).
+  development_finance
+  /// Private equity sponsor finance, no lender involvement yet.
+  private_equity
+  /// Other or not yet determined.
+  other
+}
+
 enum ProjectMemberRole {
   owner
   editor
@@ -74,6 +89,8 @@ enum RequirementPhase {
 
 /// The completion state of a requirement on a project.
 /// Progression: not_started → in_progress → draft → substantially_final → executed → waived
+/// not_applicable: this requirement does not apply to this project type (excluded from scoring denominator).
+/// waived: EXIM has explicitly excused a normally-required item (counts as 1.0 in scoring).
 enum RequirementStatus {
   not_started
   in_progress
@@ -81,11 +98,65 @@ enum RequirementStatus {
   substantially_final
   executed
   waived
+  not_applicable
+}
+
+/// EXIM environmental project category, per IFC Performance Standards and EXIM policy.
+/// Determines ESIA scope, public-disclosure timeline, and review requirements.
+enum EnvironmentalCategory {
+  /// Significant adverse environmental/social impact — full ESIA, 120-day public disclosure before Board vote.
+  category_a
+  /// Limited adverse impact — partial assessment, 30-day disclosure.
+  category_b
+  /// Minimal/no adverse impact — no assessment required.
+  category_c
+  /// Financial intermediary — applies IFC PS through subprojects.
+  category_fi
+}
+
+/// Which EXIM program path the project is pursuing.
+/// Affects US-content thresholds, repayment tenors, and applicable requirements.
+enum ProgramPath {
+  /// Standard long-term guarantee / direct loan.
+  standard
+  /// China and Transformational Exports Program — 51% US-content threshold, 10 strategic sectors.
+  ctep
+  /// Make More in America — domestic export-linked manufacturing.
+  mmia
+  /// Critical minerals / strategic supply chain pathway.
+  critical_minerals
+  /// Engineering Multiplier Program — pre-FID engineering and technical services.
+  engineering_multiplier
 }
 
 enum DocumentState {
   current
   superseded
+}
+
+enum CommentTargetType {
+  requirement
+  document
+  meeting
+}
+
+enum WatchTargetType {
+  project
+  requirement
+  document
+  meeting
+}
+
+enum ApprovalStatus {
+  draft
+  in_review
+  approved
+  rejected
+}
+
+enum ApprovalTargetType {
+  requirement
+  document
 }
 
 enum DocumentRequestStatus {
@@ -149,6 +220,21 @@ enum FunderConditionStatus {
   waived
 }
 
+enum DealPartyType {
+  epc_contractor
+  offtake_counterparty
+  senior_lender
+  mezzanine_lender
+  equity_sponsor
+  legal_counsel_host
+  legal_counsel_us
+  government_authority
+  environmental_consultant
+  independent_engineer
+  insurance_broker
+  exim_officer
+}
+
 // ═══════════════════════════════════════════════════════════
 // MODELS
 // ═══════════════════════════════════════════════════════════
@@ -163,10 +249,12 @@ model Organization {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  stakeholders        Stakeholder[]
-  projectSponsors     ProjectSponsor[]
-  epcBids             EpcBid[]
-  funderRelationships FunderRelationship[]
+  stakeholders             Stakeholder[]
+  projectSponsors          ProjectSponsor[]
+  epcBids                  EpcBid[]
+  funderRelationships      FunderRelationship[]
+  responsibleRequirements  ProjectRequirement[] @relation("RequirementOrganization")
+  dealParties              DealParty[]
 
   @@index([name])
   @@index([isUsEntity])
@@ -182,11 +270,17 @@ model Project {
   countryCode          String        @db.Char(2)
   sector               ProjectSector
   capexUsdCents        BigInt?
+  dealType             DealType      @default(exim_project_finance)
   eximCoverType        EximCoverType?
   stage                ProjectPhase  @default(concept)
   targetLoiDate        DateTime?     @db.Date
   targetCloseDate      DateTime?     @db.Date
   ownerClerkId         String
+
+  /// EXIM environmental project category. Determines ESIA scope and disclosure timeline.
+  environmentalCategory EnvironmentalCategory?
+  /// Which EXIM program path this project is pursuing. Affects content thresholds and applicable requirements.
+  programPath           ProgramPath @default(standard)
 
   /// Readiness score in basis points (e.g. 7543 = 75.43%).
   /// Updated by application layer on every requirement status change.
@@ -208,6 +302,12 @@ model Project {
   epcBids             EpcBid[]
   funderRelationships FunderRelationship[]
   activityEvents      ActivityEvent[]
+  requirementNotes    RequirementNote[]
+  dealParties         DealParty[]
+  milestones          DealMilestone[]
+  comments            Comment[]
+  watchers            Watcher[]
+  approvals           Approval[]
 
   @@index([ownerClerkId])
   @@index([stage])
@@ -268,7 +368,9 @@ model Stakeholder {
   roles        StakeholderRole[]
   attendances  MeetingAttendee[]
   actionItems  ActionItem[]
-  documentRequests DocumentRequest[]
+  documentRequests              DocumentRequest[]
+  responsibleRequirements       ProjectRequirement[] @relation("RequirementStakeholder")
+  secondaryResponsibilities     ProjectRequirement[] @relation("RequirementSecondaryStakeholder")
 
   @@index([organizationId])
   @@index([email])
@@ -312,6 +414,7 @@ model EximRequirement {
   sortOrder Int
 
   projectRequirements ProjectRequirement[]
+  requirementNotes    RequirementNote[]
 
   @@unique([category, sortOrder])
   @@map("exim_requirements")
@@ -331,19 +434,46 @@ model ProjectRequirement {
   statusChangedAt DateTime @default(now())
   statusChangedBy String?
 
+  /// Whether this requirement applies to this specific project.
+  /// false = structurally inapplicable (e.g. fuel-supply for a solar project).
+  /// This is distinct from waived (EXIM explicitly excused a normally-required item).
+  /// Non-applicable requirements are excluded from both numerator and denominator of the readiness score.
+  isApplicable      Boolean @default(true)
+  /// Human-readable reason why this requirement doesn't apply (e.g. "Renewable project — no fuel supply").
+  applicabilityReason String?
+
+  /// Organization responsible for producing the evidence for this requirement (e.g. EPC contractor, local counsel).
+  responsibleOrganizationId String?
+  /// Primary individual point-of-contact for this requirement.
+  responsibleStakeholderId  String?
+  /// Optional secondary owner — backup or co-owner for shared requirements.
+  secondaryStakeholderId    String?
+
+  /// Target date for this requirement to reach its required status. Enables aging and velocity alerts.
+  targetDate DateTime? @db.Date
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   requirement EximRequirement @relation(fields: [requirementId], references: [id])
+  responsibleOrganization Organization? @relation("RequirementOrganization", fields: [responsibleOrganizationId], references: [id], onDelete: SetNull)
+  responsibleStakeholder  Stakeholder?  @relation("RequirementStakeholder", fields: [responsibleStakeholderId], references: [id], onDelete: SetNull)
+  secondaryStakeholder    Stakeholder?  @relation("RequirementSecondaryStakeholder", fields: [secondaryStakeholderId], references: [id], onDelete: SetNull)
 
   documents        Document[]
   actionItems      ActionItem[]
   documentRequests DocumentRequest[]
   funderConditions FunderCondition[]
+  comments         Comment[]
+  approval         Approval?
 
   @@unique([projectId, requirementId])
   @@index([projectId, status])
+  @@index([projectId, isApplicable])
+  @@index([responsibleOrganizationId])
+  @@index([responsibleStakeholderId])
+  @@index([secondaryStakeholderId])
   @@map("requirement_statuses")
 }
 
@@ -385,6 +515,8 @@ model Document {
 
   project            Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectRequirement ProjectRequirement? @relation(fields: [projectRequirementId], references: [id], onDelete: SetNull)
+  comments           Comment[]
+  approval           Approval?
 
   @@unique([documentGroupId, version])
   @@index([projectId, state])
@@ -436,6 +568,7 @@ model Meeting {
   project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
   attendees   MeetingAttendee[]
   actionItems ActionItem[]
+  comments    Comment[]
 
   @@index([projectId, meetingDate])
   @@map("meetings")
@@ -532,6 +665,67 @@ model FunderRelationship {
   @@map("funder_relationships")
 }
 
+/// A timestamped note on a requirement's status thread.
+model RequirementNote {
+  id             String   @id @default(cuid())
+  projectId      String
+  requirementId  String
+  clerkUserId    String
+  note           String   @default("")
+  statusSnapshot String
+  createdAt      DateTime @default(now())
+
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement EximRequirement @relation(fields: [requirementId], references: [id])
+
+  @@index([projectId, requirementId, createdAt(sort: Desc)])
+  @@map("requirement_notes")
+}
+
+/// A user-defined planning milestone for a deal.
+/// Renders as a diamond marker on the GanttChart timeline.
+/// Does NOT affect the readiness score — orthogonal planning tool.
+model DealMilestone {
+  id          String        @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  linkedPhase ProjectPhase?
+  targetDate  DateTime?     @db.Date
+  completedAt DateTime?
+  completedBy String?
+  sortOrder   Int           @default(0)
+  createdBy   String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, sortOrder])
+  @@index([projectId, targetDate])
+  @@map("deal_milestones")
+}
+
+/// The structural role an Organization plays in a deal (e.g. EPC contractor, off-taker).
+/// Distinct from StakeholderRoleType which describes a person's function.
+model DealParty {
+  id             String        @id @default(cuid())
+  projectId      String
+  organizationId String
+  partyType      DealPartyType
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([projectId, organizationId, partyType])
+  @@index([projectId, partyType])
+  @@index([organizationId])
+  @@map("deal_parties")
+}
+
 /// An open condition or CP a funder requires before advancing.
 /// Optionally linked to the EXIM requirement it maps to.
 model FunderCondition {
@@ -550,4 +744,91 @@ model FunderCondition {
 
   @@index([funderRelationshipId, status])
   @@map("funder_conditions")
+}
+
+// ═══════════════════════════════════════════════════════════
+// COLLABORATION LAYER
+// ═══════════════════════════════════════════════════════════
+
+/// A freeform comment left by a project team member on a requirement, document, or meeting.
+/// Distinct from RequirementNote, which is status-threaded. Comments are open collaboration.
+model Comment {
+  id        String            @id @default(cuid())
+  projectId String
+  authorId  String            // Clerk user ID
+  body      String            @db.Text
+  editedAt  DateTime?         // set on edit; surfaced as "edited" badge in UI
+  createdAt DateTime          @default(now())
+
+  targetType           CommentTargetType
+  projectRequirementId String?
+  documentId           String?
+  meetingId            String?
+
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement ProjectRequirement?  @relation(fields: [projectRequirementId], references: [id], onDelete: Cascade)
+  document    Document?            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  meeting     Meeting?             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  mentions    CommentMention[]
+
+  @@index([projectId, targetType, createdAt(sort: Desc)])
+  @@index([projectRequirementId, createdAt(sort: Desc)])
+  @@index([documentId, createdAt(sort: Desc)])
+  @@index([meetingId, createdAt(sort: Desc)])
+  @@map("comments")
+}
+
+/// A structured @mention inside a Comment. mentionedId is a Clerk user ID (ProjectMember).
+model CommentMention {
+  id          String  @id @default(cuid())
+  commentId   String
+  mentionedId String  // Clerk user ID
+
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, mentionedId])
+  @@index([mentionedId])
+  @@map("comment_mentions")
+}
+
+/// A user's watch subscription on a deal, section, or specific item.
+/// targetId is null when watching the whole project.
+model Watcher {
+  id          String          @id @default(cuid())
+  clerkUserId String
+  projectId   String
+  targetType  WatchTargetType
+  targetId    String?         // null = whole project; otherwise the ID of the watched item
+  createdAt   DateTime        @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([clerkUserId, projectId, targetType, targetId])
+  @@index([projectId, targetType])
+  @@index([clerkUserId, projectId])
+  @@map("watchers")
+}
+
+/// Lightweight approval/signoff record for LOI-critical requirements and key documents.
+/// One active record per target at a time — updated in-place rather than versioned.
+model Approval {
+  id         String             @id @default(cuid())
+  projectId  String
+  reviewerId String             // Clerk user ID of the person who last acted
+  status     ApprovalStatus     @default(draft)
+  note       String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  targetType           ApprovalTargetType
+  projectRequirementId String?            @unique
+  documentId           String?            @unique
+
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement ProjectRequirement?  @relation(fields: [projectRequirementId], references: [id], onDelete: Cascade)
+  document    Document?            @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([projectId, targetType])
+  @@map("approvals")
 }

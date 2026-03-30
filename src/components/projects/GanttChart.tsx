@@ -12,7 +12,7 @@ type TourRect = { top: number; left: number; width: number; height: number };
 
 const GANTT_TOUR: TourStep[] = [
   { target: "[data-tour='gantt-density']",     title: "Density",          body: "Tight fits all 36 lanes in a compact view. Spacious gives you room to read every label.",                                                                                  placement: "bottom" },
-  { target: "[data-tour='gantt-phase']",       title: "Phase filter",     body: "Show only LOI-phase items to focus on what's blocking submission, or Final Commitment items to plan ahead.",                                                                placement: "bottom" },
+  { target: "[data-tour='gantt-phase']",       title: "Phase filter",     body: "Show only EXIM LOI-phase items to focus on what's blocking submission, or EXIM Final Commitment items to plan ahead.",                                              placement: "bottom" },
   { target: "[data-tour='gantt-predictions']", title: "Predictions",      body: "Toggle the dashed future bands. They're calculated from your current status and LOI target — a best-case estimate of when each item will close.",                          placement: "bottom" },
   { target: "[data-tour='gantt-collapse']",    title: "Collapse",         body: "Press ESC or click Collapse to return to the project page. All your filter settings are preserved.",                                                                       placement: "bottom" },
 ];
@@ -186,30 +186,33 @@ const CATEGORY_LABELS: Record<string, string> = {
 // We deliberately avoid "var(--accent-soft)" for bar fills because on slate
 // that resolves to a near-black. Use explicit rgba fallbacks instead.
 const STATUS_BAR_COLORS: Record<RequirementStatusValue, string> = {
-  not_started:       "var(--border-strong)",
-  in_progress:       "var(--gold)",
-  draft:             "var(--gold)",
+  not_started:         "var(--border-strong)",
+  in_progress:         "var(--gold)",
+  draft:               "var(--gold)",
   substantially_final: "var(--teal)",
-  executed:          "var(--teal)",
-  waived:            "var(--ink-muted)",
+  executed:            "var(--teal)",
+  waived:              "var(--ink-muted)",
+  not_applicable:      "var(--border)",
 };
 
 const STATUS_LABELS: Record<RequirementStatusValue, string> = {
-  not_started:       "Not Started",
-  in_progress:       "In Progress",
-  draft:             "Draft",
+  not_started:         "Not Started",
+  in_progress:         "In Progress",
+  draft:               "Draft",
   substantially_final: "Substantially Final",
-  executed:          "Executed",
-  waived:            "Waived",
+  executed:            "Executed",
+  waived:              "Waived",
+  not_applicable:      "N/A",
 };
 
 const STATUS_PROGRESS: Record<RequirementStatusValue, number> = {
-  not_started:       0,
-  in_progress:       0.2,
-  draft:             0.5,
+  not_started:         0,
+  in_progress:         0.2,
+  draft:               0.5,
   substantially_final: 0.9,
-  executed:          1.0,
-  waived:            1.0,
+  executed:            1.0,
+  waived:              1.0,
+  not_applicable:      0,
 };
 
 // Density presets: [rowH, rowGap, catHeaderH, barPad, fontSize]
@@ -229,11 +232,19 @@ const CHART_REF_W = 920; // viewBox reference width
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type MilestoneMarker = {
+  id: string;
+  name: string;
+  targetDate: Date | null;
+  completedAt: Date | null;
+};
+
 export type GanttProps = {
   rows: ProjectRequirementRow[];
   projectCreatedAt: Date;
   targetLoiDate: Date | null;
   targetCloseDate?: Date | null;
+  milestones?: MilestoneMarker[];
 };
 
 type GanttRow =
@@ -320,6 +331,8 @@ function ControlBar({
     color: "var(--ink-muted)",
     borderColor: "var(--border)",
   };
+  const hasCollapsedLanes = ctrl.collapsedCats.size > 0;
+  const allLanesCollapsed = ctrl.collapsedCats.size === CATEGORY_ORDER.length;
 
   return (
     <div
@@ -370,7 +383,7 @@ function ControlBar({
         <span style={{ ...btnBase, border: "none", padding: "4px 2px", color: "var(--ink-muted)", cursor: "default" }}>
           Phase
         </span>
-        {([["all", "All"], ["loi", "LOI only"], ["final_commitment", "Final only"]] as const).map(([v, label]) => (
+        {([["all", "All"], ["loi", "EXIM LOI"], ["final_commitment", "EXIM Final"]] as const).map(([v, label]) => (
           <button
             key={v}
             style={{ ...btnBase, ...(ctrl.filterPhase === v ? active : inactive) }}
@@ -402,6 +415,42 @@ function ControlBar({
       <div style={{ flex: 1 }} />
 
       {/* Expand/collapse */}
+      <button
+        onClick={() => setCtrl((c) => ({ ...c, collapsedCats: new Set() }))}
+        title="Expand all swim lanes"
+        disabled={!hasCollapsedLanes}
+        style={{
+          ...btnBase,
+          ...(hasCollapsedLanes ? inactive : { ...inactive, opacity: 0.45, cursor: "default" }),
+          display: "flex",
+          alignItems: "center",
+          gap: "5px",
+          padding: "4px 12px",
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        Expand all
+      </button>
+      <button
+        onClick={() => setCtrl((c) => ({ ...c, collapsedCats: new Set(CATEGORY_ORDER) }))}
+        title="Collapse all swim lanes"
+        disabled={allLanesCollapsed}
+        style={{
+          ...btnBase,
+          ...(allLanesCollapsed ? { ...inactive, opacity: 0.45, cursor: "default" } : inactive),
+          display: "flex",
+          alignItems: "center",
+          gap: "5px",
+          padding: "4px 12px",
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path d="M1 5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
+        Collapse all
+      </button>
       <button
         data-tour="gantt-collapse"
         onClick={onToggleFullscreen}
@@ -472,7 +521,7 @@ function Legend({ showPredicted }: { showPredicted: boolean }) {
         <svg width="16" height="7" viewBox="0 0 16 7" style={{ overflow: "visible" }}>
           <line x1="8" y1="0" x2="8" y2="7" stroke="var(--gold)" strokeWidth="1.5" strokeDasharray="3,2" />
         </svg>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)" }}>LOI Target</span>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)" }}>EXIM LOI Target</span>
       </div>
     </div>
   );
@@ -490,6 +539,7 @@ function GanttSVG({
   totalMs,
   projectCreatedAt,
   width,
+  milestones = [],
   onTooltip,
   hoveredId,
   onHover,
@@ -504,6 +554,7 @@ function GanttSVG({
   totalMs: number;
   projectCreatedAt: Date;
   width: number;    // actual pixel width of container
+  milestones?: MilestoneMarker[];
   onTooltip: (t: Tooltip | null) => void;
   hoveredId: string | null;
   onHover: (id: string | null) => void;
@@ -772,10 +823,10 @@ function GanttSVG({
                       row.name,
                       STATUS_LABELS[status],
                       row.isLoiCritical
-                        ? "LOI Critical"
+                        ? "EXIM LOI Critical"
                         : row.phaseRequired === "loi"
-                          ? "LOI Phase"
-                          : "Final Commitment Phase",
+                          ? "EXIM LOI Phase"
+                          : "EXIM Final Commitment Phase",
                     ],
                   });
                 }}
@@ -914,6 +965,51 @@ function GanttSVG({
         </g>
       )}
 
+      {/* Milestone diamonds */}
+      {milestones.map((m) => {
+        if (!m.targetDate) return null;
+        const mx = dx(new Date(m.targetDate));
+        if (mx < LABEL_W || mx > width - RIGHT_PAD) return null;
+        const my = AXIS_H - 10; // sit above the axis line
+        const S = 5; // half-size of diamond
+        const completed = !!m.completedAt;
+        const fill = completed ? "var(--teal)" : "var(--ink-mid)";
+        const stroke = completed ? "var(--teal)" : "var(--border)";
+        return (
+          <g key={m.id}>
+            {/* Vertical tick */}
+            <line
+              x1={mx} y1={my + S + 2}
+              x2={mx} y2={svgH - BOTTOM_PAD}
+              stroke={fill}
+              strokeWidth={0.8}
+              strokeDasharray="3,3"
+              strokeOpacity={0.5}
+            />
+            {/* Diamond shape */}
+            <polygon
+              points={`${mx},${my - S} ${mx + S},${my} ${mx},${my + S} ${mx - S},${my}`}
+              fill={completed ? fill : "var(--bg-card)"}
+              stroke={stroke}
+              strokeWidth={1.2}
+            />
+            {/* Label */}
+            <text
+              x={mx}
+              y={my - S - 3}
+              textAnchor="middle"
+              fontFamily="'DM Mono', monospace"
+              fontSize={7}
+              letterSpacing="0.06em"
+              fill={fill}
+              style={{ userSelect: "none" }}
+            >
+              {m.name.length > 18 ? m.name.slice(0, 16) + "…" : m.name}
+            </text>
+          </g>
+        );
+      })}
+
       {/* Label column divider */}
       <line
         x1={LABEL_W} y1={AXIS_H - 6}
@@ -927,13 +1023,14 @@ function GanttSVG({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseDate }: GanttProps) {
+export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseDate, milestones = [] }: GanttProps) {
+  const defaultCollapsedCats = new Set<string>(CATEGORY_ORDER);
   const [ctrl, setCtrl] = useState<Controls>({
     density:        "normal",
     showPredicted:  true,
     filterPhase:    "all",
     hideDone:       false,
-    collapsedCats:  new Set(),
+    collapsedCats:  defaultCollapsedCats,
   });
   const [fullscreen, setFullscreen]   = useState(false);
   const [ganttTour, setGanttTour]     = useState(false);
@@ -969,6 +1066,22 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
   useEffect(() => {
     document.body.style.overflow = fullscreen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
+  }, [fullscreen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("lodestar:gantt-fullscreen", {
+        detail: { active: fullscreen },
+      })
+    );
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("lodestar:gantt-fullscreen", {
+          detail: { active: false },
+        })
+      );
+    };
   }, [fullscreen]);
 
   // ESC to exit fullscreen
@@ -1066,6 +1179,7 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
     chartStart,
     totalMs,
     projectCreatedAt,
+    milestones,
     onTooltip: setTooltip,
     hoveredId,
     onHover: setHoveredId,

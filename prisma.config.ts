@@ -2,7 +2,7 @@ import { defineConfig } from 'prisma/config'
 import * as dotenv from 'dotenv'
 
 // Prisma 7's prisma.config.ts does not auto-load .env — load it explicitly.
-dotenv.config()
+dotenv.config({ path: '.env.local' })
 
 export default defineConfig({
   migrations: {

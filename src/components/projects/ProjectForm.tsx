@@ -59,11 +59,15 @@ const fieldStyle: React.CSSProperties = {
   marginBottom: "24px",
 };
 
-export function ProjectForm() {
+interface ProjectFormProps {
+  initialSector?: SectorValue;
+}
+
+export function ProjectForm({ initialSector }: ProjectFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [sector, setSector] = useState<SectorValue | "">("");
+  const [sector, setSector] = useState<SectorValue | "">(initialSector ?? "");
   const [coverType, setCoverType] = useState<CoverTypeValue | "">("");
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -91,6 +95,7 @@ export function ProjectForm() {
       name: data.get("name") as string,
       countryCode: data.get("countryCode") as string,
       sector,
+      dealType: "exim_project_finance",
       capexUsd: capexRaw ? Number(capexRaw) : null,
       eximCoverType: coverType || null,
       targetLoiDate: targetLoiRaw ? new Date(targetLoiRaw) : null,

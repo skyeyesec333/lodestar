@@ -1,8 +1,8 @@
-import type { ProjectSector, EximCoverType } from "@prisma/client";
+import type { ProjectSector, EximCoverType, DealType } from "@prisma/client";
 import { db } from "./index";
 import type {
   Project,
-  ProjectSummary,
+  ProjectListItem,
   ProjectListQuery,
   ProjectListSort,
   Result,
@@ -19,7 +19,17 @@ const projectSummarySelect = {
   stage: true,
   targetLoiDate: true,
   cachedReadinessScore: true,
+  capexUsdCents: true,
   createdAt: true,
+  activityEvents: {
+    select: {
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: "desc" as const,
+    },
+    take: 1,
+  },
 } as const;
 
 const projectFullSelect = {
@@ -30,6 +40,7 @@ const projectFullSelect = {
   countryCode: true,
   sector: true,
   capexUsdCents: true,
+  dealType: true,
   eximCoverType: true,
   stage: true,
   targetLoiDate: true,
@@ -46,25 +57,44 @@ const projectFullSelect = {
 export async function getProjectsByUser(
   clerkUserId: string,
   query: ProjectListQuery = {}
-): Promise<Result<ProjectSummary[]>> {
+): Promise<Result<ProjectListItem[]>> {
   try {
     const sort = query.sort ?? "created_desc";
     const search = query.q?.trim();
+    const readinessWhere = getReadinessWhere(query.readiness);
+    const filters: Array<Record<string, unknown>> = [
+      {
+        OR: [
+          { ownerClerkId: clerkUserId },
+          { members: { some: { clerkUserId } } },
+        ],
+      },
+    ];
+
+    if (search) {
+      filters.push({
+        OR: [
+          { name: { contains: search, mode: "insensitive" as const } },
+          { countryCode: { contains: search.toUpperCase(), mode: "insensitive" as const } },
+          { slug: { contains: search, mode: "insensitive" as const } },
+        ],
+      });
+    }
+
+    if (query.sector && query.sector !== "all") {
+      filters.push({ sector: query.sector });
+    }
+
+    if (query.stage && query.stage !== "all") {
+      filters.push({ stage: query.stage });
+    }
+
+    if (Object.keys(readinessWhere).length > 0) {
+      filters.push(readinessWhere);
+    }
 
     const where = {
-      ownerClerkId: clerkUserId,
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" as const } },
-              { countryCode: { contains: search.toUpperCase(), mode: "insensitive" as const } },
-              { slug: { contains: search, mode: "insensitive" as const } },
-            ],
-          }
-        : {}),
-      ...(query.sector && query.sector !== "all" ? { sector: query.sector } : {}),
-      ...(query.stage && query.stage !== "all" ? { stage: query.stage } : {}),
-      ...getReadinessWhere(query.readiness),
+      AND: filters,
     };
 
     const rows = await db.project.findMany({
@@ -72,7 +102,22 @@ export async function getProjectsByUser(
       select: projectSummarySelect,
       orderBy: getProjectListOrderBy(sort),
     });
-    return { ok: true, value: rows };
+    return {
+      ok: true,
+      value: rows.map((row) => ({
+        id: row.id,
+        name: row.name,
+        slug: row.slug,
+        countryCode: row.countryCode,
+        sector: row.sector,
+        stage: row.stage,
+        targetLoiDate: row.targetLoiDate,
+        cachedReadinessScore: row.cachedReadinessScore,
+        capexUsdCents: row.capexUsdCents,
+        createdAt: row.createdAt,
+        lastActivityAt: row.activityEvents[0]?.createdAt ?? null,
+      })),
+    };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown database error";
@@ -123,7 +168,13 @@ export async function getProjectBySlug(
 ): Promise<Result<Project>> {
   try {
     const row = await db.project.findFirst({
-      where: { slug, ownerClerkId: clerkUserId },
+      where: {
+        slug,
+        OR: [
+          { ownerClerkId: clerkUserId },
+          { members: { some: { clerkUserId } } },
+        ],
+      },
       select: projectFullSelect,
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
@@ -140,7 +191,13 @@ export async function getProjectById(
 ): Promise<Result<Project>> {
   try {
     const row = await db.project.findFirst({
-      where: { id, ownerClerkId: clerkUserId },
+      where: {
+        id,
+        OR: [
+          { ownerClerkId: clerkUserId },
+          { members: { some: { clerkUserId } } },
+        ],
+      },
       select: projectFullSelect,
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
@@ -187,6 +244,7 @@ export type CreateProjectInput = {
   description: string | null;
   countryCode: string;
   sector: ProjectSector;
+  dealType: DealType;
   capexUsdCents: bigint | null;
   eximCoverType: EximCoverType | null;
   targetLoiDate: Date | null;

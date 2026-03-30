@@ -33,6 +33,7 @@ export async function POST(req: Request) {
       countryCode: true,
       sector: true,
       capexUsdCents: true,
+      dealType: true,
       eximCoverType: true,
       targetLoiDate: true,
       description: true,
@@ -43,14 +44,15 @@ export async function POST(req: Request) {
     return new Response("Not found", { status: 404 });
   }
 
-  const reqResult = await getProjectRequirements(projectId);
+  const reqResult = await getProjectRequirements(projectId, projectRow.dealType);
   if (!reqResult.ok) {
     return new Response("Failed to load requirements", { status: 500 });
   }
 
   const rows = reqResult.value;
   const { scoreBps } = computeReadiness(
-    rows.map((r) => ({ requirementId: r.requirementId, status: r.status as RequirementStatusValue }))
+    rows.map((r) => ({ requirementId: r.requirementId, status: r.status as RequirementStatusValue })),
+    projectRow.dealType
   );
 
   const serializableProject = {
@@ -60,6 +62,7 @@ export async function POST(req: Request) {
     description: projectRow.description,
     countryCode: projectRow.countryCode,
     sector: projectRow.sector,
+    dealType: projectRow.dealType,
     capexUsdCents: projectRow.capexUsdCents != null ? Number(projectRow.capexUsdCents) : null,
     eximCoverType: projectRow.eximCoverType,
     stage: projectRow.stage,

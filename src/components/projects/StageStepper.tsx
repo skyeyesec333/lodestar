@@ -1,17 +1,30 @@
-const STAGES = [
-  { id: "concept",          label: "Concept"          },
-  { id: "pre_loi",          label: "Pre-LOI"          },
-  { id: "loi_submitted",    label: "LOI Submitted"    },
-  { id: "loi_approved",     label: "LOI Approved"     },
-  { id: "pre_commitment",   label: "Pre-Commitment"   },
-  { id: "final_commitment", label: "Final Commitment" },
-  { id: "financial_close",  label: "Financial Close"  },
+import type { DealType } from "@prisma/client";
+
+const EXIM_STAGES = [
+  { id: "concept",          label: "Concept"            },
+  { id: "pre_loi",          label: "Pre-LOI"            },
+  { id: "loi_submitted",    label: "LOI Submitted"      },
+  { id: "loi_approved",     label: "LOI Approved"       },
+  { id: "pre_commitment",   label: "Pre-Commitment"     },
+  { id: "final_commitment", label: "Final Commitment"   },
+  { id: "financial_close",  label: "Financial Close"    },
 ] as const;
 
-type StageId = (typeof STAGES)[number]["id"];
+const GENERIC_STAGES = [
+  { id: "concept",          label: "Concept"            },
+  { id: "pre_loi",          label: "Early Development"  },
+  { id: "loi_submitted",    label: "Mandate / Approval" },
+  { id: "loi_approved",     label: "Due Diligence"      },
+  { id: "pre_commitment",   label: "Pre-Commitment"     },
+  { id: "final_commitment", label: "Committed"          },
+  { id: "financial_close",  label: "Financial Close"    },
+] as const;
 
-export function StageStepper({ current }: { current: StageId }) {
-  const currentIndex = STAGES.findIndex((s) => s.id === current);
+type StageId = (typeof EXIM_STAGES)[number]["id"];
+
+export function StageStepper({ current, dealType }: { current: StageId; dealType?: DealType }) {
+  const stages = dealType === "exim_project_finance" || !dealType ? EXIM_STAGES : GENERIC_STAGES;
+  const currentIndex = stages.findIndex((s) => s.id === current);
 
   return (
     <div style={{ marginBottom: "40px" }}>
@@ -38,7 +51,7 @@ export function StageStepper({ current }: { current: StageId }) {
             height: "1px",
             width: currentIndex === 0
               ? "0%"
-              : `calc(${(currentIndex / (STAGES.length - 1)) * 100}% - 0px)`,
+              : `calc(${(currentIndex / (stages.length - 1)) * 100}% - 0px)`,
             backgroundColor: "var(--accent)",
             zIndex: 1,
             transition: "width 0.4s ease",
@@ -46,7 +59,7 @@ export function StageStepper({ current }: { current: StageId }) {
         />
 
         {/* Stage dots */}
-        {STAGES.map((stage, i) => {
+        {stages.map((stage, i) => {
           const isCompleted = i < currentIndex;
           const isCurrent   = i === currentIndex;
           const isFuture    = i > currentIndex;
@@ -58,25 +71,18 @@ export function StageStepper({ current }: { current: StageId }) {
                 flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                alignItems: i === 0 ? "flex-start" : i === STAGES.length - 1 ? "flex-end" : "center",
+                alignItems: i === 0 ? "flex-start" : i === stages.length - 1 ? "flex-end" : "center",
                 position: "relative",
                 zIndex: 2,
               }}
             >
-              {/* Dot */}
               <div
                 style={{
                   width: "20px",
                   height: "20px",
                   borderRadius: "50%",
-                  backgroundColor: isFuture
-                    ? "var(--bg)"
-                    : isCurrent
-                    ? "var(--accent)"
-                    : "var(--accent)",
-                  border: isFuture
-                    ? "1px solid var(--border)"
-                    : `2px solid var(--accent)`,
+                  backgroundColor: isFuture ? "var(--bg)" : "var(--accent)",
+                  border: isFuture ? "1px solid var(--border)" : `2px solid var(--accent)`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -93,7 +99,6 @@ export function StageStepper({ current }: { current: StageId }) {
                 )}
               </div>
 
-              {/* Label */}
               <span
                 style={{
                   fontFamily: "'DM Mono', monospace",
@@ -104,7 +109,7 @@ export function StageStepper({ current }: { current: StageId }) {
                   color: isFuture ? "var(--ink-muted)" : isCurrent ? "var(--accent)" : "var(--ink-mid)",
                   marginTop: "8px",
                   whiteSpace: "nowrap",
-                  textAlign: i === 0 ? "left" : i === STAGES.length - 1 ? "right" : "center",
+                  textAlign: i === 0 ? "left" : i === stages.length - 1 ? "right" : "center",
                 }}
               >
                 {stage.label}

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "EXIM project finance readiness platform",
 };
 
-const VALID_THEMES = ["parchment", "minimal", "navy", "forest", "slate"] as const;
+const VALID_THEMES = ["parchment", "minimal", "navy", "forest", "slate", "obsidian", "midnight", "ember", "sky_blue"] as const;
 type ThemeId = (typeof VALID_THEMES)[number];
 
 function isValidTheme(t: string): t is ThemeId {

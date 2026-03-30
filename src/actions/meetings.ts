@@ -10,6 +10,7 @@ import {
   updateActionItemStatus,
 } from "@/lib/db/meetings";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import type { MeetingType, ActionItemPriority, ActionItemStatus } from "@prisma/client";
 import type { Result } from "@/types";
 import type { MeetingRow, ActionItemRow } from "@/lib/db/meetings";
@@ -49,13 +50,6 @@ const updateActionItemStatusSchema = z.object({
   status: z.enum(STATUS_VALUES),
 });
 
-async function verifyOwnership(projectId: string, userId: string) {
-  return db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true },
-  });
-}
-
 export async function createMeeting(input: unknown): Promise<Result<MeetingRow>> {
   const { userId } = await auth();
   if (!userId) {
@@ -72,9 +66,8 @@ export async function createMeeting(input: unknown): Promise<Result<MeetingRow>>
 
   const { projectId, slug, title, meetingType, meetingDate, durationMinutes, location, summary, attendeeStakeholderIds } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await createMeetingRecord({
     projectId,
@@ -112,9 +105,8 @@ export async function createActionItem(input: unknown): Promise<Result<ActionIte
 
   const { projectId, slug, meetingId, title, description, priority, dueDate, assignedToId, requirementId } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   // Resolve requirementId → projectRequirementId
   let projectRequirementId: string | null = null;
@@ -159,9 +151,8 @@ export async function updateMeetingActionItemStatus(input: unknown): Promise<Res
 
   const { projectId, slug, actionItemId, status } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await updateActionItemStatus(actionItemId, projectId, status as ActionItemStatus);
   if (!result.ok) return result;
