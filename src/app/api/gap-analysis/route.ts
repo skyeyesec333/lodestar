@@ -44,14 +44,15 @@ export async function POST(req: Request) {
     return new Response("Not found", { status: 404 });
   }
 
-  const reqResult = await getProjectRequirements(projectId);
+  const reqResult = await getProjectRequirements(projectId, projectRow.dealType);
   if (!reqResult.ok) {
     return new Response("Failed to load requirements", { status: 500 });
   }
 
   const rows = reqResult.value;
   const { scoreBps } = computeReadiness(
-    rows.map((r) => ({ requirementId: r.requirementId, status: r.status as RequirementStatusValue }))
+    rows.map((r) => ({ requirementId: r.requirementId, status: r.status as RequirementStatusValue })),
+    projectRow.dealType
   );
 
   const serializableProject = {

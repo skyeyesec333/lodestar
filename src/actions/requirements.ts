@@ -14,7 +14,7 @@ import {
 import type { RequirementNoteRow } from "@/lib/db/requirements";
 import { recordActivity } from "@/lib/db/activity";
 import { computeReadiness } from "@/lib/scoring/index";
-import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
+import { getRequirementById } from "@/lib/requirements/index";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
 import type { Result, AppError } from "@/types";
 import type { RequirementStatusValue } from "@/types/requirements";
@@ -78,17 +78,19 @@ export async function updateRequirementStatus(
     select: { requirementId: true, status: true },
   });
 
+  const dealType = access.value.dealType;
   const { scoreBps } = computeReadiness(
     allStatuses.map((r) => ({
       requirementId: r.requirementId,
       status: r.status as RequirementStatusValue,
-    }))
+    })),
+    dealType
   );
 
   const scoreResult = await updateProjectCachedScore(projectId, scoreBps);
   if (!scoreResult.ok) return scoreResult;
 
-  const reqName = EXIM_REQUIREMENTS.find((r) => r.id === requirementId)?.name ?? requirementId;
+  const reqName = getRequirementById(dealType, requirementId)?.name ?? requirementId;
   await recordActivity(projectId, userId, "requirement_status_changed",
     `${reqName} → ${REQUIREMENT_STATUS_LABELS[status]}`,
     { requirementId, status }

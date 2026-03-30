@@ -7,11 +7,13 @@ export type ProjectAccessContext = {
   projectId: string;
   slug: string;
   role: ProjectAccessRole;
+  dealType: string;
 };
 
 const accessSelect = {
   id: true,
   slug: true,
+  dealType: true,
   ownerClerkId: true,
   members: {
     select: {
@@ -78,7 +80,7 @@ export async function getProjectAccessById(
   if (!row) return null;
   const role = resolveRole(row, clerkUserId);
   if (!role) return null;
-  return { projectId: row.id, slug: row.slug, role };
+  return { projectId: row.id, slug: row.slug, role, dealType: row.dealType };
 }
 
 export async function getProjectAccessBySlug(
@@ -106,7 +108,7 @@ export async function getProjectAccessBySlug(
   if (!row) return null;
   const role = resolveRole(row, clerkUserId);
   if (!role) return null;
-  return { projectId: row.id, slug: row.slug, role };
+  return { projectId: row.id, slug: row.slug, role, dealType: row.dealType };
 }
 
 export async function assertProjectAccess(

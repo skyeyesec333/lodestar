@@ -104,7 +104,7 @@ export default async function ProjectPage({
   if (!projectResult.ok) notFound();
   const project = projectResult.value;
 
-  const reqResult = await getProjectRequirements(project.id);
+  const reqResult = await getProjectRequirements(project.id, project.dealType);
   if (!reqResult.ok) {
     throw new Error(`Failed to load requirements: ${reqResult.error.message}`);
   }
@@ -227,7 +227,8 @@ export default async function ProjectPage({
     rows.map((r) => ({
       requirementId: r.requirementId,
       status: r.status as RequirementStatusValue,
-    }))
+    })),
+    project.dealType
   );
   const isExim = project.dealType === "exim_project_finance";
 

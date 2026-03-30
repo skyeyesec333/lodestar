@@ -1,5 +1,7 @@
 import { db } from "./index";
 import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
+import { getRequirementsForDealType } from "@/lib/requirements/index";
+import type { RequirementDef } from "@/lib/requirements/types";
 import type { RequirementStatusValue } from "@/types/requirements";
 import type { AppError, Result } from "@/types";
 
@@ -62,10 +64,11 @@ type StatusRow = {
 };
 
 function buildRows(
+  requirements: readonly RequirementDef[],
   statusMap: Map<string, StatusRow>,
   notesMap: Map<string, RequirementNoteRow[]>
 ): ProjectRequirementRow[] {
-  return EXIM_REQUIREMENTS.map((req) => {
+  return requirements.map((req) => {
     const live = statusMap.get(req.id);
     return {
       projectRequirementId: live?.id ?? "",
@@ -74,7 +77,7 @@ function buildRows(
       description: req.description,
       category: req.category,
       phaseRequired: req.phaseRequired,
-      isLoiCritical: req.isLoiCritical,
+      isLoiCritical: req.isPrimaryGate,
       weight: req.weight,
       sortOrder: req.sortOrder,
       status: (live?.status ?? "not_started") as RequirementStatusValue,
@@ -92,7 +95,8 @@ function buildRows(
 }
 
 /**
- * Returns all 43 requirement rows for a project, merged with static taxonomy.
+ * Returns all requirement rows for a project, merged with the correct static
+ * taxonomy for the project's deal type.
  * Initializes any missing rows to not_started (idempotent via createMany skipDuplicates).
  */
 type RawNoteRow = {
@@ -133,18 +137,37 @@ async function fetchNotesMap(projectId: string): Promise<Map<string, Requirement
 }
 
 export async function getProjectRequirements(
-  projectId: string
+  projectId: string,
+  dealType?: string
 ): Promise<Result<ProjectRequirementRow[]>> {
   try {
+    // Resolve the taxonomy for this deal type (falls back to EXIM if omitted)
+    const requirements: readonly RequirementDef[] =
+      dealType && dealType !== "exim_project_finance"
+        ? getRequirementsForDealType(dealType)
+        : EXIM_REQUIREMENTS.map((r) => ({
+            id: r.id,
+            category: r.category,
+            name: r.name,
+            description: r.description,
+            phaseRequired: r.phaseRequired,
+            isPrimaryGate: r.isLoiCritical,
+            weight: r.weight,
+            sortOrder: r.sortOrder,
+            phaseLabel: r.phaseRequired === "loi" ? "LOI" : "Final Commitment",
+            defaultOwner: "Sponsor",
+            applicableSectors: r.applicableSectors,
+          }));
+
     const existing = await db.projectRequirement.findMany({
       where: { projectId },
       select: requirementStatusSelect,
     });
 
     const existingIds = new Set(existing.map((r) => r.requirementId));
-    const missingIds = EXIM_REQUIREMENTS.map((r) => r.id).filter(
-      (id) => !existingIds.has(id)
-    );
+    const missingIds = requirements
+      .map((r) => r.id)
+      .filter((id) => !existingIds.has(id));
 
     const notesMap = await fetchNotesMap(projectId);
 
@@ -162,10 +185,24 @@ export async function getProjectRequirements(
         where: { projectId },
         select: requirementStatusSelect,
       });
-      return { ok: true, value: buildRows(new Map(all.map((r) => [r.requirementId, r])), notesMap) };
+      return {
+        ok: true,
+        value: buildRows(
+          requirements,
+          new Map(all.map((r) => [r.requirementId, r])),
+          notesMap
+        ),
+      };
     }
 
-    return { ok: true, value: buildRows(new Map(existing.map((r) => [r.requirementId, r])), notesMap) };
+    return {
+      ok: true,
+      value: buildRows(
+        requirements,
+        new Map(existing.map((r) => [r.requirementId, r])),
+        notesMap
+      ),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };

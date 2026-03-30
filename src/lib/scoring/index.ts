@@ -2,16 +2,23 @@
  * Readiness score calculation.
  *
  * The score is a weighted percentage reflecting how close a project's
- * EXIM requirements are to completion. Computed at application layer,
+ * requirements are to completion. Computed at application layer,
  * cached on `projects.cachedReadinessScore` as basis points (0–10000).
+ *
+ * `computeReadiness` now accepts any requirements taxonomy via the
+ * `requirements` parameter, enabling all four deal types (EXIM, DFI,
+ * Commercial Bank, PE) to share the same scoring logic.
+ *
+ * For backwards compatibility, `computeReadiness` without a `requirements`
+ * argument still operates on the EXIM taxonomy.
  */
 
 import {
   EXIM_REQUIREMENTS,
   LOI_CRITICAL_IDS,
-  TOTAL_WEIGHT,
-  REQUIREMENTS_BY_ID,
 } from "../exim/requirements";
+import { getRequirementsForDealType } from "../requirements/index";
+import type { RequirementDef } from "../requirements/types";
 import type { RequirementStatusValue } from "../../types/requirements";
 
 /**
@@ -41,10 +48,10 @@ interface ReadinessResult {
   /** Readiness score in basis points (0–10000). e.g. 7543 = 75.43% */
   scoreBps: number;
 
-  /** Whether all LOI-critical items are at substantially_final or better. */
+  /** Whether all primary-gate items are at substantially_final or better. */
   loiReady: boolean;
 
-  /** IDs of LOI-critical requirements that are NOT yet at substantially_final or better. */
+  /** IDs of primary-gate requirements that are NOT yet at substantially_final or better. */
   loiBlockers: string[];
 
   /** Per-category breakdown: category → basis points. */
@@ -52,14 +59,12 @@ interface ReadinessResult {
 }
 
 /**
- * Computes the readiness score for a project given its current
- * requirement statuses.
- *
- * Requirements not present in `statuses` are treated as `not_started`.
- * Requirements with status `not_applicable` are excluded from both the
- * numerator and denominator — they do not affect the score or LOI blockers.
+ * Core scoring logic — operates on any RequirementDef array.
  */
-export function computeReadiness(statuses: RequirementInput[]): ReadinessResult {
+function scoreRequirements(
+  requirements: readonly RequirementDef[],
+  statuses: RequirementInput[]
+): ReadinessResult {
   const statusMap = new Map(statuses.map((s) => [s.requirementId, s.status]));
 
   let weightedSum = 0;
@@ -68,7 +73,7 @@ export function computeReadiness(statuses: RequirementInput[]): ReadinessResult 
   const categoryWeights: Record<string, number> = {};
   const loiBlockers: string[] = [];
 
-  for (const req of EXIM_REQUIREMENTS) {
+  for (const req of requirements) {
     const status = statusMap.get(req.id) ?? "not_started";
 
     // not_applicable: fully excluded from scoring and blocker logic
@@ -86,7 +91,7 @@ export function computeReadiness(statuses: RequirementInput[]): ReadinessResult 
       (categoryWeights[req.category] ?? 0) + req.weight;
 
     if (
-      req.isLoiCritical &&
+      req.isPrimaryGate &&
       status !== "substantially_final" &&
       status !== "executed" &&
       status !== "waived"
@@ -95,7 +100,6 @@ export function computeReadiness(statuses: RequirementInput[]): ReadinessResult 
     }
   }
 
-  // Guard against edge case of all requirements marked not_applicable
   const scoreBps =
     applicableWeight === 0
       ? 0
@@ -113,3 +117,43 @@ export function computeReadiness(statuses: RequirementInput[]): ReadinessResult 
     categoryScores,
   };
 }
+
+/**
+ * Computes the readiness score for a project given its current requirement
+ * statuses. When `dealType` is provided, routes to the appropriate taxonomy.
+ * Defaults to EXIM for backwards compatibility.
+ *
+ * Requirements not present in `statuses` are treated as `not_started`.
+ * Requirements with status `not_applicable` are excluded from both the
+ * numerator and denominator.
+ */
+export function computeReadiness(
+  statuses: RequirementInput[],
+  dealType?: string
+): ReadinessResult {
+  if (dealType && dealType !== "exim_project_finance") {
+    const requirements = getRequirementsForDealType(dealType);
+    return scoreRequirements(requirements, statuses);
+  }
+
+  // EXIM path — uses legacy EximRequirementDef adapted to RequirementDef shape
+  const eximAsGeneric: RequirementDef[] = EXIM_REQUIREMENTS.map((r) => ({
+    id: r.id,
+    category: r.category,
+    name: r.name,
+    description: r.description,
+    phaseRequired: r.phaseRequired,
+    isPrimaryGate: r.isLoiCritical,
+    weight: r.weight,
+    sortOrder: r.sortOrder,
+    phaseLabel: r.phaseRequired === "loi" ? "LOI" : "Final Commitment",
+    defaultOwner: "Sponsor",
+    applicableSectors: r.applicableSectors,
+  }));
+
+  return scoreRequirements(eximAsGeneric, statuses);
+}
+
+// Re-export for code that imports these directly from scoring/index
+export { LOI_CRITICAL_IDS };
+export type { ReadinessResult };
