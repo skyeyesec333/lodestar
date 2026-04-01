@@ -593,6 +593,33 @@ function GanttSVG({
   const todayX  = dx(today);
   const loiX    = loiDate  ? dx(loiDate)  : null;
   const closeX  = closeDate ? dx(closeDate) : null;
+  const visibleMilestones = milestones
+    .filter((milestone) => milestone.targetDate)
+    .map((milestone) => ({
+      milestone,
+      x: dx(new Date(milestone.targetDate!)),
+    }))
+    .filter((entry) => entry.x >= LABEL_W && entry.x <= width - RIGHT_PAD)
+    .sort((a, b) => a.x - b.x);
+  const milestoneLaneRightEdges = [-Infinity, -Infinity, -Infinity];
+  const laidOutMilestones = visibleMilestones.map((entry) => {
+    const shortLabel =
+      entry.milestone.name.length > 18
+        ? entry.milestone.name.slice(0, 16) + "…"
+        : entry.milestone.name;
+    const estimatedWidth = Math.max(46, shortLabel.length * 5.4);
+    const minGap = Math.max(18, estimatedWidth * 0.45);
+    let lane = milestoneLaneRightEdges.findIndex((rightEdge) => entry.x - rightEdge >= minGap);
+    let showLabel = true;
+    if (lane === -1) {
+      lane = 2;
+      showLabel = entry.x - milestoneLaneRightEdges[2] >= Math.max(26, estimatedWidth * 0.7);
+    }
+    if (showLabel) {
+      milestoneLaneRightEdges[lane] = entry.x + estimatedWidth / 2;
+    }
+    return { ...entry, shortLabel, lane, showLabel };
+  });
 
   // Skip rendering if width isn't measured yet
   if (width < 10) return <svg style={{ display: "block", width: "100%", height: `${svgH}px` }} />;
@@ -966,10 +993,7 @@ function GanttSVG({
       )}
 
       {/* Milestone diamonds */}
-      {milestones.map((m) => {
-        if (!m.targetDate) return null;
-        const mx = dx(new Date(m.targetDate));
-        if (mx < LABEL_W || mx > width - RIGHT_PAD) return null;
+      {laidOutMilestones.map(({ milestone: m, x: mx, shortLabel, lane, showLabel }) => {
         const my = AXIS_H - 10; // sit above the axis line
         const S = 5; // half-size of diamond
         const completed = !!m.completedAt;
@@ -994,18 +1018,20 @@ function GanttSVG({
               strokeWidth={1.2}
             />
             {/* Label */}
-            <text
-              x={mx}
-              y={my - S - 3}
-              textAnchor="middle"
-              fontFamily="'DM Mono', monospace"
-              fontSize={7}
-              letterSpacing="0.06em"
-              fill={fill}
-              style={{ userSelect: "none" }}
-            >
-              {m.name.length > 18 ? m.name.slice(0, 16) + "…" : m.name}
-            </text>
+            {showLabel ? (
+              <text
+                x={mx}
+                y={my - S - 3 - lane * 11}
+                textAnchor="middle"
+                fontFamily="'DM Mono', monospace"
+                fontSize={7}
+                letterSpacing="0.06em"
+                fill={fill}
+                style={{ userSelect: "none" }}
+              >
+                {shortLabel}
+              </text>
+            ) : null}
           </g>
         );
       })}

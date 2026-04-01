@@ -60,6 +60,7 @@ export async function upsertApprovalAction(raw: unknown): Promise<Result<Approva
 }
 
 const getApprovalSchema = z.object({
+  projectId: z.string().min(1),
   targetType: z.enum(TARGET_TYPES),
   targetId: z.string().min(1),
 });
@@ -71,5 +72,9 @@ export async function getApprovalAction(raw: unknown): Promise<Result<ApprovalRo
   const parsed = getApprovalSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
-  return getApproval(parsed.data.targetType as ApprovalTargetType, parsed.data.targetId);
+  const { projectId, targetType, targetId } = parsed.data;
+  const access = await assertProjectAccess(projectId, userId, "viewer");
+  if (!access.ok) return { ok: false, error: access.error };
+
+  return getApproval(targetType as ApprovalTargetType, targetId);
 }

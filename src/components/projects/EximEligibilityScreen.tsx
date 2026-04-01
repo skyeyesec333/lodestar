@@ -321,7 +321,7 @@ export function EximEligibilityScreen({ onPass, onExit }: Props) {
     } else {
       if (answer === "check") {
         addAdvisory(
-          "CLS status has not been confirmed. Verify the deal country is open on EXIM's Country Limitation Schedule before investing significant time in the data room."
+          "CLS status has not been confirmed. Verify the deal country is open on EXIM's Country Limitation Schedule before investing significant time in the workspace."
         );
       }
       setStep(4);
@@ -634,7 +634,7 @@ export function EximEligibilityScreen({ onPass, onExit }: Props) {
                   onPass({ passed: true, sector: answers.q4, advisories })
                 }
               >
-                Continue to Deal Setup →
+                Return to Workspace Setup →
               </button>
             </div>
           </div>
@@ -714,7 +714,7 @@ export function EximEligibilityScreen({ onPass, onExit }: Props) {
             </div>
             <div style={{ marginTop: "16px" }}>
               <button type="button" style={backLinkStyle} onClick={onExit}>
-                ← Back to Deals
+                ← Close Pre-Screen
               </button>
             </div>
           </div>

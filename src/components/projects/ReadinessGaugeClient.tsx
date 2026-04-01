@@ -109,7 +109,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
               margin: "0 0 8px",
             }}
           >
-            {isExim ? "EXIM Deal Readiness" : "Deal Readiness"}
+            Next Gate Readiness
           </p>
           <p
             style={{
@@ -137,7 +137,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
                 borderRadius: "2px",
               }}
             >
-              {loiReady ? "LOI Ready" : "LOI Pending"}
+              {isExim ? (loiReady ? "LOI Ready" : "LOI Pending") : (loiReady ? "Gate Ready" : "Gate Pending")}
             </span>
           </div>
 

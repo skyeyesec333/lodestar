@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useBeacon, type BeaconTab } from "./BeaconProvider";
 import type { ChatCitation, ChatRuntimeContext } from "@/types";
 import type { ChatPresetQuestion } from "@/components/chat/ChatWidget";
+import { getWorkspaceChatPresets } from "@/lib/ai/chat-presets";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ export interface BeaconPanelProps {
   pageContext?: string;
   context?: ChatRuntimeContext;
   projectName?: string;
+  dealType?: string;
   readinessPct?: number;
   loiBlockerCount?: number;
 }
@@ -201,7 +203,7 @@ function SignalDotGlyph({ level }: { level: "critical" | "warning" | "info" }) {
 const TABS: Array<{ id: BeaconTab; label: string }> = [
   { id: "assistant", label: "Assistant" },
   { id: "signals", label: "Signals" },
-  { id: "documents", label: "Data Room" },
+  { id: "documents", label: "Evidence" },
 ];
 
 function TabBar({
@@ -840,76 +842,113 @@ function CollapseToggle({ open, onToggle }: { open: boolean; onToggle: () => voi
       aria-label={open ? "Collapse Beacon panel" : "Open Beacon panel"}
       onClick={onToggle}
       style={{
-        position: "absolute",
-        top: "50%",
-        left: "-14px",
-        transform: "translateY(-50%)",
-        width: "28px",
-        height: "28px",
-        borderRadius: "50%",
-        border: "1px solid var(--border)",
-        background: "var(--bg-card)",
-        color: "var(--ink-muted)",
+        width: open ? "30px" : "62px",
+        height: open ? "30px" : "62px",
+        borderRadius: "999px",
+        border: "1px solid color-mix(in srgb, var(--accent) 24%, var(--border))",
+        background: open
+          ? "color-mix(in srgb, var(--bg-card) 92%, var(--bg))"
+          : "linear-gradient(145deg, color-mix(in srgb, var(--accent) 12%, var(--bg-card)), color-mix(in srgb, var(--bg-card) 90%, var(--bg)))",
+        color: open ? "var(--ink-muted)" : "var(--accent)",
         cursor: "pointer",
         display: "grid",
         placeItems: "center",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.10)",
-        zIndex: 10,
+        boxShadow: open
+          ? "0 8px 18px rgba(0,0,0,0.16)"
+          : "0 16px 36px rgba(0,0,0,0.28), 0 2px 10px rgba(0,0,0,0.16)",
+        zIndex: 120,
+        transition: "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease",
       }}
     >
-      {open ? <ChevronRightGlyph /> : <ChevronLeftGlyph />}
+      {open ? <ChevronRightGlyph /> : <BeaconGlyph size={20} />}
     </button>
   );
 }
 
 // ─── BeaconPanel ──────────────────────────────────────────────────────────────
 
+const WORKSPACE_LABELS: Record<string, string> = {
+  overview: "Overview",
+  concept: "Concept",
+  parties: "Parties",
+  capital: "Capital",
+  workplan: "Workplan",
+  documents: "Evidence",
+  execution: "Execution",
+};
+
 export function BeaconPanel(props: BeaconPanelProps) {
-  const { open, setOpen, activeTab, setActiveTab } = useBeacon();
+  const { open, setOpen, activeTab, setActiveTab, activeWorkspace } = useBeacon();
+
+  const workspacePresets =
+    activeWorkspace && props.projectName && activeWorkspace !== "utilities"
+      ? getWorkspaceChatPresets(activeWorkspace, props.projectName, props.dealType ?? "other")
+      : [];
+
+  const effectivePresets =
+    workspacePresets.length > 0 ? workspacePresets : props.presetQuestions;
+
+  const workspaceLabel = activeWorkspace ? WORKSPACE_LABELS[activeWorkspace] : null;
+
+  const effectivePageContext =
+    workspaceLabel && props.pageContext
+      ? `Active workspace: ${workspaceLabel}. ${props.pageContext}`
+      : props.pageContext;
 
   return (
-    <aside
-      aria-label="Beacon AI assistant"
-      style={{
-        position: "sticky",
-        top: "72px",
-        height: "calc(100vh - 96px)",
-        width: open ? "300px" : "0px",
-        minWidth: open ? "300px" : "0px",
-        transition: "width 0.25s ease, min-width 0.25s ease",
-        overflow: "visible",
-        flexShrink: 0,
-        alignSelf: "flex-start",
-      }}
-    >
-      {/* Toggle button — always visible */}
-      <CollapseToggle open={open} onToggle={() => setOpen(!open)} />
+    <>
+      {!open && (
+        <div
+          style={{
+            position: "fixed",
+            right: "24px",
+            bottom: "24px",
+            zIndex: 120,
+          }}
+        >
+          <CollapseToggle open={false} onToggle={() => setOpen(true)} />
+        </div>
+      )}
 
-      {/* Panel body */}
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <motion.aside
             key="beacon-panel"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
+            aria-label="Beacon AI assistant"
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
             style={{
-              height: "100%",
-              width: "300px",
-              borderRadius: "16px",
+              position: "fixed",
+              right: "24px",
+              bottom: "24px",
+              zIndex: 120,
+              width: "min(360px, calc(100vw - 28px))",
+              height: "min(640px, calc(100vh - 104px))",
+              borderRadius: "18px",
               border: "1px solid var(--border)",
               background: "var(--bg-card)",
-              boxShadow: "0 4px 24px rgba(0,0,0,0.08)",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.28), 0 4px 18px rgba(0,0,0,0.12)",
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",
             }}
           >
+            <div
+              style={{
+                position: "absolute",
+                top: "12px",
+                right: "12px",
+                zIndex: 2,
+              }}
+            >
+              <CollapseToggle open onToggle={() => setOpen(false)} />
+            </div>
             {/* Header */}
             <div
               style={{
-                padding: "14px 16px 0",
+                padding: "14px 52px 0 16px",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
@@ -934,7 +973,15 @@ export function BeaconPanel(props: BeaconPanelProps) {
                   Beacon
                 </p>
                 <p style={{ margin: 0, fontSize: "11px", color: "var(--ink-muted)" }}>
-                  {props.projectName ?? "Deal assistant"}
+                  {workspaceLabel ? (
+                    <>
+                      {props.projectName ?? "Deal assistant"}
+                      <span style={{ margin: "0 4px", opacity: 0.4 }}>·</span>
+                      <span style={{ color: "var(--accent)" }}>{workspaceLabel}</span>
+                    </>
+                  ) : (
+                    props.projectName ?? "Deal assistant"
+                  )}
                 </p>
               </div>
               <span
@@ -959,10 +1006,10 @@ export function BeaconPanel(props: BeaconPanelProps) {
             {/* Tab content */}
             {activeTab === "assistant" && (
               <AssistantTab
-                presetQuestions={props.presetQuestions}
+                presetQuestions={effectivePresets}
                 placeholder={props.placeholder}
                 endpoint={props.endpoint}
-                pageContext={props.pageContext}
+                pageContext={effectivePageContext}
                 context={props.context}
               />
             )}
@@ -973,9 +1020,9 @@ export function BeaconPanel(props: BeaconPanelProps) {
               />
             )}
             {activeTab === "documents" && <DocumentsTab />}
-          </motion.div>
+          </motion.aside>
         )}
       </AnimatePresence>
-    </aside>
+    </>
   );
 }

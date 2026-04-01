@@ -9,16 +9,19 @@ type BeaconContextValue = {
   setOpen: (open: boolean) => void;
   activeTab: BeaconTab;
   setActiveTab: (tab: BeaconTab) => void;
+  activeWorkspace: string | null;
+  setActiveWorkspace: (workspace: string | null) => void;
 };
 
 const BeaconContext = createContext<BeaconContextValue | null>(null);
 
 export function BeaconProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<BeaconTab>("assistant");
+  const [activeWorkspace, setActiveWorkspace] = useState<string | null>(null);
 
   return (
-    <BeaconContext.Provider value={{ open, setOpen, activeTab, setActiveTab }}>
+    <BeaconContext.Provider value={{ open, setOpen, activeTab, setActiveTab, activeWorkspace, setActiveWorkspace }}>
       {children}
     </BeaconContext.Provider>
   );

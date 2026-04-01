@@ -8,6 +8,7 @@ describe("getProjectDetailChatPresets", () => {
   it("returns project-specific prompts with readiness details", () => {
     const presets = getProjectDetailChatPresets({
       projectName: "Kivu Hydro",
+      dealType: "exim_project_finance",
       scoreBps: 5234,
       loiReady: false,
       loiBlockerCount: 3,
@@ -22,6 +23,7 @@ describe("getProjectDetailChatPresets", () => {
   it("switches the blocker prompt when the project is LOI-ready", () => {
     const presets = getProjectDetailChatPresets({
       projectName: "Delta Port",
+      dealType: "exim_project_finance",
       scoreBps: 9000,
       loiReady: true,
       loiBlockerCount: 0,

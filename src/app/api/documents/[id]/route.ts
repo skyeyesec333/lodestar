@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { deleteDocumentRecord } from "@/lib/db/documents";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import { deleteFile } from "@/lib/storage/client";
 import { revalidatePath } from "next/cache";
 
@@ -14,19 +15,26 @@ export async function DELETE(
 
   const { id } = await params;
 
-  // Find doc to get projectId + slug for ownership check
+  // Find doc to get projectId + slug for access check
   const doc = await db.document.findFirst({
     where: { id },
     select: {
       id: true,
       projectId: true,
       filename: true,
-      project: { select: { ownerClerkId: true, slug: true } },
+      project: { select: { slug: true } },
     },
   });
 
-  if (!doc || doc.project.ownerClerkId !== userId) {
+  if (!doc) {
     return new Response("Not found", { status: 404 });
+  }
+
+  const access = await assertProjectAccess(doc.projectId, userId, "editor");
+  if (!access.ok) {
+    return new Response(access.error.message, {
+      status: access.error.code === "UNAUTHORIZED" ? 403 : 404,
+    });
   }
 
   const result = await deleteDocumentRecord(id, doc.projectId);

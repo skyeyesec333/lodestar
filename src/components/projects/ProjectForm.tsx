@@ -98,7 +98,11 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
       dealType: "exim_project_finance",
       capexUsd: capexRaw ? Number(capexRaw) : null,
       eximCoverType: coverType || null,
+      environmentalCategory: null,
+      programPath: "standard",
+      stage: "concept",
       targetLoiDate: targetLoiRaw ? new Date(targetLoiRaw) : null,
+      targetCloseDate: null,
       description: (data.get("description") as string) || null,
     });
 

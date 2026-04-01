@@ -1,4 +1,11 @@
-import type { ProjectSector, EximCoverType, DealType } from "@prisma/client";
+import type {
+  ProjectSector,
+  EximCoverType,
+  DealType,
+  EnvironmentalCategory,
+  ProgramPath,
+  ProjectPhase,
+} from "@prisma/client";
 import { db } from "./index";
 import type {
   Project,
@@ -7,6 +14,7 @@ import type {
   ProjectListSort,
   Result,
 } from "@/types";
+import { dedupeDemoPortfolioProjects } from "@/lib/projects/demo-portfolio";
 
 // ── Select shapes ─────────────────────────────────────────────────────────────
 
@@ -104,19 +112,21 @@ export async function getProjectsByUser(
     });
     return {
       ok: true,
-      value: rows.map((row) => ({
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        countryCode: row.countryCode,
-        sector: row.sector,
-        stage: row.stage,
-        targetLoiDate: row.targetLoiDate,
-        cachedReadinessScore: row.cachedReadinessScore,
-        capexUsdCents: row.capexUsdCents,
-        createdAt: row.createdAt,
-        lastActivityAt: row.activityEvents[0]?.createdAt ?? null,
-      })),
+      value: dedupeDemoPortfolioProjects(
+        rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          countryCode: row.countryCode,
+          sector: row.sector,
+          stage: row.stage,
+          targetLoiDate: row.targetLoiDate,
+          cachedReadinessScore: row.cachedReadinessScore,
+          capexUsdCents: row.capexUsdCents,
+          createdAt: row.createdAt,
+          lastActivityAt: row.activityEvents[0]?.createdAt ?? null,
+        }))
+      ),
     };
   } catch (err) {
     const message =
@@ -247,6 +257,9 @@ export type CreateProjectInput = {
   dealType: DealType;
   capexUsdCents: bigint | null;
   eximCoverType: EximCoverType | null;
+  environmentalCategory: EnvironmentalCategory | null;
+  programPath: ProgramPath;
+  stage: ProjectPhase;
   targetLoiDate: Date | null;
   targetCloseDate: Date | null;
   ownerClerkId: string;

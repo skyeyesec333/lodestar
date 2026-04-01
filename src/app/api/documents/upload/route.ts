@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { createDocumentRecord } from "@/lib/db/documents";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import { uploadFile } from "@/lib/storage/client";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
@@ -39,12 +40,12 @@ export async function POST(req: Request) {
     return new Response("Missing required fields", { status: 400 });
   }
 
-  // Verify project ownership
-  const project = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true, slug: true },
-  });
-  if (!project) return new Response("Not found", { status: 404 });
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) {
+    return new Response(access.error.message, {
+      status: access.error.code === "UNAUTHORIZED" ? 403 : 404,
+    });
+  }
 
   // Validate file
   if (file.size > MAX_SIZE_BYTES) {
@@ -99,7 +100,7 @@ export async function POST(req: Request) {
     { filename: file.name, requirementId: typeof requirementId === "string" ? requirementId : null }
   );
 
-  revalidatePath(`/projects/${slug}`);
+  revalidatePath(`/projects/${slug || access.value.slug}`);
 
   return Response.json({ ok: true, document: dbResult.value });
 }

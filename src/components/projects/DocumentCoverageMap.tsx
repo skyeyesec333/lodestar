@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { DocumentRow } from "@/lib/db/documents";
+import type { ExternalEvidenceRow } from "@/lib/db/external-evidence";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_CATEGORIES } from "@/lib/exim/requirements";
 import {
@@ -15,6 +16,7 @@ export type DocumentCoverageMapProps = {
   projectName?: string;
   requirementRows: ProjectRequirementRow[];
   documents: DocumentRow[];
+  externalEvidence?: ExternalEvidenceRow[];
 };
 
 type CoverageBucket = {
@@ -23,7 +25,14 @@ type CoverageBucket = {
   requirements: ProjectRequirementRow[];
   coveredCount: number;
   applicableCount: number;
-  documentCount: number;
+  evidenceCount: number;
+};
+
+type RequirementEvidenceItem = {
+  id: string;
+  label: string;
+  linkedAt: Date;
+  kind: "document" | "external";
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -82,17 +91,19 @@ function formatStatus(status: ProjectRequirementRow["status"]): string {
   }
 }
 
-function getCoverageLabel(row: ProjectRequirementRow, docCount: number): string {
+function getCoverageLabel(row: ProjectRequirementRow, evidenceCount: number): string {
   if (!row.isApplicable) return "Not applicable";
-  if (docCount > 0) return docCount === 1 ? "1 linked file" : `${docCount} linked files`;
+  if (evidenceCount > 0) {
+    return evidenceCount === 1 ? "1 linked source" : `${evidenceCount} linked sources`;
+  }
   if (row.status === "executed" || row.status === "waived") return "Needs linked evidence";
   if (row.status === "substantially_final") return "Evidence still pending";
   return "No linked files";
 }
 
-function getStatusTone(row: ProjectRequirementRow, docCount: number): string {
+function getStatusTone(row: ProjectRequirementRow, evidenceCount: number): string {
   if (!row.isApplicable) return "var(--ink-muted)";
-  if (docCount > 0) return "var(--teal)";
+  if (evidenceCount > 0) return "var(--teal)";
   if (row.status === "executed" || row.status === "waived") return "var(--gold)";
   return "var(--accent)";
 }
@@ -101,9 +112,11 @@ export function DocumentCoverageMap({
   projectName = "This deal",
   requirementRows,
   documents,
+  externalEvidence = [],
 }: DocumentCoverageMapProps) {
-  const docsByRequirementId = new Map<string, DocumentRow[]>();
+  const evidenceByRequirementId = new Map<string, RequirementEvidenceItem[]>();
   const orphanedDocuments: DocumentRow[] = [];
+  const orphanedExternalEvidence: ExternalEvidenceRow[] = [];
 
   for (const document of documents) {
     if (!document.projectRequirementId) {
@@ -111,21 +124,42 @@ export function DocumentCoverageMap({
       continue;
     }
 
-    const bucket = docsByRequirementId.get(document.projectRequirementId) ?? [];
-    bucket.push(document);
-    docsByRequirementId.set(document.projectRequirementId, bucket);
+    const bucket = evidenceByRequirementId.get(document.projectRequirementId) ?? [];
+    bucket.push({
+      id: document.id,
+      label: document.filename,
+      linkedAt: document.createdAt,
+      kind: "document",
+    });
+    evidenceByRequirementId.set(document.projectRequirementId, bucket);
+  }
+
+  for (const source of externalEvidence) {
+    if (!source.projectRequirementId) {
+      orphanedExternalEvidence.push(source);
+      continue;
+    }
+
+    const bucket = evidenceByRequirementId.get(source.projectRequirementId) ?? [];
+    bucket.push({
+      id: source.id,
+      label: source.title,
+      linkedAt: source.linkedAt,
+      kind: "external",
+    });
+    evidenceByRequirementId.set(source.projectRequirementId, bucket);
   }
 
   const buckets: CoverageBucket[] = REQUIREMENT_CATEGORIES.map((category) => {
     const requirements = requirementRows.filter((row) => row.category === category);
     const applicableCount = requirements.filter((row) => row.isApplicable).length;
     const coveredCount = requirements.filter((row) => {
-      const docsForRequirement = docsByRequirementId.get(row.projectRequirementId) ?? [];
-      return row.isApplicable && docsForRequirement.length > 0;
+      const evidenceForRequirement = evidenceByRequirementId.get(row.projectRequirementId) ?? [];
+      return row.isApplicable && evidenceForRequirement.length > 0;
     }).length;
-    const documentCount = requirements.reduce((sum, row) => {
-      const docsForRequirement = docsByRequirementId.get(row.projectRequirementId) ?? [];
-      return sum + docsForRequirement.length;
+    const evidenceCount = requirements.reduce((sum, row) => {
+      const evidenceForRequirement = evidenceByRequirementId.get(row.projectRequirementId) ?? [];
+      return sum + evidenceForRequirement.length;
     }, 0);
 
     return {
@@ -134,14 +168,14 @@ export function DocumentCoverageMap({
       requirements,
       coveredCount,
       applicableCount,
-      documentCount,
+      evidenceCount,
     };
   });
 
   const applicableRequirements = requirementRows.filter((row) => row.isApplicable);
   const coveredRequirements = applicableRequirements.filter((row) => {
-    const docsForRequirement = docsByRequirementId.get(row.projectRequirementId) ?? [];
-    return docsForRequirement.length > 0;
+    const evidenceForRequirement = evidenceByRequirementId.get(row.projectRequirementId) ?? [];
+    return evidenceForRequirement.length > 0;
   });
   const requiredWithDocs = coveredRequirements.length;
   const coveragePct =
@@ -150,9 +184,10 @@ export function DocumentCoverageMap({
       : 0;
   const loaCriticalRows = applicableRequirements.filter((row) => row.isLoiCritical);
   const loaCriticalCovered = loaCriticalRows.filter((row) => {
-    const docsForRequirement = docsByRequirementId.get(row.projectRequirementId) ?? [];
-    return docsForRequirement.length > 0;
+    const evidenceForRequirement = evidenceByRequirementId.get(row.projectRequirementId) ?? [];
+    return evidenceForRequirement.length > 0;
   }).length;
+  const orphanedEvidenceCount = orphanedDocuments.length + orphanedExternalEvidence.length;
 
   return (
     <section
@@ -231,9 +266,9 @@ export function DocumentCoverageMap({
       >
         {[
           { label: "Applicable requirements", value: applicableRequirements.length },
-          { label: "Linked with files", value: requiredWithDocs },
+          { label: "Linked with evidence", value: requiredWithDocs },
           { label: "LOI-critical covered", value: `${loaCriticalCovered}/${loaCriticalRows.length}` },
-          { label: "Orphaned files", value: orphanedDocuments.length },
+          { label: "Orphaned evidence", value: orphanedEvidenceCount },
         ].map((item) => (
           <div
             key={item.label}
@@ -295,8 +330,8 @@ export function DocumentCoverageMap({
           const ratio = bucket.applicableCount > 0 ? bucket.coveredCount / bucket.applicableCount : 0;
           const visibleRequirements = [...bucket.requirements]
             .sort((a, b) => {
-              const aDocCount = (docsByRequirementId.get(a.projectRequirementId) ?? []).length;
-              const bDocCount = (docsByRequirementId.get(b.projectRequirementId) ?? []).length;
+              const aDocCount = (evidenceByRequirementId.get(a.projectRequirementId) ?? []).length;
+              const bDocCount = (evidenceByRequirementId.get(b.projectRequirementId) ?? []).length;
               if (a.isLoiCritical !== b.isLoiCritical) return a.isLoiCritical ? -1 : 1;
               if (aDocCount !== bDocCount) return aDocCount - bDocCount;
               return a.sortOrder - b.sortOrder;
@@ -352,7 +387,7 @@ export function DocumentCoverageMap({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {bucket.documentCount} docs
+                  {bucket.evidenceCount} sources
                 </span>
               </div>
 
@@ -376,9 +411,11 @@ export function DocumentCoverageMap({
 
               <div style={{ display: "grid", gap: "8px" }}>
                 {visibleRequirements.map((row) => {
-                  const docsForRequirement = docsByRequirementId.get(row.projectRequirementId) ?? [];
-                  const latestDoc = docsForRequirement[0] ?? null;
-                  const docCount = docsForRequirement.length;
+                  const evidenceForRequirement = [...(evidenceByRequirementId.get(row.projectRequirementId) ?? [])].sort(
+                    (a, b) => b.linkedAt.getTime() - a.linkedAt.getTime()
+                  );
+                  const latestDoc = evidenceForRequirement[0] ?? null;
+                  const docCount = evidenceForRequirement.length;
                   const tone = getStatusTone(row, docCount);
 
                   return (
@@ -470,7 +507,7 @@ export function DocumentCoverageMap({
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              {latestDoc.filename}
+                              {latestDoc.label}
                             </span>
                             <span
                               style={{
@@ -479,9 +516,19 @@ export function DocumentCoverageMap({
                                 flexShrink: 0,
                               }}
                             >
-                              {formatDate(latestDoc.createdAt)}
+                              {formatDate(latestDoc.linkedAt)}
                             </span>
                           </div>
+                          {latestDoc.kind === "external" ? (
+                            <span
+                              style={{
+                                ...detailMicroMonoStyle,
+                                letterSpacing: "0.08em",
+                              }}
+                            >
+                              External link
+                            </span>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -504,7 +551,7 @@ export function DocumentCoverageMap({
         })}
       </div>
 
-      {orphanedDocuments.length > 0 ? (
+      {orphanedEvidenceCount > 0 ? (
         <div
           style={{
             marginTop: "16px",
@@ -521,10 +568,24 @@ export function DocumentCoverageMap({
               margin: "0 0 8px",
             }}
           >
-            Unlinked files
+            Unlinked evidence
           </p>
           <div style={{ display: "grid", gap: "6px" }}>
-            {orphanedDocuments.slice(0, 4).map((doc) => (
+            {[
+              ...orphanedDocuments.map((doc) => ({
+                id: doc.id,
+                label: doc.filename,
+                linkedAt: doc.createdAt,
+              })),
+              ...orphanedExternalEvidence.map((source) => ({
+                id: source.id,
+                label: source.title,
+                linkedAt: source.linkedAt,
+              })),
+            ]
+              .sort((a, b) => b.linkedAt.getTime() - a.linkedAt.getTime())
+              .slice(0, 4)
+              .map((doc) => (
               <div
                 key={doc.id}
                 style={{
@@ -545,7 +606,7 @@ export function DocumentCoverageMap({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {doc.filename}
+                  {doc.label}
                 </span>
                 <span
                   style={{
@@ -554,11 +615,11 @@ export function DocumentCoverageMap({
                     flexShrink: 0,
                   }}
                 >
-                  {formatDate(doc.createdAt)}
+                  {formatDate(doc.linkedAt)}
                 </span>
               </div>
             ))}
-            {orphanedDocuments.length > 4 ? (
+            {orphanedEvidenceCount > 4 ? (
               <p
                 style={{
                   ...detailMonoLabelStyle,
@@ -566,7 +627,7 @@ export function DocumentCoverageMap({
                   margin: "4px 0 0",
                 }}
               >
-                +{orphanedDocuments.length - 4} more
+                +{orphanedEvidenceCount - 4} more
               </p>
             ) : null}
           </div>

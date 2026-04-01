@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import { reviewDocument } from "@/lib/ai/document-review";
 
 export async function POST(req: Request) {
@@ -36,9 +37,15 @@ export async function POST(req: Request) {
     });
   }
 
-  // Verify the project belongs to the authenticated user
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) {
+    return new Response(access.error.message, {
+      status: access.error.code === "UNAUTHORIZED" ? 403 : 404,
+    });
+  }
+
   const project = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
+    where: { id: projectId },
     select: { id: true, sector: true, countryCode: true },
   });
   if (!project) return new Response("Not found", { status: 404 });

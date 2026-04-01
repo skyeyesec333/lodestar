@@ -305,6 +305,8 @@ model Project {
   requirementNotes    RequirementNote[]
   dealParties         DealParty[]
   milestones          DealMilestone[]
+  concept             ProjectConcept?
+  externalEvidence    ExternalEvidenceSource[]
   comments            Comment[]
   watchers            Watcher[]
   approvals           Approval[]
@@ -313,6 +315,26 @@ model Project {
   @@index([stage])
   @@index([cachedReadinessScore])
   @@map("projects")
+}
+
+/// Structured concept framing for a project. This captures the early thesis before
+/// the deal turns into a requirement-tracking machine.
+model ProjectConcept {
+  id                String   @id @default(cuid())
+  projectId         String   @unique
+  thesis            String?
+  sponsorRationale  String?
+  targetOutcome     String?
+  knownUnknowns     String?
+  fatalFlaws        String?
+  nextActions       String?
+  goNoGoRecommendation String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("project_concepts")
 }
 
 /// Which organizations sponsor a project, and in what capacity.
@@ -467,6 +489,7 @@ model ProjectRequirement {
   funderConditions FunderCondition[]
   comments         Comment[]
   approval         Approval?
+  externalEvidence ExternalEvidenceSource[]
 
   @@unique([projectId, requirementId])
   @@index([projectId, status])
@@ -798,7 +821,7 @@ model Watcher {
   clerkUserId String
   projectId   String
   targetType  WatchTargetType
-  targetId    String?         // null = whole project; otherwise the ID of the watched item
+  targetId    String          @default("") // empty string = whole project; otherwise the ID of the watched item
   createdAt   DateTime        @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -831,4 +854,26 @@ model Approval {
   @@index([projectId, status])
   @@index([projectId, targetType])
   @@map("approvals")
+}
+
+/// An externally-hosted file or folder linked into a project's Evidence workspace.
+/// Covers Google Drive, SharePoint, OneDrive, Dropbox, Box, VDRs, and other sources.
+model ExternalEvidenceSource {
+  id                   String  @id @default(cuid())
+  projectId            String
+  projectRequirementId String? // optionally pinned to a specific workplan item
+  provider             String  // google_drive | sharepoint | onedrive | dropbox | box | vdr | other
+  sourceType           String  @default("file") // file | folder
+  title                String
+  url                  String
+  notes                String?
+  linkedBy             String  // Clerk user ID
+  linkedAt             DateTime @default(now())
+
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requirement ProjectRequirement?  @relation(fields: [projectRequirementId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, linkedAt(sort: Desc)])
+  @@index([projectRequirementId])
+  @@map("external_evidence_sources")
 }

@@ -67,12 +67,12 @@ const APP_GLOSSARY: readonly AppKnowledgeEntry[] = [
   },
   {
     id: "glossary-data-room",
-    title: "Data room",
+    title: "Evidence workspace",
     snippet:
-      "The structured document repository assembled for lender and EXIM review. Lodestar's readiness model is built around how close that data room is to a submittable state.",
+      "The structured evidence layer assembled for lender and project review. Lodestar treats uploaded files, linked external sources, and requirement mapping as one evidence workspace.",
     sourceType: "app",
     url: "/projects",
-    aliases: ["data room", "document repository", "submission package"],
+    aliases: ["evidence", "evidence workspace", "data room", "document repository", "submission package"],
   },
   {
     id: "glossary-readiness-score",

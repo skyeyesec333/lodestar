@@ -1,12 +1,14 @@
 import type { RequirementStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
+import { DEMO_PROJECT_SLUG_PREFIX, isDemoProjectSlug } from "@/lib/projects/demo-portfolio";
 import { computeReadiness } from "@/lib/scoring/index";
 import type { Result } from "@/types";
 
 function buildDemoSlug(): string {
-  const suffix = Date.now().toString().slice(-6);
-  return `lodestar-demo-project-${suffix}`;
+  const timePart = Date.now().toString().slice(-6);
+  const randomPart = Math.random().toString(36).slice(2, 6);
+  return `${DEMO_PROJECT_SLUG_PREFIX}${timePart}-${randomPart}`;
 }
 
 function daysFromNow(days: number): Date {
@@ -20,6 +22,29 @@ export async function createDemoProjectForUser(
   clerkUserId: string
 ): Promise<Result<{ projectId: string; slug: string }>> {
   try {
+    const existingDemo = await db.project.findFirst({
+      where: {
+        ownerClerkId: clerkUserId,
+        activityEvents: {
+          some: {
+            eventType: "project_created",
+            label: "Demo project created",
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      select: {
+        id: true,
+        slug: true,
+      },
+    });
+
+    if (existingDemo) {
+      return { ok: true, value: { projectId: existingDemo.id, slug: existingDemo.slug } };
+    }
+
     const slug = buildDemoSlug();
 
     const requirementStates = new Map<string, { status: RequirementStatus; notes?: string }>([
@@ -291,93 +316,117 @@ export async function createDemoPortfolioForUser(
   if (!primary.ok) return primary;
 
   try {
-    const created = await Promise.all([
-      db.project.create({
-        data: {
-          name: "Rufiji Water Treatment Expansion",
-          slug: buildDemoSlug(),
+    const demoPortfolioSeeds = [
+      {
+        name: "Rufiji Water Treatment Expansion",
+        createData: {
           description:
             "Municipal water expansion project with advanced environmental work and a slower commercial bank syndication track.",
           countryCode: "TZ",
-          sector: "water",
+          sector: "water" as const,
           capexUsdCents: 148_000_000_00n,
-          eximCoverType: "political_only",
-          stage: "pre_commitment",
+          eximCoverType: "political_only" as const,
+          stage: "pre_commitment" as const,
           targetLoiDate: daysFromNow(35),
           targetCloseDate: daysFromNow(180),
-          ownerClerkId: clerkUserId,
           cachedReadinessScore: 7420,
-          cachedScoreUpdatedAt: new Date(),
-          requirementStatuses: {
-            createMany: {
-              data: EXIM_REQUIREMENTS.map((requirement) => ({
-                requirementId: requirement.id,
-                status:
-                  requirement.phaseRequired === "loi"
-                    ? "substantially_final"
-                    : requirement.category === "financial"
-                    ? "draft"
-                    : "in_progress",
-                statusChangedBy: clerkUserId,
-              })),
-            },
-          },
-          activityEvents: {
-            create: [
-              {
-                clerkUserId,
-                eventType: "project_created",
-                label: "Demo portfolio project created",
-                metadata: { demo: true },
-              },
-            ],
-          },
+          requirementStatuses: EXIM_REQUIREMENTS.map((requirement) => ({
+            requirementId: requirement.id,
+            status:
+              requirement.phaseRequired === "loi"
+                ? ("substantially_final" as const)
+                : requirement.category === "financial"
+                  ? ("draft" as const)
+                  : ("in_progress" as const),
+            statusChangedBy: clerkUserId,
+          })),
         },
-        select: { id: true, slug: true },
-      }),
-      db.project.create({
-        data: {
-          name: "Mwanza Inland Dry Port",
-          slug: buildDemoSlug(),
+      },
+      {
+        name: "Mwanza Inland Dry Port",
+        createData: {
           description:
             "Transport logistics project with early sponsor coordination complete but major LOI-critical documentation still immature.",
           countryCode: "TZ",
-          sector: "transport",
-          stage: "concept",
+          sector: "transport" as const,
           capexUsdCents: 210_000_000_00n,
-          ownerClerkId: clerkUserId,
+          stage: "concept" as const,
           cachedReadinessScore: 1860,
-          cachedScoreUpdatedAt: new Date(),
-          requirementStatuses: {
-            createMany: {
-              data: EXIM_REQUIREMENTS.map((requirement) => ({
-                requirementId: requirement.id,
-                status:
-                  requirement.id === "project_company_formation"
-                    ? "executed"
-                    : requirement.id === "feasibility_study"
-                    ? "draft"
-                    : requirement.category === "corporate"
-                    ? "in_progress"
-                    : "not_started",
-                statusChangedBy: clerkUserId,
-              })),
-            },
-          },
-          activityEvents: {
-            create: [
-              {
-                clerkUserId,
-                eventType: "project_created",
-                label: "Demo portfolio project created",
-                metadata: { demo: true },
-              },
-            ],
+          requirementStatuses: EXIM_REQUIREMENTS.map((requirement) => ({
+            requirementId: requirement.id,
+            status:
+              requirement.id === "project_company_formation"
+                ? ("executed" as const)
+                : requirement.id === "feasibility_study"
+                  ? ("draft" as const)
+                  : requirement.category === "corporate"
+                    ? ("in_progress" as const)
+                    : ("not_started" as const),
+            statusChangedBy: clerkUserId,
+          })),
+        },
+      },
+    ] as const;
+
+    const existingSecondaryProjects = await db.project.findMany({
+      where: {
+        ownerClerkId: clerkUserId,
+        name: { in: demoPortfolioSeeds.map((seed) => seed.name) },
+        activityEvents: {
+          some: {
+            eventType: "project_created",
+            label: "Demo portfolio project created",
           },
         },
-        select: { id: true, slug: true },
-      }),
-    ]);
+      },
+      select: { id: true, slug: true, name: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const existingByName = new Map<string, { id: string; slug: string }>();
+    for (const project of existingSecondaryProjects) {
+      if (!isDemoProjectSlug(project.slug) || existingByName.has(project.name)) {
+        continue;
+      }
+      existingByName.set(project.name, { id: project.id, slug: project.slug });
+    }
+
+    const created = await Promise.all(
+      demoPortfolioSeeds.map(async (seed) => {
+        const existingProject = existingByName.get(seed.name);
+        if (existingProject) {
+          return existingProject;
+        }
+
+        const { requirementStatuses, ...projectData } = seed.createData;
+
+        return db.project.create({
+          data: {
+            name: seed.name,
+            slug: buildDemoSlug(),
+            ownerClerkId: clerkUserId,
+            cachedScoreUpdatedAt: new Date(),
+            ...projectData,
+            requirementStatuses: {
+              createMany: {
+                data: requirementStatuses,
+              },
+            },
+            activityEvents: {
+              create: [
+                {
+                  clerkUserId,
+                  eventType: "project_created",
+                  label: "Demo portfolio project created",
+                  metadata: { demo: true },
+                },
+              ],
+            },
+          },
+          select: { id: true, slug: true },
+        });
+      })
+    );
 
     return {
       ok: true,

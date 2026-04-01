@@ -79,6 +79,20 @@ export default async function DashboardLayout({
             >
               Expert Network
             </Link>
+            <Link
+              href="/templates"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                fontWeight: 500,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "var(--nav-link)",
+                textDecoration: "none",
+              }}
+            >
+              Templates
+            </Link>
             <SearchBar />
             <ThemeSwitcher current={theme} />
           </div>

@@ -124,12 +124,14 @@ function RequirementNoteThread({
   currentStatus,
   notes,
   onNoteAdded,
+  canEdit = true,
 }: {
   projectId: string;
   requirementId: string;
   currentStatus: RequirementStatusValue;
   notes: RequirementNoteRow[];
   onNoteAdded: (note: RequirementNoteRow) => void;
+  canEdit?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const [submitting, startSubmit] = useTransition();
@@ -252,59 +254,63 @@ function RequirementNoteThread({
         </div>
       )}
 
-      {/* Add note form */}
-      <textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="Add a note — status context, open questions, next steps…"
-        rows={2}
-        style={{
-          width: "100%",
-          fontFamily: "'Inter', sans-serif",
-          fontSize: "13px",
-          lineHeight: 1.6,
-          color: "var(--ink)",
-          backgroundColor: "var(--bg)",
-          border: "1px solid var(--border)",
-          borderRadius: "3px",
-          padding: "8px 12px",
-          resize: "vertical",
-          outline: "none",
-          boxSizing: "border-box",
-        }}
-      />
-      {submitError && (
-        <p
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "12px",
-            color: "var(--accent)",
-            margin: "4px 0 0",
-          }}
-        >
-          {submitError}
-        </p>
+      {canEdit && (
+        <>
+          {/* Add note form */}
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Add a note — status context, open questions, next steps…"
+            rows={2}
+            style={{
+              width: "100%",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              lineHeight: 1.6,
+              color: "var(--ink)",
+              backgroundColor: "var(--bg)",
+              border: "1px solid var(--border)",
+              borderRadius: "3px",
+              padding: "8px 12px",
+              resize: "vertical",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          {submitError && (
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "12px",
+                color: "var(--accent)",
+                margin: "4px 0 0",
+              }}
+            >
+              {submitError}
+            </p>
+          )}
+          <button
+            onClick={handleAdd}
+            disabled={submitting || !draft.trim()}
+            style={{
+              marginTop: "8px",
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              fontWeight: 500,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: "#fff",
+              backgroundColor: submitting || !draft.trim() ? "var(--ink-muted)" : "var(--accent)",
+              border: "none",
+              borderRadius: "3px",
+              padding: "6px 14px",
+              cursor: submitting || !draft.trim() ? "not-allowed" : "pointer",
+            }}
+          >
+            {submitting ? "Saving…" : "Add Note"}
+          </button>
+        </>
       )}
-      <button
-        onClick={handleAdd}
-        disabled={submitting || !draft.trim()}
-        style={{
-          marginTop: "8px",
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "10px",
-          fontWeight: 500,
-          letterSpacing: "0.10em",
-          textTransform: "uppercase",
-          color: "#fff",
-          backgroundColor: submitting || !draft.trim() ? "var(--ink-muted)" : "var(--accent)",
-          border: "none",
-          borderRadius: "3px",
-          padding: "6px 14px",
-          cursor: submitting || !draft.trim() ? "not-allowed" : "pointer",
-        }}
-      >
-        {submitting ? "Saving…" : "Add Note"}
-      </button>
     </div>
   );
 }
@@ -319,6 +325,7 @@ function RequirementResponsibilityPanel({
   stakeholders,
   organizations,
   onSaved,
+  canEdit = true,
 }: {
   projectId: string;
   requirementId: string;
@@ -327,6 +334,7 @@ function RequirementResponsibilityPanel({
   stakeholders: StakeholderOption[];
   organizations: OrganizationOption[];
   onSaved: (next: ResponsibilityState) => void;
+  canEdit?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, startSaving] = useTransition();
@@ -476,7 +484,7 @@ function RequirementResponsibilityPanel({
         >
           Responsibility
         </p>
-        {!editing && (
+        {!editing && canEdit && (
           <button
             onClick={openEdit}
             style={{
@@ -858,9 +866,11 @@ type RequirementsChecklistProps = {
   commentsByRequirementId?: Record<string, CommentRow[]>;
   approvalsByRequirementId?: Record<string, ApprovalRow>;
   watchedRequirementIds?: Set<string>;
+  canEdit?: boolean;
+  canApprove?: boolean;
 };
 
-export function RequirementsChecklist({ projectId, slug, rows, documents, stakeholders, organizations, dealType, program: programProp, onProgramChange, teamMembers = [], currentUserId, actorName, commentsByRequirementId = {}, approvalsByRequirementId = {}, watchedRequirementIds = new Set() }: RequirementsChecklistProps) {
+export function RequirementsChecklist({ projectId, slug, rows, documents, stakeholders, organizations, dealType, program: programProp, onProgramChange, teamMembers = [], currentUserId, actorName, commentsByRequirementId = {}, approvalsByRequirementId = {}, watchedRequirementIds = new Set(), canEdit = true, canApprove = true }: RequirementsChecklistProps) {
   const isExim = !dealType || dealType === "exim_project_finance";
   const [activeProgram, setActiveProgram] = useState<ProgramId>(programProp ?? "exim");
 
@@ -1562,34 +1572,44 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         )}
 
                         {/* Responsibility toggle */}
-                        <button
-                          onClick={() => toggleResponsibility(row.requirementId)}
-                          title={isExpandedResponsibility ? "Hide responsibility" : hasResponsibility ? "View/edit responsibility" : "Assign responsibility"}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            fontFamily: "'DM Mono', monospace",
-                            fontSize: "9px",
-                            letterSpacing: "0.08em",
-                            color: hasResponsibility ? "var(--teal)" : "var(--ink-muted)",
-                            background: "none",
-                            border: "none",
-                            padding: "2px 4px",
-                            cursor: "pointer",
-                            opacity: isExpandedResponsibility ? 1 : 0.7,
-                            transition: "opacity 0.15s, color 0.15s",
-                          }}
-                        >
-                          {/* Person icon */}
-                          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                            <circle cx="6" cy="4" r="2" stroke="currentColor" strokeWidth="1" fill={hasResponsibility ? "currentColor" : "none"} fillOpacity={hasResponsibility ? 0.2 : 0} />
-                            <path d="M2 10c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
-                          </svg>
-                          {hasResponsibility && !isExpandedResponsibility && (
-                            <span style={{ textTransform: "uppercase" }}>owner</span>
-                          )}
-                        </button>
+                        {(canEdit || hasResponsibility) && (
+                          <button
+                            onClick={() => toggleResponsibility(row.requirementId)}
+                            title={
+                              isExpandedResponsibility
+                                ? "Hide responsibility"
+                                : canEdit
+                                  ? hasResponsibility
+                                    ? "View/edit responsibility"
+                                    : "Assign responsibility"
+                                  : "View responsibility"
+                            }
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontFamily: "'DM Mono', monospace",
+                              fontSize: "9px",
+                              letterSpacing: "0.08em",
+                              color: hasResponsibility ? "var(--teal)" : "var(--ink-muted)",
+                              background: "none",
+                              border: "none",
+                              padding: "2px 4px",
+                              cursor: "pointer",
+                              opacity: isExpandedResponsibility ? 1 : 0.7,
+                              transition: "opacity 0.15s, color 0.15s",
+                            }}
+                          >
+                            {/* Person icon */}
+                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                              <circle cx="6" cy="4" r="2" stroke="currentColor" strokeWidth="1" fill={hasResponsibility ? "currentColor" : "none"} fillOpacity={hasResponsibility ? 0.2 : 0} />
+                              <path d="M2 10c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+                            </svg>
+                            {hasResponsibility && !isExpandedResponsibility && (
+                              <span style={{ textTransform: "uppercase" }}>owner</span>
+                            )}
+                          </button>
+                        )}
 
                         {/* Collaboration: approval badge + watch (LOI-critical or applicable items) */}
                         {showCollab && row.isApplicable && (
@@ -1603,7 +1623,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                                 approval={reqApproval}
                                 currentUserId={currentUserId!}
                                 actorName={actorName}
-                                canAct
+                                canAct={canApprove}
                               />
                             )}
                             <WatchButton
@@ -1636,7 +1656,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                     {/* Status select */}
                     <select
                       value={status}
-                      disabled={isUpdating || isPending}
+                      disabled={!canEdit || isUpdating || isPending}
                       onChange={(e) =>
                         handleStatusChange(row.requirementId, e.target.value as RequirementStatusValue)
                       }
@@ -1654,8 +1674,9 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%236b6b64' d='M5 7L1 3h8z'/%3E%3C/svg%3E")`,
                         backgroundRepeat: "no-repeat",
                         backgroundPosition: "right 8px center",
-                        cursor: "pointer",
+                        cursor: canEdit ? "pointer" : "default",
                         width: "100%",
+                        opacity: canEdit ? 1 : 0.8,
                       }}
                     >
                       {REQUIREMENT_STATUS_ORDER.map((s) => (
@@ -1673,6 +1694,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                       requirementId={row.requirementId}
                       currentStatus={status}
                       notes={threadNotes}
+                      canEdit={canEdit}
                       onNoteAdded={(note) => {
                         setNoteThreads((prev) => ({
                           ...prev,
@@ -1711,6 +1733,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                       responsibility={responsibility}
                       stakeholders={stakeholders}
                       organizations={organizations}
+                      canEdit={canEdit}
                       onSaved={(next) => {
                         setResponsibilities((prev) => ({
                           ...prev,
@@ -1762,34 +1785,38 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                               {uploadError}
                             </span>
                           )}
-                          <button
-                            onClick={() => fileInputRefs.current[row.requirementId]?.click()}
-                            disabled={isUploadingThis}
-                            style={{
-                              fontFamily: "'DM Mono', monospace",
-                              fontSize: "9px",
-                              fontWeight: 500,
-                              letterSpacing: "0.10em",
-                              textTransform: "uppercase",
-                              color: "var(--teal)",
-                              backgroundColor: "transparent",
-                              border: "1px solid var(--teal)",
-                              borderRadius: "3px",
-                              padding: "4px 10px",
-                              cursor: isUploadingThis ? "not-allowed" : "pointer",
-                              opacity: isUploadingThis ? 0.5 : 1,
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {isUploadingThis ? "Uploading…" : "+ Attach"}
-                          </button>
-                          <input
-                            ref={(el) => { fileInputRefs.current[row.requirementId] = el; }}
-                            type="file"
-                            style={{ display: "none" }}
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp"
-                            onChange={(e) => handleDocUpload(row.requirementId, row.projectRequirementId, e.target.files)}
-                          />
+                          {canEdit && (
+                            <>
+                              <button
+                                onClick={() => fileInputRefs.current[row.requirementId]?.click()}
+                                disabled={isUploadingThis}
+                                style={{
+                                  fontFamily: "'DM Mono', monospace",
+                                  fontSize: "9px",
+                                  fontWeight: 500,
+                                  letterSpacing: "0.10em",
+                                  textTransform: "uppercase",
+                                  color: "var(--teal)",
+                                  backgroundColor: "transparent",
+                                  border: "1px solid var(--teal)",
+                                  borderRadius: "3px",
+                                  padding: "4px 10px",
+                                  cursor: isUploadingThis ? "not-allowed" : "pointer",
+                                  opacity: isUploadingThis ? 0.5 : 1,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {isUploadingThis ? "Uploading…" : "+ Attach"}
+                              </button>
+                              <input
+                                ref={(el) => { fileInputRefs.current[row.requirementId] = el; }}
+                                type="file"
+                                style={{ display: "none" }}
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp"
+                                onChange={(e) => handleDocUpload(row.requirementId, row.projectRequirementId, e.target.files)}
+                              />
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -1804,7 +1831,9 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                             margin: 0,
                           }}
                         >
-                          No documents attached yet. Click Attach to link a file to this requirement.
+                          {canEdit
+                            ? "No documents attached yet. Click Attach to link a file to this requirement."
+                            : "No documents attached yet."}
                         </p>
                       ) : (
                         reqDocs.map((doc, i) => (
@@ -1887,22 +1916,24 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                               >
                                 Download
                               </button>
-                              <button
-                                onClick={() => handleDocDelete(row.requirementId, row.projectRequirementId, doc.id)}
-                                style={{
-                                  fontFamily: "'DM Mono', monospace",
-                                  fontSize: "9px",
-                                  letterSpacing: "0.06em",
-                                  color: "var(--accent)",
-                                  backgroundColor: "transparent",
-                                  border: "1px solid var(--accent)",
-                                  borderRadius: "3px",
-                                  padding: "3px 8px",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Remove
-                              </button>
+                              {canEdit && (
+                                <button
+                                  onClick={() => handleDocDelete(row.requirementId, row.projectRequirementId, doc.id)}
+                                  style={{
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: "9px",
+                                    letterSpacing: "0.06em",
+                                    color: "var(--accent)",
+                                    backgroundColor: "transparent",
+                                    border: "1px solid var(--accent)",
+                                    borderRadius: "3px",
+                                    padding: "3px 8px",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))

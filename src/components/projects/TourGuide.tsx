@@ -13,54 +13,73 @@ type TourStep = {
   scrollTo?: boolean;
 };
 
-function buildTour(isExim: boolean): TourStep[] {
+function buildTour(dealType?: string, stage?: string): TourStep[] {
+  const isExim = !dealType || dealType === "exim_project_finance";
+  const isLoiPhase = stage === "pre_loi" || stage === "loi_submitted" || stage === "loi_approved";
+
   return [
     {
       target: "#section-overview",
-      title: "Deal header",
+      title: "Overview",
       body: isExim
-        ? "Your LOI countdown and urgency alerts live here. The closer to your target date, the more it changes color — red means act now."
-        : "Your deal timeline and key milestones live here. Set a target financial close date to activate the countdown.",
+        ? isLoiPhase
+          ? "Overview keeps the current EXIM stage, next gate, and LOI timing pressure in one place so the team can review whether the deal is actually ready to move."
+          : "Overview keeps the current EXIM stage, next gate, and financing pressure in one place without assuming everything is still about LOI."
+        : "Overview is the universal gate summary for the deal: stage, next milestone, timing pressure, and top blockers.",
       placement: "bottom",
       scrollTo: true,
     },
     {
-      target: "#section-readiness",
-      title: "Readiness score",
-      body: isExim
-        ? "This score reflects how much of EXIM's required data room is in substantially final or executed form. It updates in real-time as you mark requirements."
-        : "This score reflects how much of your deal workplan is complete. It updates as you mark items through their stages.",
+      target: "#section-collaborators",
+      title: "Utilities",
+      body: "Access, collaborators, and top-level controls live here as utility chrome so they do not compete with the main workspaces.",
       placement: "bottom",
       scrollTo: true,
     },
     {
-      target: "#section-timeline",
-      title: "Timeline chart",
-      body: "Solid bars show confirmed progress. Dashed bands are AI-predicted completion windows based on current status and your target date. Expand it to full screen for all controls.",
+      target: "#section-concept",
+      title: "Concept workspace",
+      body: "Concept is where the team frames why this deal exists, what the thesis is, and which assumptions still need to be clarified before the machine of requirements takes over.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-stakeholders",
+      title: "Parties workspace",
+      body: "Parties maps the institutions and people around the deal, including counterparties, ownership gaps, and the relationship graph.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-capital",
+      title: "Capital workspace",
+      body: isExim
+        ? "Capital tracks the financing path, EXIM cover assumptions, and funder conversations without forcing the whole deal shell to feel EXIM-only."
+        : "Capital tracks the financing path, counterparties, and the next financing gate for the deal.",
+      placement: "bottom",
+      scrollTo: true,
+    },
+    {
+      target: "#section-workplan",
+      title: "Workplan workspace",
+      body: isExim && isLoiPhase
+        ? "Workplan is the canonical source of truth for EXIM-required work. LOI-critical items, blockers, readiness, and the live checklist all belong here."
+        : "Workplan is the canonical source of truth for what must be completed before the next gate. Readiness, blockers, gap analysis, and the live checklist all belong here.",
       placement: "bottom",
       scrollTo: true,
     },
     {
       target: "#section-documents",
-      title: "Documents",
-      body: "Upload deal-wide files here, or attach documents directly to individual workplan items below. Requirement-linked docs show a teal badge.",
+      title: "Evidence workspace",
+      body: "Evidence replaces the old data-room framing with a simpler question: what proof exists, what is linked, and what is still missing for the next gate.",
       placement: "bottom",
       scrollTo: true,
     },
     {
-      target: "#section-requirements",
-      title: isExim ? "Requirements checklist" : "Deal workplan",
-      body: isExim
-        ? "36 EXIM-required items across 6 categories. Red-left-border items are LOI-critical — they must reach Substantially Final before you can submit. Click the paperclip on any row to attach supporting documents."
-        : "Your deal workplan tracks all items needed for financing. Click any row to update status, attach documents, or add notes.",
+      target: "#section-execution",
+      title: "Execution workspace",
+      body: "Execution brings together meetings, activity, PM signals, milestones, and the timeline so the team can judge whether the deal is truly ready to move.",
       placement: "bottom",
-      scrollTo: true,
-    },
-    {
-      target: "#section-meetings",
-      title: "Meetings log",
-      body: "Log every stakeholder meeting, extract action items, and link them to specific workplan items. Nothing falls through the cracks.",
-      placement: "top",
       scrollTo: true,
     },
   ];
@@ -129,16 +148,15 @@ function calloutPosition(
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const PAD = 10;
-const TOUR_TRIGGER_TOP = "12px";
+const TOUR_TRIGGER_TOP = "64px";
 
-export function TourGuide({ dealType }: { dealType?: string }) {
+export function TourGuide({ dealType, stage }: { dealType?: string; stage?: string }) {
   const [step, setStep] = useState<number | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
   const [vpW, setVpW] = useState(0);
   const [vpH, setVpH] = useState(0);
   const [ganttFullscreen, setGanttFullscreen] = useState(false);
-  const isExim = !dealType || dealType === "exim_project_finance";
-  const tour = buildTour(isExim);
+  const tour = buildTour(dealType, stage);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

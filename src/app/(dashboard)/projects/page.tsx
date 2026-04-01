@@ -178,6 +178,24 @@ export default async function ProjectsPage({
         <div style={{ display: "flex", gap: "10px", alignItems: "start", flexWrap: "wrap" }}>
           <CreateDemoProjectButton />
           <Link
+            href="/templates"
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "11px",
+              fontWeight: 500,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: "var(--ink)",
+              backgroundColor: "transparent",
+              border: "1px solid var(--border)",
+              padding: "10px 18px",
+              borderRadius: "3px",
+              textDecoration: "none",
+            }}
+          >
+            Templates
+          </Link>
+          <Link
             href="/projects/new"
             style={{
               fontFamily: "'DM Mono', monospace",

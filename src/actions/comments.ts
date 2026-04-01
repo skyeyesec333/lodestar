@@ -114,5 +114,8 @@ export async function getCommentsAction(raw: unknown): Promise<Result<CommentRow
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
   const { projectId, targetType, targetId } = parsed.data;
+  const access = await assertProjectAccess(projectId, userId, "viewer");
+  if (!access.ok) return { ok: false, error: access.error };
+
   return getCommentsForTarget(projectId, targetType as CommentTargetType, targetId);
 }

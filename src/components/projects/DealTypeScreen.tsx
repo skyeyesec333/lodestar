@@ -22,7 +22,7 @@ interface Props {
 
 // ─── Deal type options ────────────────────────────────────────────────────────
 
-const DEAL_TYPES: {
+export const DEAL_TYPES: {
   value: DealTypeValue;
   label: string;
   description: string;
@@ -32,7 +32,7 @@ const DEAL_TYPES: {
     value: "exim_project_finance",
     label: "US EXIM Bank Project Finance",
     description: "Long-term guarantee or direct loan via US Export-Import Bank.",
-    badge: "Full data room + readiness scoring",
+    badge: "Program module + evidence workspace",
   },
   {
     value: "commercial_finance",
@@ -120,7 +120,7 @@ const backLinkStyle: React.CSSProperties = {
 
 // ─── Option card ──────────────────────────────────────────────────────────────
 
-function DealTypeOption({
+export function DealTypeOption({
   value,
   label,
   description,

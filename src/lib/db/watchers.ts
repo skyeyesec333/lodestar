@@ -20,6 +20,24 @@ const watcherSelect = {
   createdAt: true,
 } as const;
 
+function normalizeTargetId(targetId: string | null): string {
+  return targetId ?? "";
+}
+
+function shapeWatcherRow(row: {
+  id: string;
+  clerkUserId: string;
+  projectId: string;
+  targetType: WatchTargetType;
+  targetId: string | null;
+  createdAt: Date;
+}): WatcherRow {
+  return {
+    ...row,
+    targetId: row.targetId === "" ? null : row.targetId,
+  };
+}
+
 export async function getWatchersForProject(
   projectId: string
 ): Promise<Result<WatcherRow[]>> {
@@ -28,7 +46,7 @@ export async function getWatchersForProject(
       where: { projectId },
       select: watcherSelect,
     });
-    return { ok: true, value: rows };
+    return { ok: true, value: rows.map(shapeWatcherRow) };
   } catch (err) {
     return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
   }
@@ -46,7 +64,7 @@ export async function isWatching(
         clerkUserId,
         projectId,
         targetType,
-        targetId: targetId ?? "",
+        targetId: normalizeTargetId(targetId),
       },
     },
     select: { id: true },
@@ -67,14 +85,19 @@ export async function watchItem(
           clerkUserId,
           projectId,
           targetType,
-          targetId: targetId ?? "",
+          targetId: normalizeTargetId(targetId),
         },
       },
-      create: { clerkUserId, projectId, targetType, targetId },
+      create: {
+        clerkUserId,
+        projectId,
+        targetType,
+        targetId: normalizeTargetId(targetId),
+      },
       update: {},
       select: watcherSelect,
     });
-    return { ok: true, value: row };
+    return { ok: true, value: shapeWatcherRow(row) };
   } catch (err) {
     return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
   }
@@ -88,7 +111,12 @@ export async function unwatchItem(
 ): Promise<Result<void>> {
   try {
     await db.watcher.deleteMany({
-      where: { clerkUserId, projectId, targetType, targetId },
+      where: {
+        clerkUserId,
+        projectId,
+        targetType,
+        targetId: normalizeTargetId(targetId),
+      },
     });
     return { ok: true, value: undefined };
   } catch (err) {
@@ -106,7 +134,7 @@ export async function getUserWatchList(
       orderBy: { createdAt: "asc" },
       select: watcherSelect,
     });
-    return { ok: true, value: rows };
+    return { ok: true, value: rows.map(shapeWatcherRow) };
   } catch (err) {
     return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
   }

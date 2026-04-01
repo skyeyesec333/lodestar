@@ -256,6 +256,7 @@ type Props = {
   teamMembers?: TeamMember[];
   currentUserId?: string;
   actorName?: string;
+  canEdit?: boolean;
   commentsByMeetingId?: Record<string, CommentRow[]>;
   watchedMeetingIds?: Set<string>;
 };
@@ -578,10 +579,12 @@ function ActionItemCard({
   item,
   projectId,
   slug,
+  canEdit = true,
 }: {
   item: ActionItemRow;
   projectId: string;
   slug: string;
+  canEdit?: boolean;
 }) {
   const [status, setStatus] = useState(item.status);
   const [showAdvancePrompt, setShowAdvancePrompt] = useState(false);
@@ -635,12 +638,12 @@ function ActionItemCard({
       <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "8px 0" }}>
         {/* Checkbox */}
         <button
-          onClick={toggle}
+          onClick={() => canEdit && toggle()}
           style={{
             width: "16px", height: "16px", borderRadius: "3px", flexShrink: 0, marginTop: "2px",
             border: `1px solid ${done ? "var(--teal)" : "var(--border)"}`,
             backgroundColor: done ? "var(--teal)" : "transparent",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: canEdit ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
           {done && <span style={{ color: "#fff", fontSize: "9px", lineHeight: 1 }}>✓</span>}
@@ -683,7 +686,7 @@ function ActionItemCard({
       </div>
 
       {/* Advance requirement prompt */}
-      {showAdvancePrompt && canAdvance && (
+      {showAdvancePrompt && canAdvance && canEdit && (
         <div
           style={{
             display: "flex",
@@ -1194,6 +1197,7 @@ function MeetingCard({
   teamMembers = [],
   currentUserId,
   actorName,
+  canEdit = true,
   initialComments = [],
   initialWatching = false,
 }: {
@@ -1205,6 +1209,7 @@ function MeetingCard({
   teamMembers?: TeamMember[];
   currentUserId?: string;
   actorName?: string;
+  canEdit?: boolean;
   initialComments?: CommentRow[];
   initialWatching?: boolean;
 }) {
@@ -1290,18 +1295,22 @@ function MeetingCard({
                 Action Items
               </p>
               <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                <button
-                  onClick={() => setShowExtract((v) => !v)}
-                  style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--teal)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                >
-                  ✦ Extract Insights
-                </button>
-                <button
-                  onClick={() => setShowAddAction((v) => !v)}
-                  style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                >
-                  + Add
-                </button>
+                {canEdit && (
+                  <>
+                    <button
+                      onClick={() => setShowExtract((v) => !v)}
+                      style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--teal)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                    >
+                      ✦ Extract Insights
+                    </button>
+                    <button
+                      onClick={() => setShowAddAction((v) => !v)}
+                      style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+                    >
+                      + Add
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -1310,10 +1319,10 @@ function MeetingCard({
             )}
 
             {actionItems.map((item) => (
-              <ActionItemCard key={item.id} item={item} projectId={projectId} slug={slug} />
+              <ActionItemCard key={item.id} item={item} projectId={projectId} slug={slug} canEdit={canEdit} />
             ))}
 
-            {showAddAction && (
+            {showAddAction && canEdit && (
               <AddActionItemForm
                 projectId={projectId}
                 slug={slug}
@@ -1329,7 +1338,7 @@ function MeetingCard({
       )}
 
       {/* Extract Insights Panel */}
-      {expanded && showExtract && (
+      {expanded && showExtract && canEdit && (
         <ExtractInsightsPanel
           meetingId={meeting.id}
           projectId={projectId}
@@ -1365,7 +1374,7 @@ function MeetingCard({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, requirements, teamMembers = [], currentUserId, actorName, commentsByMeetingId = {}, watchedMeetingIds = new Set() }: Props) {
+export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, requirements, teamMembers = [], currentUserId, actorName, canEdit = true, commentsByMeetingId = {}, watchedMeetingIds = new Set() }: Props) {
   const [meetings, setMeetings] = useState<MeetingRow[]>(initialMeetings);
   const [showForm, setShowForm] = useState(false);
 
@@ -1381,23 +1390,25 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, re
             {meetings.length} logged
           </p>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          style={{
-            fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 500, letterSpacing: "0.10em",
-            textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent",
-            border: "1px solid var(--accent)", borderRadius: "3px", padding: "6px 14px", cursor: "pointer",
-          }}
-        >
-          {showForm ? "Cancel" : "+ Log Meeting"}
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            style={{
+              fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 500, letterSpacing: "0.10em",
+              textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent",
+              border: "1px solid var(--accent)", borderRadius: "3px", padding: "6px 14px", cursor: "pointer",
+            }}
+          >
+            {showForm ? "Cancel" : "+ Log Meeting"}
+          </button>
+        )}
       </div>
 
       {/* Provider connector */}
       <ProviderConnector />
 
       {/* Log form */}
-      {showForm && (
+      {showForm && canEdit && (
         <div style={{ border: "1px solid var(--border)", borderRadius: "4px", marginBottom: "16px", overflow: "hidden", backgroundColor: "var(--bg-card)" }}>
           <AddMeetingForm
             projectId={projectId}
@@ -1467,7 +1478,9 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, re
               lineHeight: 1.5,
             }}
           >
-            Log your first meeting above — include attendees, summary, and any open action items.
+            {canEdit
+              ? "Log your first meeting above — include attendees, summary, and any open action items."
+              : "Meeting logs will appear here once a collaborator records them."}
           </p>
         </div>
       )}
@@ -1483,6 +1496,7 @@ export function MeetingsLog({ projectId, slug, initialMeetings, stakeholders, re
           teamMembers={teamMembers}
           currentUserId={currentUserId}
           actorName={actorName}
+          canEdit={canEdit}
           initialComments={commentsByMeetingId[m.id] ?? []}
           initialWatching={watchedMeetingIds.has(m.id)}
         />

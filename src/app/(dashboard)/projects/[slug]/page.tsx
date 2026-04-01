@@ -35,14 +35,19 @@ import { TourGuide } from "@/components/projects/TourGuide";
 import { getProjectDetailChatPresets } from "@/lib/ai/chat-presets";
 import { BeaconProvider } from "@/components/beacon/BeaconProvider";
 import { BeaconPanel } from "@/components/beacon/BeaconPanel";
+import { WorkspaceBeaconSync } from "@/components/beacon/WorkspaceBeaconSync";
 import { CriticalPathBoard } from "@/components/projects/CriticalPathBoard";
 import { DocumentCoverageMap } from "@/components/projects/DocumentCoverageMap";
 import { OwnershipLoadBoard } from "@/components/projects/OwnershipLoadBoard";
 import { WeeklyDriftPanel } from "@/components/projects/WeeklyDriftPanel";
+import { ProjectConceptPanel } from "@/components/projects/ProjectConceptPanel";
 import type { RequirementStatusValue } from "@/types/requirements";
 import { getCommentsByProject } from "@/lib/db/comments";
 import { getApprovalsByProject } from "@/lib/db/approvals";
 import { getUserWatchList } from "@/lib/db/watchers";
+import { buildGateReview } from "@/lib/projects/gate-review";
+import { getProjectConcept } from "@/lib/db/project-concepts";
+import { getProjectExternalEvidence } from "@/lib/db/external-evidence";
 import type { TeamMember } from "@/types/collaboration";
 import type { ProjectMemberRow } from "@/lib/db/members";
 
@@ -90,6 +95,113 @@ function buildTeamMembers(
   return Array.from(deduped.values());
 }
 
+const EXIM_STAGE_LABELS: Record<string, string> = {
+  concept: "Concept",
+  pre_loi: "Pre-LOI",
+  loi_submitted: "LOI Submitted",
+  loi_approved: "LOI Approved",
+  pre_commitment: "Pre-Commitment",
+  final_commitment: "Final Commitment",
+  financial_close: "Financial Close",
+};
+
+const GENERIC_STAGE_LABELS: Record<string, string> = {
+  concept: "Concept",
+  pre_loi: "Early Development",
+  loi_submitted: "Mandate / Approval",
+  loi_approved: "Due Diligence",
+  pre_commitment: "Pre-Commitment",
+  final_commitment: "Committed",
+  financial_close: "Financial Close",
+};
+
+const DEAL_TYPE_LABELS: Record<string, string> = {
+  exim_project_finance: "US EXIM Project Finance",
+  commercial_finance: "Commercial Finance",
+  development_finance: "Development Finance",
+  private_equity: "Private Equity",
+  other: "Undecided Path",
+};
+
+function formatDealTypeLabel(dealType: string) {
+  return DEAL_TYPE_LABELS[dealType] ?? dealType.replace(/_/g, " ");
+}
+
+function formatStageLabel(stage: string, dealType: string) {
+  const labels = dealType === "exim_project_finance" ? EXIM_STAGE_LABELS : GENERIC_STAGE_LABELS;
+  return labels[stage] ?? stage.replace(/_/g, " ");
+}
+
+function getNextGateLabel(stage: string, dealType: string) {
+  const labels = dealType === "exim_project_finance" ? EXIM_STAGE_LABELS : GENERIC_STAGE_LABELS;
+  const order = [
+    "concept",
+    "pre_loi",
+    "loi_submitted",
+    "loi_approved",
+    "pre_commitment",
+    "final_commitment",
+    "financial_close",
+  ];
+  const currentIndex = order.indexOf(stage);
+  if (currentIndex < 0 || currentIndex >= order.length - 1) {
+    return "Financial Close";
+  }
+  return labels[order[currentIndex + 1]] ?? order[currentIndex + 1].replace(/_/g, " ");
+}
+
+function formatTargetDate(date: Date | null | undefined) {
+  if (!date) return "Not set";
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function WorkspaceFocusStrip({
+  items,
+}: {
+  items: Array<{ label: string; detail: string }>;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: "12px",
+        marginBottom: "18px",
+      }}
+    >
+      {items.map((item) => (
+        <div
+          key={item.label}
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "14px 16px",
+          }}
+        >
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>
+            {item.label}
+          </p>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+            }}
+          >
+            {item.detail}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default async function ProjectPage({
   params,
 }: {
@@ -123,6 +235,8 @@ export default async function ProjectPage({
     commentsResult,
     approvalsResult,
     watchListResult,
+    conceptResult,
+    externalEvidenceResult,
   ] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
@@ -136,6 +250,8 @@ export default async function ProjectPage({
     getCommentsByProject(project.id),
     getApprovalsByProject(project.id),
     getUserWatchList(userId, project.id),
+    getProjectConcept(project.id),
+    getProjectExternalEvidence(project.id),
   ]);
   const activityEvents = activityResult.ok ? activityResult.value : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
@@ -149,6 +265,17 @@ export default async function ProjectPage({
   const comments = commentsResult.ok ? commentsResult.value : [];
   const approvals = approvalsResult.ok ? approvalsResult.value : [];
   const watchList = watchListResult.ok ? watchListResult.value : [];
+  const concept = conceptResult.ok ? conceptResult.value : null;
+  const externalEvidence = externalEvidenceResult.ok ? externalEvidenceResult.value : [];
+  const currentMembership = members.find((member) => member.clerkUserId === userId);
+  const currentProjectRole =
+    project.ownerClerkId === userId
+      ? "owner"
+      : currentMembership?.role === "editor"
+        ? "editor"
+        : "viewer";
+  const canEditProject = currentProjectRole === "owner";
+  const canEditProjectContent = currentProjectRole !== "viewer";
   const teamMembers = buildTeamMembers(project.ownerClerkId, members);
   const actorName = teamMembers.find((member) => member.clerkUserId === userId)?.name;
   const teamMemberNamesById = Object.fromEntries(
@@ -215,14 +342,6 @@ export default async function ProjectPage({
     targetLoiDate: project.targetLoiDate ? project.targetLoiDate.toISOString() : null,
   };
 
-  // LOI countdown — computed server-side, accurate to the day
-  const loiDaysRemaining = project.targetLoiDate
-    ? Math.ceil(
-        (new Date(project.targetLoiDate).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) /
-          86_400_000
-      )
-    : null;
-
   const { scoreBps, loiReady, loiBlockers, categoryScores } = computeReadiness(
     rows.map((r) => ({
       requirementId: r.requirementId,
@@ -231,12 +350,58 @@ export default async function ProjectPage({
     project.dealType
   );
   const isExim = project.dealType === "exim_project_finance";
+  const dealTypeLabel = formatDealTypeLabel(project.dealType);
+  const currentStageLabel = formatStageLabel(project.stage, project.dealType);
+  const nextGateLabel = getNextGateLabel(project.stage, project.dealType);
+  const targetGateDate = isExim
+    ? (project.targetLoiDate ?? project.targetCloseDate)
+    : (project.targetCloseDate ?? project.targetLoiDate);
+  const targetGateDaysRemaining = targetGateDate
+    ? Math.ceil(
+        (new Date(targetGateDate).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) /
+          86_400_000
+      )
+    : null;
+  const gateReview = buildGateReview({
+    project,
+    requirements: rows,
+    scoreBps,
+    concept,
+  });
+  const gateReviewTone =
+    gateReview.status === "ready"
+      ? "var(--teal)"
+      : gateReview.status === "at_risk"
+        ? "var(--gold)"
+        : "var(--accent)";
+  const conceptPrompts = [
+    !concept?.thesis && !project.description ? "Add a concise deal thesis and sponsor rationale." : null,
+    !concept?.targetOutcome ? "State the concrete outcome this deal is trying to achieve." : null,
+    !concept?.sponsorRationale ? "Explain why the sponsor is pursuing this deal now." : null,
+    !concept?.knownUnknowns ? "Capture the unknowns that could materially change the capital path." : null,
+    !concept?.fatalFlaws ? "Write down the fatal flaws the team needs to disprove early." : null,
+    !concept?.nextActions ? "List the next actions needed to move the concept toward the next gate." : null,
+    !concept?.goNoGoRecommendation ? "Record a current go / no-go recommendation before advancing." : null,
+    project.capexUsdCents == null ? "Set a working CAPEX range for the team." : null,
+    !targetGateDate ? "Add a target milestone date to activate urgency tracking." : null,
+    isExim && !project.eximCoverType ? "Choose an initial EXIM cover path to frame lender conversations." : null,
+  ].filter(Boolean) as string[];
+
+  const conceptSummary =
+    concept?.thesis ??
+    project.description ??
+    "No concept note has been written yet. Use this workspace to define the sponsor thesis, the strategic logic for the asset, and why this financing path is the right one.";
 
   const chatPresets = getProjectDetailChatPresets({
     projectName: project.name,
+    dealType: project.dealType,
     scoreBps,
     loiReady,
     loiBlockerCount: loiBlockers.length,
+    conceptThesis: concept?.thesis,
+    targetOutcome: concept?.targetOutcome,
+    knownUnknowns: concept?.knownUnknowns,
+    fatalFlaws: concept?.fatalFlaws,
   });
 
   return (
@@ -244,7 +409,8 @@ export default async function ProjectPage({
     <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
     <div style={{ flex: 1, minWidth: 0 }}>
       <ProjectNav />
-      <TourGuide dealType={project.dealType} />
+      <WorkspaceBeaconSync />
+      <TourGuide dealType={project.dealType} stage={project.stage} />
 
       {/* Breadcrumb */}
       <div style={{ marginBottom: "32px" }}>
@@ -263,57 +429,243 @@ export default async function ProjectPage({
         </Link>
       </div>
 
-      {/* Collaborators */}
-      <CollaboratorsPanel
-        projectId={project.id}
-        slug={project.slug}
-        ownerClerkId={project.ownerClerkId}
-        currentUserId={userId}
-        initialMembers={members}
-      />
-
-      {/* Project header */}
-      <section id="section-overview" style={{ marginBottom: "40px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "24px", flexWrap: "wrap" }}>
-          <div style={{ flex: 1 }}>
-            <p className="eyebrow" style={{ marginBottom: "10px" }}>
-              {project.sector} · {project.countryCode}
-            </p>
-            <h1
+      <section id="section-collaborators" style={{ marginBottom: "32px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "18px",
+            flexWrap: "wrap",
+            marginBottom: "16px",
+          }}
+        >
+          <div style={{ maxWidth: "680px" }}>
+            <p className="eyebrow" style={{ marginBottom: "8px" }}>Workspace utilities</p>
+            <h2
               style={{
                 fontFamily: "'DM Serif Display', Georgia, serif",
-                fontSize: "40px",
+                fontSize: "24px",
                 fontWeight: 400,
                 color: "var(--ink)",
-                margin: "0 0 12px",
+                margin: "0 0 8px",
               }}
             >
-              {project.name}
-            </h1>
-            {project.description && (
+              Access and controls
+            </h2>
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "14px",
+                color: "var(--ink-mid)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Manage collaborators, project settings, and stage controls here so they stay in utility chrome rather than competing with the operating workspaces.
+            </p>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "14px" }}>
+              <Link
+                href="/templates"
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--ink)",
+                  textDecoration: "none",
+                  padding: "8px 12px",
+                  borderRadius: "999px",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--bg-card)",
+                }}
+              >
+                Browse Templates
+              </Link>
+              <Link
+                href="/projects/new"
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-muted)",
+                  textDecoration: "none",
+                  padding: "8px 12px",
+                  borderRadius: "999px",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                }}
+              >
+                New Workspace
+              </Link>
+            </div>
+          </div>
+
+          <div style={{ flexShrink: 0 }}>
+            <ProjectEditForm
+              project={serializableProject}
+              canManageProject={canEditProject}
+              gateReview={gateReview}
+            />
+          </div>
+        </div>
+
+        <CollaboratorsPanel
+          projectId={project.id}
+          slug={project.slug}
+          ownerClerkId={project.ownerClerkId}
+          currentUserId={userId}
+          initialMembers={members}
+        />
+      </section>
+
+      <section id="section-overview" style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "22px" }}>
+          <p className="eyebrow" style={{ marginBottom: "10px" }}>
+            {dealTypeLabel} · {project.countryCode} · {project.sector}
+          </p>
+          <h1
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "40px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 12px",
+            }}
+          >
+            {project.name}
+          </h1>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "15px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.7,
+              maxWidth: "720px",
+              margin: 0,
+            }}
+          >
+            {project.description ?? "This overview keeps the current stage, next gate, and operating pressure in one place so the team can orient quickly before moving into the deeper workspaces."}
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            marginBottom: "24px",
+          }}
+        >
+          {[
+            {
+              label: "Current stage",
+              value: currentStageLabel,
+              detail: `${dealTypeLabel} workflow`,
+              color: "var(--ink)",
+            },
+            {
+              label: "Next gate",
+              value: nextGateLabel,
+              detail: targetGateDate
+                ? `${formatTargetDate(targetGateDate)}${targetGateDaysRemaining !== null ? ` · ${targetGateDaysRemaining < 0 ? "date passed" : targetGateDaysRemaining === 0 ? "today" : `${targetGateDaysRemaining} days remaining`}` : ""}`
+                : "No target date set",
+              color: "var(--teal)",
+            },
+            {
+              label: "Gate review",
+              value:
+                gateReview.status === "ready"
+                  ? "Ready to review"
+                  : gateReview.status === "at_risk"
+                    ? "At risk"
+                    : "Blocked",
+              detail: gateReview.summary,
+              color: gateReviewTone,
+            },
+          ].map((card) => (
+            <div
+              key={card.label}
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "14px",
+                padding: "18px 20px",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-muted)",
+                  margin: "0 0 10px",
+                }}
+              >
+                {card.label}
+              </p>
+              <p
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "28px",
+                  lineHeight: 1.05,
+                  color: card.color,
+                  margin: "0 0 8px",
+                }}
+              >
+                {card.value}
+              </p>
               <p
                 style={{
                   fontFamily: "'Inter', sans-serif",
-                  fontSize: "15px",
+                  fontSize: "13px",
+                  lineHeight: 1.55,
                   color: "var(--ink-mid)",
-                  lineHeight: 1.7,
-                  maxWidth: "600px",
                   margin: 0,
                 }}
               >
-                {project.description}
+                {card.detail}
               </p>
-            )}
-          </div>
+            </div>
+          ))}
+        </div>
 
-          {/* LOI countdown badge — EXIM only */}
-          {isExim && loiDaysRemaining !== null && (
-            <div
-              style={{
-                textAlign: "right",
-                flexShrink: 0,
-              }}
-            >
+        <StageStepper current={project.stage} dealType={project.dealType} />
+
+        <div
+          style={{
+            display: "flex",
+            gap: "24px 28px",
+            marginBottom: "4px",
+            paddingBottom: "28px",
+            borderBottom: "1px solid var(--border)",
+            flexWrap: "wrap",
+          }}
+        >
+          {[
+            { label: "Country", value: project.countryCode },
+            { label: "Sector", value: project.sector },
+            {
+              label: "CAPEX",
+              value:
+                project.capexUsdCents != null
+                  ? `$${(Number(project.capexUsdCents) / 100_000_000).toFixed(0)}M`
+                  : "—",
+            },
+            {
+              label: isExim ? "Target LOI" : "Target Close",
+              value: formatTargetDate(targetGateDate),
+            },
+            {
+              label: "Readiness",
+              value: `${(scoreBps / 100).toFixed(1)}%`,
+            },
+          ].map(({ label, value }) => (
+            <div key={label}>
               <p
                 style={{
                   fontFamily: "'DM Mono', monospace",
@@ -322,209 +674,384 @@ export default async function ProjectPage({
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
                   color: "var(--ink-muted)",
-                  margin: "0 0 6px",
+                  margin: "0 0 4px",
                 }}
               >
-                LOI Target
+                {label}
               </p>
               <p
                 style={{
-                  fontFamily: "'DM Serif Display', Georgia, serif",
-                  fontSize: "48px",
-                  fontWeight: 400,
-                  lineHeight: 1,
-                  margin: "0 0 4px",
-                  color:
-                    loiDaysRemaining < 0
-                      ? "var(--ink-muted)"
-                      : loiDaysRemaining <= 30
-                      ? "var(--accent)"
-                      : loiDaysRemaining <= 90
-                      ? "var(--gold)"
-                      : "var(--teal)",
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                  color: "var(--ink)",
+                  margin: 0,
+                  textTransform: "capitalize",
                 }}
               >
-                {loiDaysRemaining < 0
-                  ? "—"
-                  : loiDaysRemaining === 0
-                  ? "Today"
-                  : loiDaysRemaining}
-                {loiDaysRemaining > 0 && (
+                {value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="section-concept" style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "16px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Concept workspace</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "24px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 8px",
+            }}
+          >
+            Deal framing
+          </h2>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+              maxWidth: "760px",
+            }}
+          >
+            This workspace holds the project thesis, the target structure, and the reasons the team believes this deal deserves active pursuit before Capital and Workplan deepen it.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: "18px",
+          }}
+        >
+          <ProjectConceptPanel
+            projectId={project.id}
+            slug={project.slug}
+            initialConcept={concept}
+            canEdit={canEditProjectContent}
+          />
+
+          <div
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              borderRadius: "14px",
+              padding: "20px 22px",
+            }}
+          >
+            <p className="eyebrow" style={{ marginBottom: "10px" }}>Current framing</p>
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "14px",
+                color: "var(--ink-mid)",
+                lineHeight: 1.75,
+                margin: 0,
+              }}
+            >
+              {conceptSummary}
+            </p>
+            {concept?.sponsorRationale ? (
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink-mid)",
+                  lineHeight: 1.65,
+                  margin: "12px 0 0",
+                }}
+              >
+                <span style={{ color: "var(--ink)" }}>Sponsor rationale:</span> {concept.sponsorRationale}
+              </p>
+            ) : null}
+          </div>
+
+          <div
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              borderRadius: "14px",
+              padding: "20px 22px",
+            }}
+          >
+            <p className="eyebrow" style={{ marginBottom: "10px" }}>Launch assumptions</p>
+            <div style={{ display: "grid", gap: "10px" }}>
+              {[
+                { label: "Capital path", value: dealTypeLabel },
+                { label: "Current maturity", value: currentStageLabel },
+                {
+                  label: "Target outcome",
+                  value: concept?.targetOutcome ?? "Not captured yet",
+                },
+                {
+                  label: isExim ? "Target LOI" : "Target close",
+                  value: formatTargetDate(targetGateDate),
+                },
+                {
+                  label: "Gate review",
+                  value: gateReview.summary,
+                },
+              ].map((item) => (
+                <div key={item.label} style={{ display: "grid", gap: "2px" }}>
                   <span
                     style={{
                       fontFamily: "'DM Mono', monospace",
-                      fontSize: "13px",
+                      fontSize: "9px",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
                       color: "var(--ink-muted)",
-                      marginLeft: "6px",
                     }}
                   >
-                    {loiDaysRemaining === 1 ? "day" : "days"}
+                    {item.label}
                   </span>
-                )}
-              </p>
-              <p
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "10px",
-                  letterSpacing: "0.06em",
-                  color: "var(--ink-muted)",
-                  margin: 0,
-                }}
-              >
-                {loiDaysRemaining < 0
-                  ? "passed "
-                  : "remaining · "}
-                {new Date(project.targetLoiDate!).toLocaleDateString("en-US", {
-                  month: "short",
-                  year: "numeric",
-                })}
-              </p>
+                  <span
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "13px",
+                      color: "var(--ink)",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {item.value}
+                  </span>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+
+          <div
+            style={{
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              borderRadius: "14px",
+              padding: "20px 22px",
+            }}
+          >
+            <p className="eyebrow" style={{ marginBottom: "10px" }}>What to clarify next</p>
+            <div style={{ display: "grid", gap: "10px" }}>
+              {(conceptPrompts.length > 0 ? conceptPrompts : ["Refine the concept note with counterparties, capital path, and milestone assumptions."]).map((prompt) => (
+                <div key={prompt} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      marginTop: "7px",
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      backgroundColor: "var(--accent)",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <p
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "13px",
+                      color: "var(--ink-mid)",
+                      lineHeight: 1.6,
+                      margin: 0,
+                    }}
+                  >
+                    {prompt}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Urgency banner — EXIM only, ≤30 days and not LOI ready */}
-        {isExim && loiDaysRemaining !== null && loiDaysRemaining >= 0 && loiDaysRemaining <= 30 && !loiReady && (
+        <div
+          style={{
+            marginTop: "18px",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "14px",
+            padding: "18px 20px",
+          }}
+        >
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              marginTop: "20px",
-              backgroundColor: "var(--accent-soft)",
-              border: "1px solid var(--accent)",
-              borderRadius: "3px",
-              padding: "10px 16px",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: "16px",
+              flexWrap: "wrap",
             }}
           >
-            <span style={{ fontSize: "14px" }}>⚠</span>
-            <p
+            <div style={{ minWidth: 0, maxWidth: "760px" }}>
+              <p className="eyebrow" style={{ marginBottom: "8px" }}>Gate review</p>
+              <h3
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "22px",
+                  fontWeight: 400,
+                  color: gateReviewTone,
+                  margin: "0 0 8px",
+                }}
+              >
+                {gateReview.nextStageLabel
+                  ? `${gateReview.nextStageLabel} review`
+                  : "Final stage"}
+              </h3>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "14px",
+                  color: "var(--ink-mid)",
+                  lineHeight: 1.65,
+                  margin: 0,
+                }}
+              >
+                {gateReview.focusText}
+              </p>
+            </div>
+
+            <div
               style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: "13px",
-                color: "var(--accent)",
-                margin: 0,
-              }}
-            >
-              <strong>
-                {loiDaysRemaining === 0 ? "LOI target is today" : `${loiDaysRemaining} day${loiDaysRemaining === 1 ? "" : "s"} to LOI target`}
-              </strong>
-              {" "}— {loiBlockers.length} LOI-critical item{loiBlockers.length !== 1 ? "s" : ""} still pending.
-              Focus on blockers below.
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* Stakeholders */}
-      <div id="section-stakeholders" />
-      <StakeholderPanel
-        projectId={project.id}
-        slug={project.slug}
-        initialStakeholders={stakeholders}
-        initialDealParties={dealParties}
-      />
-
-      {/* EPC Qualification — EXIM only */}
-      {isExim && (
-        <>
-          <div id="section-epc" />
-          <EpcBidsPanel
-            projectId={project.id}
-            slug={project.slug}
-            initialBids={epcBids}
-          />
-        </>
-      )}
-
-      {/* Funder Workspace */}
-      <FunderWorkspace
-        projectId={project.id}
-        slug={project.slug}
-        initialFunders={funders}
-        requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
-        capexUsdCents={project.capexUsdCents != null ? Number(project.capexUsdCents) : null}
-      />
-
-      {/* Edit / advance controls */}
-      <div style={{ marginBottom: "32px" }}>
-        <ProjectEditForm project={serializableProject} />
-      </div>
-
-      {/* Stage stepper */}
-      <StageStepper current={project.stage} dealType={project.dealType} />
-
-      {/* Metadata row */}
-      <div
-        style={{
-          display: "flex",
-          gap: "28px 32px",
-          marginBottom: "40px",
-          paddingBottom: "32px",
-          borderBottom: "1px solid var(--border)",
-          flexWrap: "wrap",
-        }}
-      >
-        {[
-          { label: "Deal Phase", value: project.stage.replace(/_/g, " ") },
-          { label: "Country", value: project.countryCode },
-          { label: "Sector", value: project.sector },
-          {
-            label: "CAPEX",
-            value:
-              project.capexUsdCents != null
-                ? `$${(Number(project.capexUsdCents) / 100_000_000).toFixed(0)}M`
-                : "—",
-          },
-          ...(isExim ? [{
-            label: "EXIM Cover",
-            value: project.eximCoverType
-              ? project.eximCoverType.replace(/_/g, " ")
-              : "—",
-          }] : []),
-          {
-            label: isExim ? "Target LOI" : "Target Close",
-            value: (isExim ? project.targetLoiDate : (project.targetCloseDate ?? project.targetLoiDate))
-              ? new Date((isExim ? project.targetLoiDate : (project.targetCloseDate ?? project.targetLoiDate))!).toLocaleDateString("en-US", {
-                  month: "short",
-                  year: "numeric",
-                })
-              : "—",
-          },
-        ].map(({ label, value }) => (
-          <div key={label}>
-            <p
-              style={{
+                padding: "8px 10px",
+                borderRadius: "999px",
+                border: `1px solid ${gateReviewTone}`,
+                color: gateReviewTone,
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "10px",
-                fontWeight: 500,
-                letterSpacing: "0.12em",
+                letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: "var(--ink-muted)",
-                margin: "0 0 4px",
               }}
             >
-              {label}
-            </p>
-            <p
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: "15px",
-                fontWeight: 500,
-                color: "var(--ink)",
-                margin: 0,
-                textTransform: "capitalize",
-              }}
-            >
-              {value}
-            </p>
+              {gateReview.summary}
+            </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <section style={{ marginBottom: "40px" }}>
+        <div
+          style={{
+            marginTop: "18px",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "14px",
+            padding: "18px 20px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: "16px",
+              flexWrap: "wrap",
+              marginBottom: "14px",
+            }}
+          >
+            <div style={{ minWidth: 0, maxWidth: "760px" }}>
+              <p className="eyebrow" style={{ marginBottom: "8px" }}>Concept agent brief</p>
+              <h3
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "22px",
+                  fontWeight: 400,
+                  color: "var(--ink)",
+                  margin: "0 0 8px",
+                }}
+              >
+                What Beacon should pressure-test here
+              </h3>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "14px",
+                  color: "var(--ink-mid)",
+                  lineHeight: 1.65,
+                  margin: 0,
+                }}
+              >
+                Beacon should use the structured concept record, uploaded evidence, and external context to challenge the deal thesis before the team spends more time on execution.
+              </p>
+            </div>
+
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: "999px",
+                border: "1px solid var(--border)",
+                color: "var(--accent)",
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
+              Concept workspace
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "14px",
+            }}
+          >
+            {[
+              {
+                label: "Frame the opportunity",
+                detail: concept?.thesis
+                  ? "Assess whether the current thesis is differentiated, financeable, and worth advancing."
+                  : "No thesis is captured yet. Help the team define what the deal actually is and why it matters.",
+              },
+              {
+                label: "Pressure-test assumptions",
+                detail: concept?.knownUnknowns
+                  ? `Use the known unknowns to identify the assumptions most likely to break the current plan.`
+                  : "Surface the missing assumptions that could materially change the capital path or timing.",
+              },
+              {
+                label: "Map external context",
+                detail:
+                  "Connect the concept to comparable opportunities, market conditions, policy context, and sponsor positioning.",
+              },
+              {
+                label: "Recommend next moves",
+                detail: concept?.nextActions
+                  ? "Challenge whether the listed next actions are the highest-leverage way to improve the next gate."
+                  : "Suggest the next few actions that would most quickly validate or kill the concept.",
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  backgroundColor: "var(--bg)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
+                }}
+              >
+                <p className="eyebrow" style={{ marginBottom: "8px" }}>{item.label}</p>
+                <p
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "13px",
+                    color: "var(--ink-mid)",
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
+                  {item.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="section-stakeholders" style={{ marginBottom: "40px" }}>
         <div style={{ marginBottom: "16px" }}>
-          <p className="eyebrow" style={{ marginBottom: "8px" }}>Execution</p>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Parties workspace</p>
           <h2
             style={{
               fontFamily: "'DM Serif Display', Georgia, serif",
@@ -534,154 +1061,192 @@ export default async function ProjectPage({
               margin: 0,
             }}
           >
-            Meetings and recent activity
+            Deal parties and relationship map
           </h2>
         </div>
+
+        <WorkspaceFocusStrip
+          items={[
+            {
+              label: "Map critical parties",
+              detail:
+                "Keep the sponsor, EPC, advisors, counterparties, and public actors visible in one relationship layer.",
+            },
+            {
+              label: "Track influence and asks",
+              detail:
+                "Surface who matters most, what they control, and which open asks still need active handling.",
+            },
+            {
+              label: "Watch relationship risk",
+              detail:
+                "Use the graph and stakeholder load to see where weak contact cadence could slow the deal.",
+            },
+          ]}
+        />
+
+        <StakeholderPanel
+          projectId={project.id}
+          slug={project.slug}
+          initialStakeholders={stakeholders}
+          initialDealParties={dealParties}
+        />
+
+        {isExim && (
+          <EpcBidsPanel
+            projectId={project.id}
+            slug={project.slug}
+            initialBids={epcBids}
+          />
+        )}
+      </section>
+
+      <section id="section-capital" style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "16px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Capital workspace</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "24px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 8px",
+            }}
+          >
+            Financing path and counterparties
+          </h2>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+              maxWidth: "760px",
+            }}
+          >
+            Capital gathers the active financing route, counterparty coverage, and the next external financing gate. It should feel program-aware without forcing every deal into EXIM language.
+          </p>
+        </div>
+
+        <WorkspaceFocusStrip
+          items={[
+            {
+              label: "Choose the active path",
+              detail:
+                "Make the capital route explicit so the team is not mixing EXIM, DFI, and commercial assumptions.",
+            },
+            {
+              label: "Track counterparties",
+              detail:
+                "Keep lenders, DFIs, sponsors, and funders aligned around the same next gate and conditions.",
+            },
+            {
+              label: "Pressure-test terms",
+              detail:
+                "Use this workspace to compare cover, timing, and conditions before the deal moves forward.",
+            },
+          ]}
+        />
 
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "20px",
-            alignItems: "start",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "14px",
+            marginBottom: "18px",
           }}
         >
-          <section id="section-meetings">
-            <MeetingsLog
-              projectId={project.id}
-              slug={project.slug}
-              initialMeetings={meetings}
-              stakeholders={stakeholders}
-              requirements={rows.map((r) => ({
-                requirementId: r.requirementId,
-                name: r.name,
-                status: r.status,
-              }))}
-              teamMembers={teamMembers}
-              currentUserId={userId}
-              actorName={actorName}
-              commentsByMeetingId={commentsByMeetingId}
-              watchedMeetingIds={watchedMeetingIds}
-            />
-          </section>
-
-          <section id="section-activity">
-            <ActivityFeed events={activityEvents} teamMemberNamesById={teamMemberNamesById} />
-          </section>
+          {[
+            { label: "Financing path", value: dealTypeLabel },
+            { label: "Current phase", value: currentStageLabel },
+            ...(isExim ? [{
+              label: "EXIM cover",
+              value: project.eximCoverType ? project.eximCoverType.replace(/_/g, " ") : "Not set",
+            }] : []),
+            {
+              label: isExim ? "Target LOI" : "Target close",
+              value: formatTargetDate(targetGateDate),
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "12px",
+                padding: "16px 18px",
+              }}
+            >
+              <p className="eyebrow" style={{ marginBottom: "8px" }}>{item.label}</p>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  color: "var(--ink)",
+                  margin: 0,
+                  textTransform: "capitalize",
+                }}
+              >
+                {item.value}
+              </p>
+            </div>
+          ))}
         </div>
+
+        <FunderWorkspace
+          projectId={project.id}
+          slug={project.slug}
+          initialFunders={funders}
+          requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
+          capexUsdCents={project.capexUsdCents != null ? Number(project.capexUsdCents) : null}
+        />
       </section>
 
-      <section style={{ marginBottom: "40px" }}>
+      <section id="section-workplan" style={{ marginBottom: "40px" }}>
         <div style={{ marginBottom: "18px" }}>
-          <p className="eyebrow" style={{ marginBottom: "8px" }}>PM Signal Layer</p>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Workplan workspace</p>
           <h2
             style={{
               fontFamily: "'DM Serif Display', Georgia, serif",
               fontSize: "26px",
               fontWeight: 400,
               color: "var(--ink)",
-              margin: 0,
+              margin: "0 0 8px",
             }}
           >
-            Operational visuals for the next gate
+            Readiness, blockers, and required work
           </h2>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+              maxWidth: "760px",
+            }}
+          >
+            Workplan is the canonical source of truth for what must be completed before the next gate. It combines readiness, blocker logic, the gap view, and the live checklist.
+          </p>
         </div>
 
-        <WeeklyDriftPanel
-          events={activityEvents}
-          asOf={new Date()}
-          projectCreatedAt={project.createdAt}
-          targetLoiDate={project.targetLoiDate}
-          targetCloseDate={project.targetCloseDate}
-        />
+        <section id="section-readiness">
+          <ReadinessGauge
+            scoreBps={scoreBps}
+            loiReady={loiReady}
+            categoryScores={categoryScores}
+            dealType={project.dealType}
+          />
+        </section>
 
-        <CriticalPathBoard
-          rows={rows}
-          referenceDate={new Date()}
-          subtitle="Focus on the requirements most likely to slip the next milestone, with ownership and timing pressure shown inline."
-        />
+        {isExim && !loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
 
-        <OwnershipLoadBoard
-          requirements={rows}
-          stakeholders={stakeholders}
-          subtitle="Surface owner pressure before coordination debt turns into schedule slip."
-        />
-      </section>
+        <div id="section-gap-analysis" />
+        <GapAnalysis projectId={project.id} />
 
-      {/* Readiness gauge */}
-      <section id="section-readiness">
-        <ReadinessGauge
-          scoreBps={scoreBps}
-          loiReady={loiReady}
-          categoryScores={categoryScores}
-          dealType={project.dealType}
-        />
-      </section>
-
-      {/* LOI blockers — EXIM only */}
-      {isExim && !loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
-
-      {/* Deal Milestones */}
-      <MilestonePanel
-        projectId={project.id}
-        slug={project.slug}
-        initialMilestones={milestones}
-        anchorDate={project.targetLoiDate?.toISOString() ?? project.createdAt.toISOString()}
-      />
-
-      {/* Timeline / Gantt chart */}
-      <section
-        id="section-timeline"
-        style={{
-          backgroundColor: "var(--bg-card)",
-          border: "1px solid var(--border)",
-          borderRadius: "4px",
-          padding: "24px",
-          marginBottom: "24px",
-        }}
-      >
-        <p className="eyebrow" style={{ marginBottom: "20px" }}>Deal Timeline</p>
-        <GanttChart
-          rows={rows}
-          projectCreatedAt={project.createdAt}
-          targetLoiDate={project.targetLoiDate}
-          targetCloseDate={project.targetCloseDate}
-          milestones={milestones.map((m) => ({
-            id: m.id,
-            name: m.name,
-            targetDate: m.targetDate,
-            completedAt: m.completedAt,
-          }))}
-        />
-      </section>
-
-      {/* Documents */}
-      <section id="section-documents">
-        <DocumentCoverageMap
-          projectName={project.name}
-          requirementRows={rows}
-          documents={documents}
-        />
-        <DocumentPanel
-          projectId={project.id}
-          slug={project.slug}
-          initialDocuments={documents}
-          requirementRows={rows}
-          teamMembers={teamMembers}
-          currentUserId={userId}
-          actorName={actorName}
-          commentsByDocumentId={commentsByDocumentId}
-          approvalsByDocumentId={approvalsByDocumentId}
-          watchedDocumentIds={watchedDocumentIds}
-        />
-      </section>
-
-      {/* Claude gap analysis */}
-      <div id="section-gap-analysis" />
-      <GapAnalysis projectId={project.id} />
-
-      {/* Getting started callout — shown only at 0% */}
-      {scoreBps === 0 && (
+        {scoreBps === 0 && (
         <div
           style={{
             backgroundColor: "var(--gold-soft)",
@@ -715,7 +1280,7 @@ export default async function ProjectPage({
               lineHeight: 1.3,
             }}
           >
-            Begin building your deal data room
+            Begin building your evidence base
           </p>
           <p
             style={{
@@ -769,39 +1334,250 @@ export default async function ProjectPage({
         </div>
       )}
 
-      {/* Requirements checklist */}
-      <section id="section-requirements">
-        <RequirementsChecklist
+        <section id="section-requirements">
+          <RequirementsChecklist
+            projectId={project.id}
+            slug={project.slug}
+            dealType={project.dealType}
+            rows={rows}
+            documents={documents}
+            stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
+            organizations={Array.from(
+              new Map(
+                stakeholders
+                  .filter((s): s is typeof s & { organizationId: string; organizationName: string } =>
+                    s.organizationId !== null && s.organizationName !== null
+                  )
+                  .map((s) => [s.organizationId, { id: s.organizationId, name: s.organizationName }])
+              ).values()
+            )}
+            teamMembers={teamMembers}
+            currentUserId={userId}
+            actorName={actorName}
+            canEdit={canEditProjectContent}
+            canApprove={canEditProjectContent}
+            commentsByRequirementId={commentsByRequirementId}
+            approvalsByRequirementId={approvalsByRequirementId}
+            watchedRequirementIds={watchedRequirementIds}
+          />
+        </section>
+      </section>
+
+      <section id="section-documents" style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "18px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Evidence workspace</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "26px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 8px",
+            }}
+          >
+            Evidence and document coverage
+          </h2>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+              maxWidth: "760px",
+            }}
+          >
+            Evidence replaces the old data-room framing with a clearer question: what proof exists, what is linked, and what is still missing for the next gate.
+          </p>
+        </div>
+
+        <WorkspaceFocusStrip
+          items={[
+            {
+              label: "Link proof to work",
+              detail:
+                "Evidence should map to requirements directly so the team can see what is actually supported.",
+            },
+            {
+              label: "Expose missing coverage",
+              detail:
+                "Use the coverage view to identify where documents are absent, weak, or still unlinked.",
+            },
+            {
+              label: "Pull from external sources",
+              detail:
+                "Manual and provider-backed evidence should live here beside uploaded files, not outside the workspace.",
+            },
+          ]}
+        />
+
+        <DocumentCoverageMap
+          projectName={project.name}
+          requirementRows={rows}
+          documents={documents}
+          externalEvidence={externalEvidence}
+        />
+        <DocumentPanel
           projectId={project.id}
           slug={project.slug}
-          dealType={project.dealType}
-          rows={rows}
-          documents={documents}
-          stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
-          organizations={Array.from(
-            new Map(
-              stakeholders
-                .filter((s): s is typeof s & { organizationId: string; organizationName: string } =>
-                  s.organizationId !== null && s.organizationName !== null
-                )
-                .map((s) => [s.organizationId, { id: s.organizationId, name: s.organizationName }])
-            ).values()
-          )}
+          initialDocuments={documents}
+          externalEvidence={externalEvidence}
+          requirementRows={rows}
           teamMembers={teamMembers}
           currentUserId={userId}
           actorName={actorName}
-          commentsByRequirementId={commentsByRequirementId}
-          approvalsByRequirementId={approvalsByRequirementId}
-          watchedRequirementIds={watchedRequirementIds}
+          canEdit={canEditProjectContent}
+          canApprove={canEditProjectContent}
+          commentsByDocumentId={commentsByDocumentId}
+          approvalsByDocumentId={approvalsByDocumentId}
+          watchedDocumentIds={watchedDocumentIds}
         />
+      </section>
+
+      <section id="section-execution" style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "16px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Execution workspace</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "24px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 8px",
+            }}
+          >
+            Meetings, signals, timeline, and stage review
+          </h2>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+              maxWidth: "760px",
+            }}
+          >
+            Execution is where the live operating pulse sits: what changed, where timing pressure is building, and whether the deal can realistically move through the next gate.
+          </p>
+        </div>
+
+        <WorkspaceFocusStrip
+          items={[
+            {
+              label: "Review the next gate",
+              detail:
+                "Keep the stage review, drift, and timeline tied to the same decision about whether the deal can advance.",
+            },
+            {
+              label: "Connect meetings to action",
+              detail:
+                "Use meetings and activity together so discussions translate into accountable next moves.",
+            },
+            {
+              label: "Watch operating pressure",
+              detail:
+                "Critical path, ownership load, and weekly drift should explain where execution is actually slipping.",
+            },
+          ]}
+        />
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: "20px",
+            alignItems: "start",
+            marginBottom: "24px",
+          }}
+        >
+          <section id="section-meetings">
+            <MeetingsLog
+              projectId={project.id}
+              slug={project.slug}
+              initialMeetings={meetings}
+              stakeholders={stakeholders}
+              requirements={rows.map((r) => ({
+                requirementId: r.requirementId,
+                name: r.name,
+                status: r.status,
+              }))}
+              teamMembers={teamMembers}
+              currentUserId={userId}
+              actorName={actorName}
+              canEdit={canEditProjectContent}
+              commentsByMeetingId={commentsByMeetingId}
+              watchedMeetingIds={watchedMeetingIds}
+            />
+          </section>
+
+          <section id="section-activity">
+            <ActivityFeed events={activityEvents} teamMemberNamesById={teamMemberNamesById} />
+          </section>
+        </div>
+
+        <div id="section-pm-signals" style={{ marginBottom: "24px" }}>
+          <WeeklyDriftPanel
+            events={activityEvents}
+            asOf={new Date()}
+            projectCreatedAt={project.createdAt}
+            targetLoiDate={project.targetLoiDate}
+            targetCloseDate={project.targetCloseDate}
+          />
+
+          <CriticalPathBoard
+            rows={rows}
+            referenceDate={new Date()}
+            subtitle="Focus on the requirements most likely to slip the next milestone, with ownership and timing pressure shown inline."
+          />
+
+          <OwnershipLoadBoard
+            requirements={rows}
+            stakeholders={stakeholders}
+            subtitle="Surface owner pressure before coordination debt turns into schedule slip."
+          />
+        </div>
+
+        <MilestonePanel
+          projectId={project.id}
+          slug={project.slug}
+          initialMilestones={milestones}
+          anchorDate={project.targetLoiDate?.toISOString() ?? project.createdAt.toISOString()}
+        />
+
+        <section
+          id="section-timeline"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "4px",
+            padding: "24px",
+            marginBottom: "24px",
+          }}
+        >
+          <p className="eyebrow" style={{ marginBottom: "20px" }}>Deal Timeline</p>
+          <GanttChart
+            rows={rows}
+            projectCreatedAt={project.createdAt}
+            targetLoiDate={project.targetLoiDate}
+            targetCloseDate={project.targetCloseDate}
+            milestones={milestones.map((m) => ({
+              id: m.id,
+              name: m.name,
+              targetDate: m.targetDate,
+              completedAt: m.completedAt,
+            }))}
+          />
+        </section>
       </section>
     </div>
     </div>
     <BeaconPanel
       presetQuestions={chatPresets}
-      pageContext={`Deal detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. Deal type ${project.dealType.replace(/_/g, " ")}. Readiness ${(scoreBps / 100).toFixed(1)}%.${isExim ? ` EXIM LOI blockers ${loiBlockers.length}.` : ""}`}
+      pageContext={`Deal detail page for ${project.name}. Country ${project.countryCode}. Sector ${project.sector}. Stage ${project.stage.replace(/_/g, " ")}. Deal type ${project.dealType.replace(/_/g, " ")}. Readiness ${(scoreBps / 100).toFixed(1)}%.${concept?.thesis ? ` Thesis: ${concept.thesis}.` : ""}${concept?.targetOutcome ? ` Target outcome: ${concept.targetOutcome}.` : ""}${concept?.knownUnknowns ? ` Known unknowns: ${concept.knownUnknowns}.` : ""}${concept?.fatalFlaws ? ` Fatal flaws: ${concept.fatalFlaws}.` : ""}${isExim ? ` EXIM LOI blockers ${loiBlockers.length}.` : ""}`}
       context={{ page: "project_detail", projectId: project.id, projectSlug: project.slug }}
       projectName={project.name}
+      dealType={project.dealType}
       readinessPct={scoreBps / 100}
       loiBlockerCount={loiBlockers.length}
     />

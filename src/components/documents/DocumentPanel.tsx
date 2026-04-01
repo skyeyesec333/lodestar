@@ -7,6 +7,15 @@ import type { DocumentReviewResult } from "@/lib/ai/document-review";
 import type { CommentRow } from "@/lib/db/comments";
 import type { ApprovalRow } from "@/lib/db/approvals";
 import type { TeamMember } from "@/types/collaboration";
+import {
+  addExternalEvidenceLink,
+  removeExternalEvidenceLink,
+} from "@/actions/external-evidence";
+import type {
+  ExternalEvidenceRow,
+  ExternalEvidenceProvider,
+  ExternalEvidenceSourceType,
+} from "@/lib/db/external-evidence";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
 import { WatchButton } from "@/components/collaboration/WatchButton";
@@ -17,15 +26,33 @@ type Props = {
   requirementId?: string;
   requirementName?: string;
   initialDocuments: DocumentRow[];
+  externalEvidence?: ExternalEvidenceRow[];
   requirementRows?: ProjectRequirementRow[];
   // Collaboration
   teamMembers?: TeamMember[];
   currentUserId?: string;
   actorName?: string;
+  canEdit?: boolean;
+  canApprove?: boolean;
   commentsByDocumentId?: Record<string, CommentRow[]>;
   approvalsByDocumentId?: Record<string, ApprovalRow>;
   watchedDocumentIds?: Set<string>;
 };
+
+const EXTERNAL_PROVIDER_OPTIONS: Array<{ value: ExternalEvidenceProvider; label: string }> = [
+  { value: "google_drive", label: "Google Drive" },
+  { value: "sharepoint", label: "SharePoint" },
+  { value: "onedrive", label: "OneDrive" },
+  { value: "dropbox", label: "Dropbox" },
+  { value: "box", label: "Box" },
+  { value: "vdr", label: "VDR / Data Room" },
+  { value: "other", label: "Other" },
+];
+
+const EXTERNAL_SOURCE_TYPE_OPTIONS: Array<{ value: ExternalEvidenceSourceType; label: string }> = [
+  { value: "file", label: "File" },
+  { value: "folder", label: "Folder" },
+];
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -48,10 +75,13 @@ export function DocumentPanel({
   requirementId,
   requirementName,
   initialDocuments,
+  externalEvidence = [],
   requirementRows,
   teamMembers = [],
   currentUserId,
   actorName,
+  canEdit = true,
+  canApprove = true,
   commentsByDocumentId = {},
   approvalsByDocumentId = {},
   watchedDocumentIds = new Set(),
@@ -61,9 +91,19 @@ export function DocumentPanel({
     ? new Map(requirementRows.map((r) => [r.projectRequirementId, r.name]))
     : new Map<string, string>();
   const [documents, setDocuments] = useState<DocumentRow[]>(initialDocuments);
+  const [linkedEvidence, setLinkedEvidence] = useState<ExternalEvidenceRow[]>(externalEvidence);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkDraft, setLinkDraft] = useState({
+    title: "",
+    url: "",
+    provider: "google_drive" as ExternalEvidenceProvider,
+    sourceType: "file" as ExternalEvidenceSourceType,
+    notes: "",
+  });
   const [, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -144,7 +184,50 @@ export function DocumentPanel({
     }
   }
 
-  const title = requirementName ? `Data Room · ${requirementName}` : "Data Room";
+  async function handleAddExternalLink() {
+    setLinkError(null);
+    const result = await addExternalEvidenceLink({
+      projectId,
+      slug,
+      projectRequirementId: requirementId ?? null,
+      provider: linkDraft.provider,
+      sourceType: linkDraft.sourceType,
+      title: linkDraft.title,
+      url: linkDraft.url,
+      notes: linkDraft.notes || null,
+    });
+
+    if (!result.ok) {
+      setLinkError(result.error.message);
+      return;
+    }
+
+    startTransition(() => {
+      setLinkedEvidence((prev) => [result.value, ...prev]);
+    });
+    setLinkDraft({
+      title: "",
+      url: "",
+      provider: "google_drive",
+      sourceType: "file",
+      notes: "",
+    });
+    setLinkOpen(false);
+  }
+
+  async function handleRemoveExternalLink(id: string) {
+    const result = await removeExternalEvidenceLink({ id, projectId, slug });
+    if (!result.ok) {
+      setLinkError(result.error.message);
+      return;
+    }
+
+    startTransition(() => {
+      setLinkedEvidence((prev) => prev.filter((item) => item.id !== id));
+    });
+  }
+
+  const title = requirementName ? `Evidence · ${requirementName}` : "Evidence";
 
   return (
     <div
@@ -193,36 +276,214 @@ export function DocumentPanel({
           </p>
         </div>
 
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
+        {canEdit && (
+          <>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setLinkOpen((current) => !current)}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: linkOpen ? "var(--ink-muted)" : "var(--teal)",
+                  backgroundColor: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: "3px",
+                  padding: "6px 14px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {linkOpen ? "Cancel link" : "+ Link external"}
+              </button>
+              <button
+                onClick={() => inputRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--accent)",
+                  backgroundColor: "transparent",
+                  border: "1px solid var(--accent)",
+                  borderRadius: "3px",
+                  padding: "6px 14px",
+                  cursor: uploading ? "not-allowed" : "pointer",
+                  opacity: uploading ? 0.5 : 1,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {uploading ? "Uploading…" : "+ Upload"}
+              </button>
+            </div>
+            <input
+              ref={inputRef}
+              type="file"
+              style={{ display: "none" }}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
+          </>
+        )}
+      </div>
+
+      {linkOpen && canEdit ? (
+        <div
           style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: "10px",
-            fontWeight: 500,
-            letterSpacing: "0.10em",
-            textTransform: "uppercase",
-            color: "var(--accent)",
-            backgroundColor: "transparent",
-            border: "1px solid var(--accent)",
-            borderRadius: "3px",
-            padding: "6px 14px",
-            cursor: uploading ? "not-allowed" : "pointer",
-            opacity: uploading ? 0.5 : 1,
-            whiteSpace: "nowrap",
-            flexShrink: 0,
+            padding: "16px 24px",
+            borderBottom: "1px solid var(--border)",
+            backgroundColor: "var(--bg)",
+            display: "grid",
+            gap: "12px",
           }}
         >
-          {uploading ? "Uploading…" : "+ Upload"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          style={{ display: "none" }}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px" }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+                Title
+              </span>
+              <input
+                value={linkDraft.title}
+                onChange={(event) => setLinkDraft((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Feasibility Study folder"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink)",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  padding: "8px 10px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
+              />
+            </label>
+
+            <label style={{ display: "grid", gap: "6px" }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+                Provider
+              </span>
+              <select
+                value={linkDraft.provider}
+                onChange={(event) => setLinkDraft((current) => ({ ...current, provider: event.target.value as ExternalEvidenceProvider }))}
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink)",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  padding: "8px 10px",
+                }}
+              >
+                {EXTERNAL_PROVIDER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "6px" }}>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+                Source type
+              </span>
+              <select
+                value={linkDraft.sourceType}
+                onChange={(event) => setLinkDraft((current) => ({ ...current, sourceType: event.target.value as ExternalEvidenceSourceType }))}
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink)",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  padding: "8px 10px",
+                }}
+              >
+                {EXTERNAL_SOURCE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label style={{ display: "grid", gap: "6px" }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+              URL
+            </span>
+            <input
+              value={linkDraft.url}
+              onChange={(event) => setLinkDraft((current) => ({ ...current, url: event.target.value }))}
+              placeholder="https://drive.google.com/..."
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "13px",
+                color: "var(--ink)",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                padding: "8px 10px",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            />
+          </label>
+
+          <label style={{ display: "grid", gap: "6px" }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+              Notes
+            </span>
+            <textarea
+              value={linkDraft.notes}
+              onChange={(event) => setLinkDraft((current) => ({ ...current, notes: event.target.value }))}
+              rows={2}
+              placeholder="Optional: why this source matters or what it should cover."
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "13px",
+                color: "var(--ink)",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "6px",
+                padding: "8px 10px",
+                width: "100%",
+                boxSizing: "border-box",
+                resize: "vertical",
+              }}
+            />
+          </label>
+
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink-mid)", margin: 0 }}>
+              Manual links let the team use Drive, SharePoint, Box, or VDR sources before full provider connectors are in place.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleAddExternalLink()}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                fontWeight: 500,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "#fff",
+                backgroundColor: "var(--teal)",
+                border: "none",
+                borderRadius: "3px",
+                padding: "8px 14px",
+                cursor: "pointer",
+              }}
+            >
+              Save external link
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Drop zone — shown when empty */}
       {documents.length === 0 && (
@@ -245,7 +506,7 @@ export function DocumentPanel({
                 margin: "0 0 7px",
               }}
             >
-              EXIM Data Room Files
+              Evidence sources
             </p>
             <p
               style={{
@@ -256,7 +517,7 @@ export function DocumentPanel({
                 margin: "0 0 8px",
               }}
             >
-              Link every data room file to its workplan item
+              Link every evidence source to its workplan item
             </p>
             <p
               style={{
@@ -268,10 +529,7 @@ export function DocumentPanel({
                 maxWidth: "520px",
               }}
             >
-              EXIM data room files include executed contracts, feasibility studies,
-              environmental impact assessments, and financial models. Upload each file and
-              link it to the corresponding workplan item so reviewers can trace every
-              data room file directly to its EXIM requirement.
+              Evidence can come from uploaded files or linked external sources like Drive, SharePoint, Box, or a VDR. Link each source to the corresponding workplan item so reviewers can trace it directly to the requirement it supports.
             </p>
             <p
               style={{
@@ -286,14 +544,14 @@ export function DocumentPanel({
             </p>
           </div>
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => { if (!canEdit) return; e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-            onClick={() => inputRef.current?.click()}
+            onDrop={(e) => { if (!canEdit) return; e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+            onClick={() => canEdit && inputRef.current?.click()}
             style={{
               padding: "32px 24px",
               textAlign: "center",
-              cursor: "pointer",
+              cursor: canEdit ? "pointer" : "default",
               backgroundColor: dragOver ? "var(--accent-soft)" : "transparent",
               border: dragOver ? "1px dashed var(--accent)" : "none",
               transition: "background-color 0.15s",
@@ -307,7 +565,7 @@ export function DocumentPanel({
                 margin: 0,
               }}
             >
-              Drag & drop a file here, or click to browse
+              {canEdit ? "Drag & drop a file here, or click to browse" : "No files have been uploaded yet."}
             </p>
           </div>
         </>
@@ -318,9 +576,9 @@ export function DocumentPanel({
         <div>
           {/* Drop overlay on existing list */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => { if (!canEdit) return; e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+            onDrop={(e) => { if (!canEdit) return; e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
           >
             {documents.map((doc, i) => (
               <div key={doc.id}>
@@ -416,7 +674,7 @@ export function DocumentPanel({
                         approval={approvalsByDocumentId[doc.id] ?? null}
                         currentUserId={currentUserId}
                         actorName={actorName}
-                        canAct
+                        canAct={canApprove}
                       />
                       <WatchButton
                         projectId={projectId}
@@ -445,48 +703,52 @@ export function DocumentPanel({
                   >
                     Download
                   </button>
-                  <button
-                    onClick={() =>
-                      setReviewOpenId((prev) => (prev === doc.id ? null : doc.id))
-                    }
-                    title="AI Review"
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "10px",
-                      letterSpacing: "0.06em",
-                      textTransform: "uppercase",
-                      color: "var(--ink-muted)",
-                      backgroundColor: "transparent",
-                      border: "1px solid var(--border)",
-                      borderRadius: "3px",
-                      padding: "4px 10px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    AI Review
-                  </button>
-                  <button
-                    onClick={() => handleDelete(doc.id)}
-                    title="Delete"
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "10px",
-                      letterSpacing: "0.06em",
-                      color: "var(--accent)",
-                      backgroundColor: "transparent",
-                      border: "1px solid var(--accent)",
-                      borderRadius: "3px",
-                      padding: "4px 10px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Delete
-                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() =>
+                        setReviewOpenId((prev) => (prev === doc.id ? null : doc.id))
+                      }
+                      title="AI Review"
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "10px",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-muted)",
+                        backgroundColor: "transparent",
+                        border: "1px solid var(--border)",
+                        borderRadius: "3px",
+                        padding: "4px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      AI Review
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button
+                      onClick={() => handleDelete(doc.id)}
+                      title="Delete"
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "10px",
+                        letterSpacing: "0.06em",
+                        color: "var(--accent)",
+                        backgroundColor: "transparent",
+                        border: "1px solid var(--accent)",
+                        borderRadius: "3px",
+                        padding: "4px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
 
               {/* Inline AI Review panel */}
-              {reviewOpenId === doc.id && (
+              {canEdit && reviewOpenId === doc.id && (
 
                 <div
                   style={{
@@ -582,8 +844,165 @@ export function DocumentPanel({
         </div>
       )}
 
+      {linkedEvidence.length > 0 && (
+        <div style={{ borderTop: documents.length > 0 ? "1px solid var(--border)" : undefined }}>
+          <div
+            style={{
+              padding: "12px 24px",
+              borderBottom: "1px solid var(--border)",
+              backgroundColor: "var(--bg)",
+            }}
+          >
+            <p className="eyebrow" style={{ marginBottom: "6px" }}>Linked external evidence</p>
+            <p
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: "12px",
+                color: "var(--ink-mid)",
+                margin: 0,
+              }}
+            >
+              Files and folders linked from external providers without re-uploading them into Lodestar.
+            </p>
+          </div>
+          {linkedEvidence.map((item, index) => (
+            <div
+              key={item.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "12px 24px",
+                borderBottom: index < linkedEvidence.length - 1 ? "1px solid var(--border)" : undefined,
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                  color: "var(--teal)",
+                  backgroundColor: "var(--teal-soft)",
+                  borderRadius: "3px",
+                  padding: "3px 6px",
+                  flexShrink: 0,
+                  textTransform: "uppercase",
+                }}
+              >
+                {item.sourceType}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                    margin: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {item.title}
+                </p>
+                <p
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "10px",
+                    color: "var(--ink-muted)",
+                    margin: "2px 0 0",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {item.provider.replace(/_/g, " ")} ·{" "}
+                  {new Date(item.linkedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+                {item.projectRequirementId && reqNameById.has(item.projectRequirementId) ? (
+                  <p
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px",
+                      color: "var(--teal)",
+                      backgroundColor: "var(--teal-soft)",
+                      display: "inline-block",
+                      padding: "1px 6px",
+                      borderRadius: "2px",
+                      margin: "4px 0 0",
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {reqNameById.get(item.projectRequirementId)}
+                  </p>
+                ) : null}
+                {item.notes ? (
+                  <p
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "12px",
+                      color: "var(--ink-mid)",
+                      lineHeight: 1.5,
+                      margin: "6px 0 0",
+                    }}
+                  >
+                    {item.notes}
+                  </p>
+                ) : null}
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "10px",
+                    letterSpacing: "0.06em",
+                    color: "var(--ink-muted)",
+                    backgroundColor: "transparent",
+                    border: "1px solid var(--border)",
+                    borderRadius: "3px",
+                    padding: "4px 10px",
+                    textDecoration: "none",
+                  }}
+                >
+                  Open
+                </a>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveExternalLink(item.id)}
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      letterSpacing: "0.06em",
+                      color: "var(--accent)",
+                      backgroundColor: "transparent",
+                      border: "1px solid var(--accent)",
+                      borderRadius: "3px",
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Upload error */}
-      {uploadError && (
+      {(uploadError || linkError) && (
         <div
           style={{
             padding: "12px 24px",
@@ -598,7 +1017,7 @@ export function DocumentPanel({
               margin: 0,
             }}
           >
-            {uploadError}
+            {uploadError ?? linkError}
           </p>
         </div>
       )}

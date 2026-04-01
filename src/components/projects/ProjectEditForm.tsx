@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { updateProject, advanceProjectStage } from "@/actions/projects";
 import type { ProjectSector, EximCoverType, ProjectPhase, DealType } from "@prisma/client";
+import type { GateReview } from "@/lib/projects/gate-review";
 
 // Serializable version of Project — capexUsdCents as number (BigInt can't cross server/client boundary)
 export type SerializableProject = {
@@ -35,7 +36,11 @@ const PHASE_LABELS: Record<string, string> = {
   financial_close: "Financial Close",
 };
 
-type Props = { project: SerializableProject };
+type Props = {
+  project: SerializableProject;
+  canManageProject?: boolean;
+  gateReview?: GateReview;
+};
 
 const inputStyle = {
   fontFamily: "'Inter', sans-serif",
@@ -61,9 +66,14 @@ const labelStyle = {
   marginBottom: "6px",
 };
 
-export function ProjectEditForm({ project }: Props) {
+export function ProjectEditForm({
+  project,
+  canManageProject = true,
+  gateReview,
+}: Props) {
   const isExim = project.dealType === "exim_project_finance";
   const [open, setOpen] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isAdvancing, startAdvanceTransition] = useTransition();
@@ -71,6 +81,12 @@ export function ProjectEditForm({ project }: Props) {
   const isLastStage = project.stage === "financial_close";
   const currentStageIndex = PHASE_VALUES.indexOf(project.stage as typeof PHASE_VALUES[number]);
   const nextStageLabel = !isLastStage ? PHASE_LABELS[PHASE_VALUES[currentStageIndex + 1]] : null;
+  const gateTone =
+    gateReview?.status === "ready"
+      ? "var(--teal)"
+      : gateReview?.status === "at_risk"
+        ? "var(--gold)"
+        : "var(--accent)";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -124,6 +140,8 @@ export function ProjectEditForm({ project }: Props) {
 
   return (
     <div>
+      {!canManageProject ? null : (
+        <>
       {/* Trigger row */}
       <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
         <button
@@ -146,30 +164,206 @@ export function ProjectEditForm({ project }: Props) {
           {open ? "Cancel" : "Edit Project"}
         </button>
 
-        {!isLastStage && (
+        {!isLastStage && gateReview && (
           <button
-            onClick={handleAdvance}
-            disabled={isAdvancing}
+            onClick={() => setGateOpen((current) => !current)}
             style={{
               fontFamily: "'DM Mono', monospace",
               fontSize: "10px",
               fontWeight: 500,
               letterSpacing: "0.10em",
               textTransform: "uppercase",
-              color: "#ffffff",
-              backgroundColor: "var(--teal)",
-              border: "none",
+              color: gateTone,
+              backgroundColor: "transparent",
+              border: `1px solid ${gateTone}`,
               borderRadius: "3px",
               padding: "6px 14px",
-              cursor: isAdvancing ? "not-allowed" : "pointer",
-              opacity: isAdvancing ? 0.6 : 1,
-              transition: "opacity 0.15s",
+              cursor: "pointer",
             }}
           >
-            {isAdvancing ? "Advancing…" : `Advance → ${nextStageLabel}`}
+            {gateOpen ? "Close Gate Review" : `Review Gate → ${gateReview.nextStageLabel ?? nextStageLabel}`}
           </button>
         )}
       </div>
+
+      {error && !open ? (
+        <div
+          style={{
+            backgroundColor: "var(--accent-soft)",
+            border: "1px solid var(--accent)",
+            borderRadius: "3px",
+            padding: "8px 14px",
+            marginTop: "12px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              color: "var(--accent)",
+              margin: 0,
+            }}
+          >
+            {error}
+          </p>
+        </div>
+      ) : null}
+
+      {gateOpen && gateReview ? (
+        <div
+          style={{
+            marginTop: "16px",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "18px 18px 16px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: "16px",
+              flexWrap: "wrap",
+              marginBottom: "14px",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <p style={{ ...labelStyle, marginBottom: "8px" }}>Gate Review</p>
+              <p
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "24px",
+                  color: gateTone,
+                  margin: "0 0 6px",
+                }}
+              >
+                {gateReview.nextStageLabel ?? "Final Stage"}
+              </p>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink-mid)",
+                  lineHeight: 1.55,
+                  margin: 0,
+                  maxWidth: "640px",
+                }}
+              >
+                {gateReview.focusText}
+              </p>
+            </div>
+
+            <div
+              style={{
+                padding: "8px 10px",
+                borderRadius: "999px",
+                border: `1px solid ${gateTone}`,
+                color: gateTone,
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+              }}
+            >
+              {gateReview.summary}
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "10px",
+              marginBottom: "16px",
+            }}
+          >
+            {gateReview.criteria.map((criterion) => {
+              const criterionTone =
+                criterion.status === "ready" ? "var(--teal)" : "var(--accent)";
+              return (
+                <div
+                  key={criterion.id}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: "10px",
+                    padding: "12px 14px",
+                    backgroundColor:
+                      criterion.status === "ready"
+                        ? "color-mix(in srgb, var(--teal) 8%, var(--bg-card))"
+                        : "color-mix(in srgb, var(--accent) 6%, var(--bg-card))",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "10px",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    <span style={{ ...labelStyle, marginBottom: 0 }}>{criterion.label}</span>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: criterionTone,
+                      }}
+                    >
+                      {criterion.status === "ready" ? "Ready" : "Blocked"}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "12px",
+                      lineHeight: 1.55,
+                      color: "var(--ink-mid)",
+                      margin: 0,
+                    }}
+                  >
+                    {criterion.detail}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={handleAdvance}
+              disabled={isAdvancing || !gateReview.canAdvance}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                fontWeight: 500,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "#ffffff",
+                backgroundColor:
+                  isAdvancing || !gateReview.canAdvance ? "var(--ink-muted)" : "var(--teal)",
+                border: "none",
+                borderRadius: "3px",
+                padding: "8px 14px",
+                cursor:
+                  isAdvancing || !gateReview.canAdvance ? "not-allowed" : "pointer",
+                opacity: isAdvancing || !gateReview.canAdvance ? 0.65 : 1,
+              }}
+            >
+              {isAdvancing
+                ? "Advancing…"
+                : gateReview.canAdvance
+                  ? `Advance → ${gateReview.nextStageLabel ?? nextStageLabel}`
+                  : "Advance blocked"}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Edit panel */}
       {open && (
@@ -325,6 +519,8 @@ export function ProjectEditForm({ project }: Props) {
             </button>
           </div>
         </form>
+      )}
+        </>
       )}
     </div>
   );

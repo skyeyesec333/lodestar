@@ -3,11 +3,25 @@
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import type { ProjectSector, EximCoverType, ProjectPhase, DealType } from "@prisma/client";
+import type {
+  ProjectSector,
+  EximCoverType,
+  ProjectPhase,
+  DealType,
+  EnvironmentalCategory,
+  ProgramPath,
+} from "@prisma/client";
 import { createProjectRecord, updateProjectRecord } from "@/lib/db/projects";
+import { getProjectById } from "@/lib/db/projects";
+import { getProjectRequirements } from "@/lib/db/requirements";
+import { upsertProjectConcept } from "@/lib/db/project-concepts";
+import { getProjectConcept } from "@/lib/db/project-concepts";
 import { recordActivity } from "@/lib/db/activity";
 import { createDemoPortfolioForUser, createDemoProjectForUser } from "@/lib/db/demo";
+import { computeReadiness } from "@/lib/scoring/index";
+import { buildGateReview } from "@/lib/projects/gate-review";
 import type { ProjectSummary, AppError, Result } from "@/types";
+import type { RequirementStatusValue } from "@/types/requirements";
 
 // ── Slug utility ──────────────────────────────────────────────────────────────
 
@@ -34,6 +48,19 @@ const SECTOR_VALUES = [
 ] as const;
 
 const COVER_VALUES = ["comprehensive", "political_only"] as const;
+const ENVIRONMENTAL_CATEGORY_VALUES = [
+  "category_a",
+  "category_b",
+  "category_c",
+  "category_fi",
+] as const;
+const PROGRAM_PATH_VALUES = [
+  "standard",
+  "ctep",
+  "mmia",
+  "critical_minerals",
+  "engineering_multiplier",
+] as const;
 
 const DEAL_TYPE_VALUES = [
   "exim_project_finance",
@@ -42,22 +69,6 @@ const DEAL_TYPE_VALUES = [
   "private_equity",
   "other",
 ] as const;
-
-const createProjectSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(120),
-  dealType: z.enum(DEAL_TYPE_VALUES).default("exim_project_finance"),
-  countryCode: z
-    .string()
-    .length(2, "Country code must be exactly 2 characters")
-    .transform((v) => v.toUpperCase()),
-  sector: z.enum(SECTOR_VALUES),
-  capexUsd: z.coerce.number().positive().nullable().optional(),
-  eximCoverType: z.enum(COVER_VALUES).nullable().optional(),
-  targetLoiDate: z.coerce.date().nullable().optional(),
-  description: z.string().max(2000).nullable().optional(),
-});
-
-export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 const PHASE_VALUES = [
   "concept",
@@ -68,6 +79,32 @@ const PHASE_VALUES = [
   "final_commitment",
   "financial_close",
 ] as const;
+
+const createProjectSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(120),
+  dealType: z.enum(DEAL_TYPE_VALUES).default("other"),
+  countryCode: z
+    .string()
+    .length(2, "Country code must be exactly 2 characters")
+    .transform((v) => v.toUpperCase()),
+  sector: z.enum(SECTOR_VALUES),
+  capexUsd: z.coerce.number().positive().nullable().optional(),
+  eximCoverType: z.enum(COVER_VALUES).nullable().optional(),
+  environmentalCategory: z.enum(ENVIRONMENTAL_CATEGORY_VALUES).nullable().optional(),
+  programPath: z.enum(PROGRAM_PATH_VALUES).optional().default("standard"),
+  stage: z.enum(PHASE_VALUES).optional().default("concept"),
+  targetLoiDate: z.coerce.date().nullable().optional(),
+  targetCloseDate: z.coerce.date().nullable().optional(),
+  description: z.string().max(2000).nullable().optional(),
+  sponsorRationale: z.string().max(2000).nullable().optional(),
+  targetOutcome: z.string().max(2000).nullable().optional(),
+  knownUnknowns: z.string().max(2000).nullable().optional(),
+  fatalFlaws: z.string().max(2000).nullable().optional(),
+  nextActions: z.string().max(2000).nullable().optional(),
+  goNoGoRecommendation: z.string().max(2000).nullable().optional(),
+});
+
+export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 const updateProjectSchema = z.object({
   projectId: z.string().min(1),
@@ -114,7 +151,26 @@ export async function createProject(
     };
   }
 
-  const { name, countryCode, sector, dealType, capexUsd, eximCoverType, targetLoiDate, description } =
+  const {
+    name,
+    countryCode,
+    sector,
+    dealType,
+    capexUsd,
+    eximCoverType,
+    environmentalCategory,
+    programPath,
+    stage,
+    targetLoiDate,
+    targetCloseDate,
+    description,
+    sponsorRationale,
+    targetOutcome,
+    knownUnknowns,
+    fatalFlaws,
+    nextActions,
+    goNoGoRecommendation,
+  } =
     parsed.data;
 
   const capexUsdCents =
@@ -129,12 +185,28 @@ export async function createProject(
     dealType: dealType as DealType,
     capexUsdCents,
     eximCoverType: (eximCoverType ?? null) as EximCoverType | null,
+    environmentalCategory: (environmentalCategory ?? null) as EnvironmentalCategory | null,
+    programPath: programPath as ProgramPath,
+    stage: stage as ProjectPhase,
     targetLoiDate: targetLoiDate ?? null,
-    targetCloseDate: null,
+    targetCloseDate: targetCloseDate ?? null,
     ownerClerkId: userId,
   });
 
   if (!dbResult.ok) return dbResult;
+
+  const conceptResult = await upsertProjectConcept({
+    projectId: dbResult.value.id,
+    thesis: description ?? null,
+    sponsorRationale: sponsorRationale ?? null,
+    targetOutcome: targetOutcome ?? null,
+    knownUnknowns: knownUnknowns ?? null,
+    fatalFlaws: fatalFlaws ?? null,
+    nextActions: nextActions ?? null,
+    goNoGoRecommendation: goNoGoRecommendation ?? null,
+  });
+
+  if (!conceptResult.ok) return conceptResult;
 
   // Return summary only — omits capexUsdCents (BigInt) to keep the response serializable
   const {
@@ -143,7 +215,7 @@ export async function createProject(
     slug,
     countryCode: cc,
     sector: s,
-    stage,
+    stage: createdStage,
     targetLoiDate: loiDate,
     cachedReadinessScore,
     createdAt,
@@ -158,7 +230,7 @@ export async function createProject(
       slug,
       countryCode: cc,
       sector: s,
-      stage,
+      stage: createdStage,
       targetLoiDate: loiDate,
       cachedReadinessScore,
       createdAt,
@@ -225,9 +297,46 @@ export async function advanceProjectStage(
   }
 
   const { projectId, slug, currentStage } = parsed.data;
+  const projectResult = await getProjectById(projectId, userId);
+  if (!projectResult.ok) return projectResult;
+
+  const requirementsResult = await getProjectRequirements(
+    projectId,
+    projectResult.value.dealType
+  );
+  if (!requirementsResult.ok) return requirementsResult;
+  const conceptResult = await getProjectConcept(projectId);
+  if (!conceptResult.ok) return conceptResult;
+
+  const { scoreBps } = computeReadiness(
+    requirementsResult.value.map((row) => ({
+      requirementId: row.requirementId,
+      status: row.status as RequirementStatusValue,
+    })),
+    projectResult.value.dealType
+  );
+  const gateReview = buildGateReview({
+    project: projectResult.value,
+    requirements: requirementsResult.value,
+    scoreBps,
+    concept: conceptResult.value,
+  });
+
   const currentIndex = PHASE_VALUES.indexOf(currentStage);
   if (currentIndex === PHASE_VALUES.length - 1) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: "Already at final stage." } };
+  }
+  if (!gateReview.canAdvance) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: `Gate review blocked. ${gateReview.missingCriteria
+          .slice(0, 2)
+          .map((criterion) => criterion.label)
+          .join(" · ")}`,
+      },
+    };
   }
 
   const nextStage = PHASE_VALUES[currentIndex + 1] as ProjectPhase;

@@ -67,6 +67,9 @@ export async function getUserWatchListAction(raw: unknown): Promise<Result<Watch
   const parsed = watchListSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
+  const access = await assertProjectAccess(parsed.data.projectId, userId, "viewer");
+  if (!access.ok) return { ok: false, error: access.error };
+
   return getUserWatchList(userId, parsed.data.projectId);
 }
 
@@ -84,6 +87,9 @@ export async function isWatchingAction(raw: unknown): Promise<Result<boolean>> {
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
   const { projectId, targetType, targetId = null } = parsed.data;
+  const access = await assertProjectAccess(projectId, userId, "viewer");
+  if (!access.ok) return { ok: false, error: access.error };
+
   const watching = await isWatching(userId, projectId, targetType as WatchTargetType, targetId ?? null);
   return { ok: true, value: watching };
 }
