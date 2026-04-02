@@ -142,6 +142,11 @@ export async function updateRequirementNotes(
   const result = await updateRequirementNotesInDb(projectId, requirementId, notes);
   if (!result.ok) return result;
 
+  recordActivity(projectId, userId, "requirement_notes_updated",
+    `Notes updated for requirement ${requirementId}`,
+    { requirementId }
+  ).catch(() => {});
+
   revalidatePath(`/projects/${access.value.slug}`);
 
   return { ok: true, value: undefined };
@@ -184,9 +189,68 @@ export async function addRequirementNoteAction(
   const result = await addRequirementNote(projectId, requirementId, userId, note, statusSnapshot);
   if (!result.ok) return result;
 
+  recordActivity(projectId, userId, "requirement_note_added",
+    `Note added for requirement ${requirementId}`,
+    { requirementId, statusSnapshot }
+  ).catch(() => {});
+
   revalidatePath(`/projects/${access.value.slug}`);
 
   return result;
+}
+
+const bulkUpdateStatusSchema = z.object({
+  projectId: z.string().min(1),
+  requirementIds: z.array(z.string().min(1)).min(1),
+  status: z.enum(STATUS_VALUES),
+  slug: z.string().min(1),
+});
+
+export async function bulkUpdateRequirementStatus(
+  input: unknown
+): Promise<Result<void>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "You must be signed in." },
+    };
+  }
+
+  const parsed = bulkUpdateStatusSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION_ERROR",
+        message: parsed.error.issues[0]?.message ?? "Invalid input.",
+      },
+    };
+  }
+
+  const { projectId, requirementIds, status, slug } = parsed.data;
+
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
+
+  try {
+    await db.projectRequirement.updateMany({
+      where: { projectId, requirementId: { in: requirementIds } },
+      data: { status },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+
+  recordActivity(projectId, userId, "requirement_status_updated",
+    `Bulk status update: ${requirementIds.length} requirements → ${status}`,
+    { requirementIds, status }
+  ).catch(() => {});
+
+  revalidatePath(`/projects/${slug}`);
+
+  return { ok: true, value: undefined };
 }
 
 const updateResponsibilitySchema = z.object({
@@ -235,6 +299,11 @@ export async function updateRequirementResponsibilityAction(
     applicabilityReason: applicabilityReason ?? null,
   });
   if (!result.ok) return result;
+
+  recordActivity(projectId, userId, "requirement_responsibility_updated",
+    `Responsibility updated for requirement ${requirementId}`,
+    { requirementId }
+  ).catch(() => {});
 
   revalidatePath(`/projects/${slug || access.value.slug}`);
 

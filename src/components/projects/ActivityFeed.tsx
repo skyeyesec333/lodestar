@@ -249,7 +249,7 @@ export async function ActivityFeed({ projectId, events, teamMemberNamesById = {}
   if (!events && projectId) {
     const result = await getProjectActivity(projectId);
     if (result.ok) {
-      resolvedEvents = result.value;
+      resolvedEvents = result.value.items;
     } else {
       errorMessage = result.error.message;
     }

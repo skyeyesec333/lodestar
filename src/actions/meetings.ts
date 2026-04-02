@@ -131,6 +131,11 @@ export async function createActionItem(input: unknown): Promise<Result<ActionIte
 
   if (!result.ok) return result;
 
+  recordActivity(projectId, userId, "action_item_created",
+    `Action item created: ${title}`,
+    { meetingId, title, priority }
+  ).catch(() => {});
+
   revalidatePath(`/projects/${slug}`);
   return result;
 }
@@ -156,6 +161,11 @@ export async function updateMeetingActionItemStatus(input: unknown): Promise<Res
 
   const result = await updateActionItemStatus(actionItemId, projectId, status as ActionItemStatus);
   if (!result.ok) return result;
+
+  recordActivity(projectId, userId, "action_item_updated",
+    `Action item status changed to ${status}`,
+    { actionItemId, status }
+  ).catch(() => {});
 
   revalidatePath(`/projects/${slug}`);
   return { ok: true, value: undefined };

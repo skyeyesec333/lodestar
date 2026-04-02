@@ -237,3 +237,39 @@ export function getProjectsListChatPresets(): ChatPresetQuestion[] {
     },
   ];
 }
+
+const EXIM_CATEGORY_GUIDE = `EXIM requirement categories:
+- corporate: Company formation, sponsor track record, board resolutions, legal opinions
+- financial: Financial model, debt term sheets, DSCR covenants, sources and uses
+- environmental: ESIA, environmental categorization, community engagement, resettlement plans
+- studies: Feasibility study, independent engineer report, resource assessments
+- commercial: EPC contract, off-take agreement, operation and maintenance contract, insurance
+- insurance: Political risk insurance, completion guarantee, EXIM cover type determination`.trim();
+
+export function buildMeetingActionItemsPrompt(
+  transcript: string,
+  projectName: string
+): string {
+  return `${EXIM_CATEGORY_GUIDE}
+
+You are reviewing notes from a project finance meeting for ${projectName}.
+
+Extract all action items from the following transcript. For each action item:
+1. Write a concise action description
+2. Identify the owner (person responsible) if mentioned — otherwise null
+3. Identify the due date if mentioned — otherwise null
+4. Suggest which EXIM requirement category the action relates to, choosing from: corporate, financial, environmental, studies, commercial, insurance — or null if none apply
+
+Return a JSON array only. No prose, no markdown code fences. Use exactly this schema:
+[
+  {
+    "action": "short description of the action item",
+    "owner": "person name or null",
+    "dueDate": "date text as stated or null",
+    "requirementCategory": "one of: corporate | financial | environmental | studies | commercial | insurance | null"
+  }
+]
+
+MEETING TRANSCRIPT:
+${transcript}`;
+}

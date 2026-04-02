@@ -69,10 +69,15 @@ export async function editCommentAction(raw: unknown): Promise<Result<CommentRow
   const parsed = editCommentSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
-  const { slug, commentId, body, mentionedIds } = parsed.data;
+  const { projectId, slug, commentId, body, mentionedIds } = parsed.data;
 
   const result = await editComment(commentId, userId, body, mentionedIds);
   if (!result.ok) return result;
+
+  recordActivity(projectId, userId, "comment_edited",
+    "A comment was edited",
+    { commentId }
+  ).catch(() => {});
 
   revalidatePath(`/projects/${slug}`);
   return result;
@@ -91,10 +96,15 @@ export async function deleteCommentAction(raw: unknown): Promise<Result<void>> {
   const parsed = deleteCommentSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
-  const { slug, commentId } = parsed.data;
+  const { projectId, slug, commentId } = parsed.data;
 
   const result = await deleteComment(commentId, userId);
   if (!result.ok) return result;
+
+  recordActivity(projectId, userId, "comment_deleted",
+    "A comment was deleted",
+    { commentId }
+  ).catch(() => {});
 
   revalidatePath(`/projects/${slug}`);
   return result;

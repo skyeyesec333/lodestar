@@ -12,6 +12,7 @@ import {
 } from "@/actions/funders";
 import type { FunderRelationshipRow, FunderConditionRow } from "@/lib/db/funders";
 import { CapitalStackBar } from "@/components/projects/CapitalStackBar";
+import { FunderKanban } from "@/components/projects/FunderKanban";
 
 // ── Label / style constants ───────────────────────────────────────────────────
 
@@ -304,6 +305,22 @@ export function FunderWorkspace({
     const days = daysSince(f.lastContactDate);
     return days !== null && days > 30;
   }).length;
+  const activeFunders = funders.filter(
+    (f) => f.engagementStage !== "committed" && f.engagementStage !== "declined"
+  );
+  const openConditionCount = funders.reduce(
+    (sum, funder) =>
+      sum +
+      funder.conditions.filter(
+        (condition) => condition.status === "open" || condition.status === "in_progress"
+      ).length,
+    0
+  );
+  const followupsDueSoon = funders.filter((funder) => {
+    const days = daysUntil(funder.nextFollowupDate);
+    return days !== null && days >= 0 && days <= 7;
+  }).length;
+  const committedCount = funders.filter((funder) => funder.engagementStage === "committed").length;
 
   // ── Add funder ────────────────────────────────────────────────────────────
 
@@ -606,6 +623,98 @@ export function FunderWorkspace({
         />
       )}
 
+      {funders.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: "12px",
+            marginBottom: "18px",
+          }}
+        >
+          {[
+            { label: "Active counterparties", value: activeFunders.length, tone: "var(--ink)" },
+            { label: "Open conditions", value: openConditionCount, tone: openConditionCount > 0 ? "var(--gold)" : "var(--teal)" },
+            { label: "Follow-ups due", value: followupsDueSoon, tone: followupsDueSoon > 0 ? "var(--gold)" : "var(--teal)" },
+            { label: "Committed", value: committedCount, tone: committedCount > 0 ? "var(--teal)" : "var(--ink-muted)" },
+          ].map((metric) => (
+            <div
+              key={metric.label}
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "10px",
+                padding: "12px 14px",
+                backgroundColor: "color-mix(in srgb, var(--bg) 60%, var(--bg-card))",
+              }}
+            >
+              <p style={{ ...labelStyle, marginBottom: "8px" }}>{metric.label}</p>
+              <p
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "28px",
+                  lineHeight: 1,
+                  color: metric.tone,
+                  margin: 0,
+                }}
+              >
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {funders.length > 0 && (
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: "10px",
+            padding: "16px 16px 4px",
+            backgroundColor: "color-mix(in srgb, var(--bg) 55%, var(--bg-card))",
+            marginBottom: "20px",
+          }}
+        >
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>
+            Counterparty pipeline
+          </p>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              color: "var(--ink-mid)",
+              margin: "0 0 12px",
+              lineHeight: 1.55,
+            }}
+          >
+            Use the lane view to see where counterparties are clustering and which ones need movement now.
+          </p>
+          <FunderKanban
+            funders={funders}
+            onSelectFunder={(funderId) => {
+              const selected = funders.find((funder) => funder.id === funderId);
+              if (!selected) return;
+              setDetailsEdit({
+                relationshipId: selected.id,
+                amountUsdCents:
+                  selected.amountUsdCents != null
+                    ? String(selected.amountUsdCents / 1_000_000)
+                    : "",
+                notes: selected.notes ?? "",
+                lastContactDate: toDateInputValue(selected.lastContactDate),
+                nextFollowupDate: toDateInputValue(selected.nextFollowupDate),
+              });
+              setStageEdit(null);
+              requestAnimationFrame(() => {
+                document.getElementById(`funder-card-${selected.id}`)?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                });
+              });
+            }}
+          />
+        </div>
+      )}
+
       {/* Add funder form */}
       {showAddForm && (
         <div
@@ -789,6 +898,7 @@ export function FunderWorkspace({
             return (
               <div
                 key={funder.id}
+                id={`funder-card-${funder.id}`}
                 style={{
                   backgroundColor: "var(--bg)",
                   border: "1px solid var(--border)",

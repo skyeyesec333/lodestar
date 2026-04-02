@@ -6,6 +6,7 @@ import type { WatchTargetType } from "@prisma/client";
 
 interface WatchButtonProps {
   projectId: string;
+  slug: string;
   targetType: WatchTargetType;
   targetId?: string | null;
   initialWatching: boolean;
@@ -16,6 +17,7 @@ interface WatchButtonProps {
 
 export function WatchButton({
   projectId,
+  slug,
   targetType,
   targetId = null,
   initialWatching,
@@ -30,7 +32,7 @@ export function WatchButton({
     setWatching(next);
 
     startTransition(async () => {
-      const input = { projectId, targetType, targetId, actorName };
+      const input = { projectId, slug, targetType, targetId, actorName };
       const result = next ? await watchItemAction(input) : await unwatchItemAction(input);
       if (!result.ok) {
         // Revert on failure

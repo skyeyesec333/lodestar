@@ -136,7 +136,7 @@ export async function GET(
   );
 
   const documents = sortByDateDesc(
-    documentsResult.value.map((document) => ({
+    documentsResult.value.items.map((document) => ({
       name: document.filename,
       state: document.state,
       uploadedAt: document.createdAt,

@@ -6,13 +6,22 @@ import { computeReadiness } from "@/lib/scoring/index";
 import { anthropic } from "@/lib/ai/client";
 import { buildGapAnalysisPrompt } from "@/lib/ai/prompts";
 import type { RequirementStatusValue } from "@/types/requirements";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({ projectId: z.string().min(1) });
+
+const GAP_MAX_REQUESTS = 10;
+const GAP_WINDOW_MS = 60_000;
 
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  const { allowed, resetMs } = checkRateLimit(`${userId}:gap-analysis`, GAP_MAX_REQUESTS, GAP_WINDOW_MS);
+  if (!allowed) {
+    return Response.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
   }
 
   const body = await req.json().catch(() => null);

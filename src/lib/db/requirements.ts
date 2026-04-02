@@ -348,3 +348,65 @@ export async function updateProjectCachedScore(
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
   }
 }
+
+export type CategoryBreakdown = {
+  category: string;
+  label: string;
+  total: number;
+  completed: number;
+  inProgress: number;
+  scorePct: number;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  contracts: "Contracts",
+  financial: "Financial",
+  studies: "Studies",
+  permits: "Permits",
+  corporate: "Corporate",
+  environmental_social: "Env & Social",
+};
+
+export async function getRequirementCategoryBreakdown(
+  projectId: string
+): Promise<Result<CategoryBreakdown[]>> {
+  try {
+    const rows = await db.projectRequirement.findMany({
+      where: { projectId },
+      select: {
+        status: true,
+        isApplicable: true,
+        requirement: { select: { category: true } },
+      },
+    });
+
+    const groups: Record<string, { total: number; completed: number; inProgress: number }> = {};
+
+    for (const row of rows) {
+      if (!row.isApplicable) continue;
+      const cat = row.requirement.category;
+      if (!groups[cat]) groups[cat] = { total: 0, completed: 0, inProgress: 0 };
+      groups[cat].total++;
+      if (["substantially_final", "executed", "waived"].includes(row.status)) {
+        groups[cat].completed++;
+      } else if (["in_progress", "draft"].includes(row.status)) {
+        groups[cat].inProgress++;
+      }
+    }
+
+    const breakdown: CategoryBreakdown[] = Object.entries(groups).map(([cat, counts]) => ({
+      category: cat,
+      label: CATEGORY_LABELS[cat] ?? cat,
+      total: counts.total,
+      completed: counts.completed,
+      inProgress: counts.inProgress,
+      scorePct: counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0,
+    }));
+
+    breakdown.sort((a, b) => a.scorePct - b.scorePct);
+    return { ok: true, value: breakdown };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}

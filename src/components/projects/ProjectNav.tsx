@@ -48,10 +48,8 @@ export function ProjectNav() {
   const [compactHeight, setCompactHeight] = useState<number>(PROJECT_COMPACT_NAV_MAX_HEIGHT);
   const [navHeight, setNavHeight] = useState<number>(PROJECT_NAV_MAX_HEIGHT);
   const [viewportHeight, setViewportHeight] = useState<number>(900);
-  const [isCompactOpen, setIsCompactOpen] = useState(false);
   const [sectionViewportStates, setSectionViewportStates] = useState<SectionViewportState[]>([]);
   const ticking = useRef(false);
-  const compactNavRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function updateLayout() {
@@ -140,31 +138,10 @@ export function ProjectNav() {
     };
   }, []);
 
-  useEffect(() => {
-    if (navLeft !== null) {
-      setIsCompactOpen(false);
-    }
-  }, [navLeft]);
-
-  useEffect(() => {
-    if (!isCompactOpen) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      if (!compactNavRef.current) return;
-      if (!compactNavRef.current.contains(event.target as Node)) {
-        setIsCompactOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [isCompactOpen]);
-
   function scrollTo(id: string) {
     const el = document.getElementById(id);
     if (!el) return;
     const y = el.getBoundingClientRect().top + window.scrollY - 72;
-    setIsCompactOpen(false);
     window.scrollTo({ top: y, behavior: "smooth" });
   }
 
@@ -344,144 +321,126 @@ export function ProjectNav() {
   }
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label="Open section navigation"
-        aria-expanded={isCompactOpen}
-        onClick={() => setIsCompactOpen((open) => !open)}
+    <nav
+      aria-label="Page sections"
+      style={{
+        position: "fixed",
+        left: `${compactLeft}px`,
+        top: `${PROJECT_COMPACT_NAV_TOP}px`,
+        zIndex: 60,
+        width: `${compactWidth}px`,
+        maxWidth: `min(${compactWidth}px, calc(100vw - 24px))`,
+        height: `${compactHeight}px`,
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? "auto" : "none",
+        transition: "opacity 0.25s ease",
+      }}
+    >
+      <div
         style={{
-          position: "fixed",
-          left: `${compactLeft}px`,
-          top: "112px",
-          zIndex: 60,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "10px 14px",
-          borderRadius: "999px",
-          border: "1px solid var(--border)",
-          background: "color-mix(in srgb, var(--bg-card) 94%, transparent)",
-          boxShadow: "0 10px 24px rgba(17, 24, 39, 0.12)",
-          backdropFilter: "blur(10px)",
-          color: "var(--ink)",
-          cursor: "pointer",
-          opacity: visible ? 1 : 0,
-          pointerEvents: visible ? "auto" : "none",
-          transition: "opacity 0.25s ease, transform 0.25s ease",
+          position: "relative",
+          height: "100%",
+          paddingLeft: "0",
         }}
       >
-        <span
+        <div
           style={{
-            width: "10px",
-            height: "10px",
-            borderRadius: "50%",
-            backgroundColor: "var(--accent)",
-            boxShadow: activeId ? "0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent)" : "none",
-            flexShrink: 0,
-          }}
-        />
-        <span
-          style={{
-            fontFamily: "'DM Mono', monospace",
-            fontSize: "10px",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            marginBottom: "14px",
+            paddingLeft: "8px",
           }}
         >
-          Sections
-        </span>
-      </button>
-
-      {isCompactOpen ? (
-          <nav
-            ref={compactNavRef}
-            aria-label="Page sections"
+          <span
+            aria-hidden="true"
             style={{
-              position: "fixed",
-              left: `${compactLeft}px`,
-              top: "160px",
-              zIndex: 70,
-              display: "block",
-              width: `${compactWidth}px`,
-              maxWidth: `min(${compactWidth}px, calc(100vw - 32px))`,
-              height: `${compactHeight}px`,
-              maxHeight: `${compactHeight}px`,
-              overflow: "hidden",
-              padding: "0",
-              border: "none",
-              borderRadius: "0",
-              background: "none",
-              boxShadow: "none",
-              backdropFilter: "none",
+              width: "10px",
+              height: "10px",
+              borderRadius: "50%",
+              backgroundColor: "var(--accent)",
+              boxShadow: "0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent)",
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
             }}
           >
-            <div
-              aria-hidden="true"
+            Sections
+          </span>
+        </div>
+
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            left: "12px",
+            top: "26px",
+            bottom: "0",
+            width: "1px",
+            background: "color-mix(in srgb, var(--border) 72%, transparent)",
+            opacity: 0.5,
+          }}
+        />
+        {compactVisibleItems.map(({ section, top }) => {
+          const isActive = activeId === section.id;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              aria-current={isActive ? "location" : undefined}
+              onClick={() => scrollTo(section.id)}
               style={{
                 position: "absolute",
-                left: "12px",
-                top: "0",
-                bottom: "0",
-                width: "1px",
-                background: "color-mix(in srgb, var(--border) 72%, transparent)",
-                opacity: 0.5,
+                left: "0",
+                top: `${top + 28}px`,
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                width: "100%",
+                padding: "4px 0 4px 22px",
+                border: "none",
+                background: "none",
+                cursor: "pointer",
+                textAlign: "left",
               }}
-            />
-            {compactVisibleItems.map(({ section, top }) => {
-              const isActive = activeId === section.id;
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  aria-current={isActive ? "location" : undefined}
-                  onClick={() => scrollTo(section.id)}
-                  style={{
-                    position: "absolute",
-                    left: "0",
-                    top: `${top}px`,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    width: "100%",
-                    padding: "4px 0 4px 22px",
-                    border: "none",
-                    background: "none",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      position: "absolute",
-                      left: "9px",
-                      width: isActive ? "8px" : "5px",
-                      height: isActive ? "8px" : "5px",
-                      borderRadius: "50%",
-                      backgroundColor: isActive ? "var(--accent)" : "var(--border-strong)",
-                      transition: "width 0.2s ease, height 0.2s ease, background-color 0.2s ease",
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "9px",
-                      fontWeight: isActive ? 600 : 400,
-                      letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      color: isActive ? "var(--ink)" : "var(--ink-muted)",
-                      whiteSpace: "nowrap",
-                      lineHeight: 1.25,
-                    }}
-                  >
-                    {section.label}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
-      ) : null}
-    </>
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  position: "absolute",
+                  left: "9px",
+                  width: isActive ? "8px" : "5px",
+                  height: isActive ? "8px" : "5px",
+                  borderRadius: "50%",
+                  backgroundColor: isActive ? "var(--accent)" : "var(--border-strong)",
+                  transition: "width 0.2s ease, height 0.2s ease, background-color 0.2s ease",
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "9px",
+                  fontWeight: isActive ? 600 : 400,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: isActive ? "var(--ink)" : "var(--ink-muted)",
+                  whiteSpace: "nowrap",
+                  lineHeight: 1.25,
+                }}
+              >
+                {section.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }

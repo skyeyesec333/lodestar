@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getProjectDetailChatPresets,
   getProjectsListChatPresets,
+  buildMeetingActionItemsPrompt,
 } from "@/lib/ai/chat-presets";
 
 describe("getProjectDetailChatPresets", () => {
@@ -14,10 +15,12 @@ describe("getProjectDetailChatPresets", () => {
       loiBlockerCount: 3,
     });
 
-    expect(presets).toHaveLength(5);
+    // EXIM deals return 6 presets (5 base + 1 EXIM cover item)
+    expect(presets).toHaveLength(6);
     expect(presets[0]?.question).toContain("Kivu Hydro");
     expect(presets[0]?.question).toContain("52.3%");
-    expect(presets[1]?.question).toContain("3 current LOI blockers");
+    // project-loi-blockers is index 2 (after next-step and concept-framing)
+    expect(presets[2]?.question).toContain("3 current LOI blockers");
   });
 
   it("switches the blocker prompt when the project is LOI-ready", () => {
@@ -29,7 +32,7 @@ describe("getProjectDetailChatPresets", () => {
       loiBlockerCount: 0,
     });
 
-    expect(presets[1]?.question).toContain("considered LOI-ready");
+    expect(presets[2]?.question).toContain("considered LOI-ready");
   });
 });
 
@@ -43,5 +46,31 @@ describe("getProjectsListChatPresets", () => {
       "What do these readiness bands mean?",
       "How should I read the LOI timing?",
     ]);
+  });
+});
+
+describe("buildMeetingActionItemsPrompt", () => {
+  const TRANSCRIPT =
+    "Alice will draft the EPC term sheet by Friday. Bob needs to follow up with the off-taker on the PPA credit support.";
+  const PROJECT = "Kivu Hydro";
+
+  it("includes the transcript in the output", () => {
+    const prompt = buildMeetingActionItemsPrompt(TRANSCRIPT, PROJECT);
+    expect(prompt).toContain(TRANSCRIPT);
+  });
+
+  it("includes the project name in the output", () => {
+    const prompt = buildMeetingActionItemsPrompt(TRANSCRIPT, PROJECT);
+    expect(prompt).toContain(PROJECT);
+  });
+
+  it("contains the word 'action' (case-insensitive)", () => {
+    const prompt = buildMeetingActionItemsPrompt(TRANSCRIPT, PROJECT);
+    expect(prompt.toLowerCase()).toContain("action");
+  });
+
+  it("contains the JSON schema hint for the action field", () => {
+    const prompt = buildMeetingActionItemsPrompt(TRANSCRIPT, PROJECT);
+    expect(prompt).toContain('"action":');
   });
 });

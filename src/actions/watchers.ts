@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { watchItem, unwatchItem, getUserWatchList, isWatching } from "@/lib/db/watchers";
 import { recordActivity } from "@/lib/db/activity";
 import { assertProjectAccess } from "@/lib/db/project-access";
@@ -13,6 +14,7 @@ const TARGET_TYPES = ["project", "requirement", "document", "meeting"] as const;
 
 const watchSchema = z.object({
   projectId: z.string().min(1),
+  slug: z.string().min(1),
   targetType: z.enum(TARGET_TYPES),
   targetId: z.string().nullable().optional(),
   actorName: z.string().optional(),
@@ -25,7 +27,7 @@ export async function watchItemAction(raw: unknown): Promise<Result<WatcherRow>>
   const parsed = watchSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
-  const { projectId, targetType, targetId = null, actorName } = parsed.data;
+  const { projectId, slug, targetType, targetId = null, actorName } = parsed.data;
 
   const access = await assertProjectAccess(projectId, userId, "viewer");
   if (!access.ok) return access;
@@ -40,6 +42,7 @@ export async function watchItemAction(raw: unknown): Promise<Result<WatcherRow>>
     { targetType, targetId, actorName: actor }
   );
 
+  revalidatePath(`/projects/${slug}`);
   return result;
 }
 
@@ -50,12 +53,14 @@ export async function unwatchItemAction(raw: unknown): Promise<Result<void>> {
   const parsed = watchSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." } };
 
-  const { projectId, targetType, targetId = null } = parsed.data;
+  const { projectId, slug, targetType, targetId = null } = parsed.data;
 
   const access = await assertProjectAccess(projectId, userId, "viewer");
   if (!access.ok) return access;
 
-  return unwatchItem(userId, projectId, targetType as WatchTargetType, targetId ?? null);
+  const result = await unwatchItem(userId, projectId, targetType as WatchTargetType, targetId ?? null);
+  if (result.ok) revalidatePath(`/projects/${slug}`);
+  return result;
 }
 
 const watchListSchema = z.object({ projectId: z.string().min(1) });

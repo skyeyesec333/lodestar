@@ -1246,6 +1246,7 @@ function MeetingCard({
             <span onClick={(e) => e.stopPropagation()}>
               <WatchButton
                 projectId={projectId}
+                slug={slug}
                 targetType="meeting"
                 targetId={meeting.id}
                 initialWatching={initialWatching}

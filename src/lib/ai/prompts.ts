@@ -2,12 +2,31 @@ import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
 import type { SerializableProject } from "@/components/projects/ProjectEditForm";
 
+function getDealTypeGuidance(dealType: string): string {
+  switch (dealType) {
+    case "exim_project_finance":
+      return "Focus on LOI-critical items, US content certification (>51%), EPC term sheet status, and off-take agreement creditworthiness. EXIM's LOI submission requires substantially final form on all LOI-critical items.";
+    case "development_finance":
+      return "Focus on ESMS (Environmental and Social Management System), environmental categorization, additionality demonstration, and SEP (Stakeholder Engagement Plan). DFIs require IFC Performance Standards compliance.";
+    case "commercial_finance":
+      return "Focus on DSCR covenant compliance, financial close conditions precedent, MAC clause definitions, and lender due diligence package completeness. Commercial banks require a fully executed term sheet before credit approval.";
+    case "blended_finance":
+      return "Focus on concessional window approval, additionality memo, first-loss tranche term sheet, and the blended finance structure rationale. Donor grant agreements must be in place before commercial lenders commit.";
+    case "private_equity":
+      return "Focus on management team references, LP mandate compliance memo, exit strategy documentation, and ESG baseline. PE sponsors need a clear path to exit and LP approval before deploying capital.";
+    default:
+      return "Focus on the highest-weighted incomplete items, prioritizing any items that gate the next project stage.";
+  }
+}
+
 export function buildGapAnalysisPrompt(
   project: SerializableProject,
   rows: ProjectRequirementRow[],
-  scoreBps: number
+  scoreBps: number,
+  dealType?: string
 ): string {
   const pct = (scoreBps / 100).toFixed(1);
+  const effectiveDealType = dealType ?? project.dealType ?? "exim_project_finance";
 
   const loiItems = rows.filter((r) => r.isLoiCritical);
   const notStarted = loiItems.filter((r) => r.status === "not_started");
@@ -28,7 +47,12 @@ export function buildGapAnalysisPrompt(
     })
     .join("\n\n");
 
-  return `You are an expert in US EXIM Bank project finance. A project sponsor needs concise, actionable guidance on their readiness progress.
+  const isExim = effectiveDealType === "exim_project_finance";
+  const gateLabel = isExim ? "LOI submission" : "next gate";
+
+  return `You are an expert in project finance. A project sponsor needs concise, actionable guidance on their readiness progress.
+
+DEAL TYPE FOCUS: ${getDealTypeGuidance(effectiveDealType)}
 
 PROJECT: ${project.name}
 Country: ${project.countryCode} | Sector: ${project.sector} | Stage: ${project.stage.replace(/_/g, " ")}
@@ -46,7 +70,7 @@ LOI-CRITICAL ITEMS (${loiItems.length} total):
 ALL REQUIREMENTS BY CATEGORY:
 ${categoryLines}
 
-Based on this status, provide a gap analysis with exactly 3 prioritized actions the sponsor should take THIS WEEK to most efficiently advance toward LOI submission.
+Based on this status, provide a gap analysis with exactly 3 prioritized actions the sponsor should take THIS WEEK to most efficiently advance toward ${gateLabel}.
 
 Format your response as:
 **Priority 1: [short title]**

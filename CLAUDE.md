@@ -88,6 +88,23 @@ docs/
 - Errors bubble up as typed `Result<T, AppError>` — no raw `try/catch` in components
 - All monetary/percentage values stored as integers (basis points or integer %) — no floats in DB
 
+## New tables (Phase 1 additions)
+- `debt_tranches` — stores debt tranche records per funder relationship
+- `covenants` — financial covenant tracking per project/funder
+- `project_share_links` — public share tokens for read-only project views
+- `funder_relationships` / `funder_conditions` — lender pipeline and CPs
+
+## New action files
+- `src/actions/covenants.ts`
+- `src/actions/external-evidence.ts`
+
+## New DB helper files
+- `src/lib/db/portfolio.ts`
+- `src/lib/db/covenants.ts`
+- `src/lib/db/debt-tranches.ts`
+- `src/lib/db/share-links.ts`
+- `src/lib/db/external-evidence.ts`
+
 ## Current build phase
 **Phase 1 — Alpha product.**
 The repo is past pure foundation work. It now includes an authenticated dashboard,

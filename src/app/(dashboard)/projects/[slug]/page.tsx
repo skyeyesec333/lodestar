@@ -48,8 +48,23 @@ import { getUserWatchList } from "@/lib/db/watchers";
 import { buildGateReview } from "@/lib/projects/gate-review";
 import { getProjectConcept } from "@/lib/db/project-concepts";
 import { getProjectExternalEvidence } from "@/lib/db/external-evidence";
+import { CovenantMonitoringPanel } from "@/components/projects/CovenantMonitoringPanel";
+import { getProjectCovenants } from "@/lib/db/covenants";
+import { ResponsibilityMatrix } from "@/components/projects/ResponsibilityMatrix";
+import { ExpiryTimeline } from "@/components/documents/ExpiryTimeline";
+import { ReadinessBreakdown } from "@/components/projects/ReadinessBreakdown";
+import { ShareLinksPanel } from "@/components/projects/ShareLinksPanel";
+import { getShareLinksForProject } from "@/lib/db/share-links";
+import type { CategoryBreakdown } from "@/lib/db/requirements";
 import type { TeamMember } from "@/types/collaboration";
 import type { ProjectMemberRow } from "@/lib/db/members";
+import { DecisionDesk } from "@/components/projects/DecisionDesk";
+import { checkStageGate } from "@/lib/projects/stage-gate";
+import { buildProjectOperatingMetrics } from "@/lib/projects/operating-metrics";
+import { WorkplanQueue } from "@/components/projects/WorkplanQueue";
+import { ProjectWorkspaceTabs } from "@/components/projects/ProjectWorkspaceTabs";
+import { EvidenceActionBoard } from "@/components/projects/EvidenceActionBoard";
+import { ExecutionCommitmentsBoard } from "@/components/projects/ExecutionCommitmentsBoard";
 
 function roleLabel(role: TeamMember["role"]): string {
   switch (role) {
@@ -237,6 +252,8 @@ export default async function ProjectPage({
     watchListResult,
     conceptResult,
     externalEvidenceResult,
+    covenantsResult,
+    shareLinksResult,
   ] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
@@ -252,10 +269,12 @@ export default async function ProjectPage({
     getUserWatchList(userId, project.id),
     getProjectConcept(project.id),
     getProjectExternalEvidence(project.id),
+    getProjectCovenants(project.id),
+    getShareLinksForProject(project.id),
   ]);
-  const activityEvents = activityResult.ok ? activityResult.value : [];
+  const activityEvents = activityResult.ok ? activityResult.value.items : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
-  const documents = documentsResult.ok ? documentsResult.value : [];
+  const documents = documentsResult.ok ? documentsResult.value.items : [];
   const meetings = meetingsResult.ok ? meetingsResult.value : [];
   const epcBids = epcBidsResult.ok ? epcBidsResult.value : [];
   const funders = fundersResult.ok ? fundersResult.value : [];
@@ -267,6 +286,8 @@ export default async function ProjectPage({
   const watchList = watchListResult.ok ? watchListResult.value : [];
   const concept = conceptResult.ok ? conceptResult.value : null;
   const externalEvidence = externalEvidenceResult.ok ? externalEvidenceResult.value : [];
+  const covenants = covenantsResult.ok ? covenantsResult.value : [];
+  const shareLinks = shareLinksResult.ok ? shareLinksResult.value : [];
   const currentMembership = members.find((member) => member.clerkUserId === userId);
   const currentProjectRole =
     project.ownerClerkId === userId
@@ -342,6 +363,72 @@ export default async function ProjectPage({
     targetLoiDate: project.targetLoiDate ? project.targetLoiDate.toISOString() : null,
   };
 
+  // Compute category breakdown from already-fetched requirement rows (no extra DB call)
+  const CATEGORY_LABELS_LOCAL: Record<string, string> = {
+    contracts: "Contracts",
+    financial: "Financial",
+    studies: "Studies",
+    permits: "Permits",
+    corporate: "Corporate",
+    environmental_social: "Env & Social",
+  };
+  const categoryBreakdown: CategoryBreakdown[] = (() => {
+    const groups: Record<string, { total: number; completed: number; inProgress: number }> = {};
+    for (const row of rows) {
+      if (!row.isApplicable) continue;
+      const cat = row.category;
+      if (!groups[cat]) groups[cat] = { total: 0, completed: 0, inProgress: 0 };
+      groups[cat].total++;
+      if (["substantially_final", "executed", "waived"].includes(row.status)) groups[cat].completed++;
+      else if (["in_progress", "draft"].includes(row.status)) groups[cat].inProgress++;
+    }
+    return Object.entries(groups).map(([cat, counts]) => ({
+      category: cat,
+      label: CATEGORY_LABELS_LOCAL[cat] ?? cat,
+      total: counts.total,
+      completed: counts.completed,
+      inProgress: counts.inProgress,
+      scorePct: counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0,
+    }));
+  })();
+
+  // Compute documents expiring within 90 days for ExpiryTimeline
+  const now = new Date();
+  const ninetyDaysOut = new Date(now.getTime() + 90 * 86_400_000);
+  const expiringDocuments = documents.filter(
+    (d) => d.expiresAt !== null && d.expiresAt > now && d.expiresAt <= ninetyDaysOut
+  );
+  const evidenceMissingRows = rows
+    .filter((row) => {
+      if (row.isApplicable === false) return false;
+      return (
+        !documents.some((document) => document.projectRequirementId === row.projectRequirementId) &&
+        !externalEvidence.some((evidence) => evidence.projectRequirementId === row.projectRequirementId)
+      );
+    })
+    .sort((a, b) => {
+      if (a.isLoiCritical !== b.isLoiCritical) return a.isLoiCritical ? -1 : 1;
+      return a.sortOrder - b.sortOrder;
+    });
+  const orphanedEvidenceCount =
+    documents.filter((document) => !document.projectRequirementId).length +
+    externalEvidence.filter((evidence) => !evidence.projectRequirementId).length;
+  const applicableRequirementCount = rows.filter((row) => row.isApplicable !== false).length;
+  const linkedRequirementCount = rows.filter((row) => {
+    if (row.isApplicable === false) return false;
+    return (
+      documents.some((document) => document.projectRequirementId === row.projectRequirementId) ||
+      externalEvidence.some((evidence) => evidence.projectRequirementId === row.projectRequirementId)
+    );
+  }).length;
+  const linkedCoveragePct =
+    applicableRequirementCount > 0 ? Math.round((linkedRequirementCount / applicableRequirementCount) * 100) : 0;
+  const criticalEvidenceRows = rows.filter((row) => row.isApplicable !== false && row.isLoiCritical);
+  const linkedCriticalEvidenceCount = criticalEvidenceRows.filter((row) =>
+    documents.some((document) => document.projectRequirementId === row.projectRequirementId) ||
+    externalEvidence.some((evidence) => evidence.projectRequirementId === row.projectRequirementId)
+  ).length;
+
   const { scoreBps, loiReady, loiBlockers, categoryScores } = computeReadiness(
     rows.map((r) => ({
       requirementId: r.requirementId,
@@ -362,6 +449,15 @@ export default async function ProjectPage({
           86_400_000
       )
     : null;
+  const operatingMetrics = buildProjectOperatingMetrics({
+    stage: project.stage,
+    dealType: project.dealType,
+    targetLoiDate: project.targetLoiDate,
+    targetCloseDate: project.targetCloseDate,
+    requirements: rows,
+    documents,
+  });
+  const gateResult = checkStageGate(operatingMetrics.nextStageId, rows);
   const gateReview = buildGateReview({
     project,
     requirements: rows,
@@ -520,6 +616,12 @@ export default async function ProjectPage({
           currentUserId={userId}
           initialMembers={members}
         />
+
+        <ShareLinksPanel
+          projectId={project.id}
+          slug={project.slug}
+          initialLinks={shareLinks}
+        />
       </section>
 
       <section id="section-overview" style={{ marginBottom: "40px" }}>
@@ -552,87 +654,24 @@ export default async function ProjectPage({
           </p>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "16px",
-            marginBottom: "24px",
-          }}
-        >
-          {[
-            {
-              label: "Current stage",
-              value: currentStageLabel,
-              detail: `${dealTypeLabel} workflow`,
-              color: "var(--ink)",
-            },
-            {
-              label: "Next gate",
-              value: nextGateLabel,
-              detail: targetGateDate
-                ? `${formatTargetDate(targetGateDate)}${targetGateDaysRemaining !== null ? ` · ${targetGateDaysRemaining < 0 ? "date passed" : targetGateDaysRemaining === 0 ? "today" : `${targetGateDaysRemaining} days remaining`}` : ""}`
-                : "No target date set",
-              color: "var(--teal)",
-            },
-            {
-              label: "Gate review",
-              value:
-                gateReview.status === "ready"
-                  ? "Ready to review"
-                  : gateReview.status === "at_risk"
-                    ? "At risk"
-                    : "Blocked",
-              detail: gateReview.summary,
-              color: gateReviewTone,
-            },
-          ].map((card) => (
-            <div
-              key={card.label}
-              style={{
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                borderRadius: "14px",
-                padding: "18px 20px",
-              }}
-            >
-              <p
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "10px",
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "var(--ink-muted)",
-                  margin: "0 0 10px",
-                }}
-              >
-                {card.label}
-              </p>
-              <p
-                style={{
-                  fontFamily: "'DM Serif Display', Georgia, serif",
-                  fontSize: "28px",
-                  lineHeight: 1.05,
-                  color: card.color,
-                  margin: "0 0 8px",
-                }}
-              >
-                {card.value}
-              </p>
-              <p
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: "13px",
-                  lineHeight: 1.55,
-                  color: "var(--ink-mid)",
-                  margin: 0,
-                }}
-              >
-                {card.detail}
-              </p>
-            </div>
-          ))}
-        </div>
+        <ProjectWorkspaceTabs />
+
+        <DecisionDesk
+          projectSlug={project.slug}
+          projectName={project.name}
+          dealTypeLabel={dealTypeLabel}
+          currentStageLabel={currentStageLabel}
+          nextGateLabel={nextGateLabel}
+          readinessPct={scoreBps / 100}
+          gateReviewSummary={gateReview.summary}
+          gateReviewStatus={gateReview.status}
+          gateReviewTone={gateReviewTone}
+          targetGateLabel={isExim ? "Target LOI" : "Target close"}
+          daysToNextGate={operatingMetrics.daysToNextGate}
+          categoryBreakdown={categoryBreakdown}
+          metrics={operatingMetrics}
+          gateResult={gateResult}
+        />
 
         <StageStepper current={project.stage} dealType={project.dealType} />
 
@@ -1202,6 +1241,12 @@ export default async function ProjectPage({
           requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
           capexUsdCents={project.capexUsdCents != null ? Number(project.capexUsdCents) : null}
         />
+
+        <CovenantMonitoringPanel
+          projectId={project.id}
+          slug={project.slug}
+          initialCovenants={covenants}
+        />
       </section>
 
       <section id="section-workplan" style={{ marginBottom: "40px" }}>
@@ -1245,6 +1290,15 @@ export default async function ProjectPage({
 
         <div id="section-gap-analysis" />
         <GapAnalysis projectId={project.id} />
+
+        <WorkplanQueue
+          projectId={project.id}
+          slug={project.slug}
+          dealType={project.dealType}
+          rows={rows}
+          documents={documents}
+          canEdit={canEditProjectContent}
+        />
 
         {scoreBps === 0 && (
         <div
@@ -1333,7 +1387,6 @@ export default async function ProjectPage({
           </div>
         </div>
       )}
-
         <section id="section-requirements">
           <RequirementsChecklist
             projectId={project.id}
@@ -1361,6 +1414,8 @@ export default async function ProjectPage({
             watchedRequirementIds={watchedRequirementIds}
           />
         </section>
+
+        <ResponsibilityMatrix requirements={rows} />
       </section>
 
       <section id="section-documents" style={{ marginBottom: "40px" }}>
@@ -1411,6 +1466,25 @@ export default async function ProjectPage({
           ]}
         />
 
+        <EvidenceActionBoard
+          projectSlug={project.slug}
+          linkedCoveragePct={linkedCoveragePct}
+          missingEvidenceCount={evidenceMissingRows.length}
+          orphanedEvidenceCount={orphanedEvidenceCount}
+          expiringEvidenceCount={expiringDocuments.length}
+          criticalCoverageLabel={
+            criticalEvidenceRows.length > 0
+              ? `${linkedCriticalEvidenceCount}/${criticalEvidenceRows.length} gate-critical requirements have linked proof.`
+              : "No gate-critical evidence requirements are defined for this deal yet."
+          }
+          topGaps={evidenceMissingRows.slice(0, 4).map((row) => ({
+            requirementId: row.requirementId,
+            name: row.name,
+            category: row.category,
+            isLoiCritical: row.isLoiCritical,
+          }))}
+        />
+
         <DocumentCoverageMap
           projectName={project.name}
           requirementRows={rows}
@@ -1432,6 +1506,8 @@ export default async function ProjectPage({
           approvalsByDocumentId={approvalsByDocumentId}
           watchedDocumentIds={watchedDocumentIds}
         />
+
+        <ExpiryTimeline documents={expiringDocuments} projectSlug={project.slug} />
       </section>
 
       <section id="section-execution" style={{ marginBottom: "40px" }}>
@@ -1446,7 +1522,7 @@ export default async function ProjectPage({
               margin: "0 0 8px",
             }}
           >
-            Meetings, signals, timeline, and stage review
+            Commitments, signals, timeline, and stage review
           </h2>
           <p
             style={{
@@ -1458,7 +1534,7 @@ export default async function ProjectPage({
               maxWidth: "760px",
             }}
           >
-            Execution is where the live operating pulse sits: what changed, where timing pressure is building, and whether the deal can realistically move through the next gate.
+            Execution is where follow-through becomes visible: what the team committed to, what is slipping, and whether the deal can realistically move through the next gate.
           </p>
         </div>
 
@@ -1480,6 +1556,12 @@ export default async function ProjectPage({
                 "Critical path, ownership load, and weekly drift should explain where execution is actually slipping.",
             },
           ]}
+        />
+
+        <ExecutionCommitmentsBoard
+          projectSlug={project.slug}
+          meetings={meetings}
+          activityEvents={activityEvents}
         />
 
         <div

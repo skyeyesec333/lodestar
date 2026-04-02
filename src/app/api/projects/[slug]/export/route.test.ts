@@ -131,13 +131,16 @@ describe("GET /api/projects/[slug]/export", () => {
     });
     mocks.getProjectDocumentsMock.mockResolvedValue({
       ok: true,
-      value: [
-        {
-          filename: "term-sheet.pdf",
-          state: "current",
-          createdAt: new Date("2026-03-29T00:00:00.000Z"),
-        },
-      ],
+      value: {
+        items: [
+          {
+            filename: "term-sheet.pdf",
+            state: "current",
+            createdAt: new Date("2026-03-29T00:00:00.000Z"),
+          },
+        ],
+        nextCursor: null,
+      },
     });
     mocks.getProjectFundersMock.mockResolvedValue({
       ok: true,

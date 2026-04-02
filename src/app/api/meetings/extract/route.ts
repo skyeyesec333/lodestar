@@ -1,11 +1,20 @@
 import { auth } from "@clerk/nextjs/server";
 import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
 import { extractMeetingInsights } from "@/lib/ai/meeting-extraction";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+const EXTRACT_MAX_REQUESTS = 10;
+const EXTRACT_WINDOW_MS = 60_000;
 
 export async function POST(req: Request): Promise<Response> {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { allowed, resetMs } = checkRateLimit(`${userId}:meetings-extract`, EXTRACT_MAX_REQUESTS, EXTRACT_WINDOW_MS);
+  if (!allowed) {
+    return Response.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
   }
 
   let body: unknown;

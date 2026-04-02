@@ -45,6 +45,8 @@ function makeDocument(overrides: Partial<DocumentRow> = {}): DocumentRow {
     uploadedBy: "user-1",
     state: "active",
     projectRequirementId: null,
+    expiresAt: null,
+    expiryAlertDismissedAt: null,
     createdAt: new Date("2026-01-01"),
     ...overrides,
   };

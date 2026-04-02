@@ -1628,6 +1628,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                             )}
                             <WatchButton
                               projectId={projectId}
+                              slug={slug}
                               targetType="requirement"
                               targetId={row.projectRequirementId}
                               initialWatching={isWatched}

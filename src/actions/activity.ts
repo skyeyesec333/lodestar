@@ -2,16 +2,18 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
-import { getProjectActivity, type ActivityEventRow } from "@/lib/db/activity";
+import { getProjectActivity, type ActivityPage } from "@/lib/db/activity";
 import type { Result } from "@/types";
 
 const getProjectActivitySchema = z.object({
   projectId: z.string().min(1),
+  cursor: z.string().optional(),
+  limit: z.number().int().positive().optional(),
 });
 
 export async function getProjectActivityAction(
   input: unknown
-): Promise<Result<ActivityEventRow[]>> {
+): Promise<Result<ActivityPage>> {
   const { userId } = await auth();
   if (!userId) {
     return {
@@ -34,5 +36,5 @@ export async function getProjectActivityAction(
     };
   }
 
-  return getProjectActivity(parsed.data.projectId);
+  return getProjectActivity(parsed.data.projectId, parsed.data.limit, parsed.data.cursor);
 }

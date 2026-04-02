@@ -678,6 +678,7 @@ export function DocumentPanel({
                       />
                       <WatchButton
                         projectId={projectId}
+                        slug={slug}
                         targetType="document"
                         targetId={doc.id}
                         initialWatching={watchedDocumentIds.has(doc.id)}
