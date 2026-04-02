@@ -150,7 +150,15 @@ function calloutPosition(
 const PAD = 10;
 const TOUR_TRIGGER_TOP = "64px";
 
-export function TourGuide({ dealType, stage }: { dealType?: string; stage?: string }) {
+export function TourGuide({
+  dealType,
+  stage,
+  inline = false,
+}: {
+  dealType?: string;
+  stage?: string;
+  inline?: boolean;
+}) {
   const [step, setStep] = useState<number | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
   const [vpW, setVpW] = useState(0);
@@ -235,6 +243,52 @@ export function TourGuide({ dealType, stage }: { dealType?: string; stage?: stri
   const calloutStyle = rect && currentStep
     ? calloutPosition(rect, currentStep.placement, vpW, vpH)
     : { top: "50%", left: "50%", width: 320, transform: "translate(-50%,-50%)" };
+  const restartButtonStyle: React.CSSProperties = inline
+    ? {
+        minHeight: "34px",
+        borderRadius: "999px",
+        backgroundColor: "var(--bg-card)",
+        border: "1px solid var(--border-strong)",
+        color: "var(--ink-muted)",
+        fontFamily: "'DM Mono', monospace",
+        fontSize: "10px",
+        fontWeight: 500,
+        letterSpacing: "0.10em",
+        textTransform: "uppercase",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+        padding: "0 14px",
+        boxShadow: "none",
+        transition: "border-color 0.15s, color 0.15s, box-shadow 0.15s",
+        flexShrink: 0,
+      }
+    : {
+        position: "fixed",
+        top: TOUR_TRIGGER_TOP,
+        right: "16px",
+        zIndex: 1100,
+        minHeight: "34px",
+        borderRadius: "999px",
+        backgroundColor: "var(--bg-card)",
+        border: "1px solid var(--border-strong)",
+        color: "var(--ink-muted)",
+        fontFamily: "'DM Mono', monospace",
+        fontSize: "10px",
+        fontWeight: 500,
+        letterSpacing: "0.10em",
+        textTransform: "uppercase",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+        padding: "0 14px",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.14)",
+        transition: "border-color 0.15s, color 0.15s, box-shadow 0.15s",
+      };
 
   return (
     <>
@@ -409,39 +463,16 @@ export function TourGuide({ dealType, stage }: { dealType?: string; stage?: stri
             transition={{ delay: 0.3, type: "spring", stiffness: 400, damping: 28 }}
             onClick={restart}
             title="Start page tour"
-            style={{
-              position: "fixed",
-              top: TOUR_TRIGGER_TOP,
-              right: "16px",
-              zIndex: 1100,
-              minHeight: "34px",
-              borderRadius: "999px",
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-strong)",
-              color: "var(--ink-muted)",
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "10px",
-              fontWeight: 500,
-              letterSpacing: "0.10em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              padding: "0 14px",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.14)",
-              transition: "border-color 0.15s, color 0.15s, box-shadow 0.15s",
-            }}
+            style={restartButtonStyle}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = "var(--accent)";
               e.currentTarget.style.color = "var(--accent)";
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
+              if (!inline) e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = "var(--border-strong)";
               e.currentTarget.style.color = "var(--ink-muted)";
-              e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.14)";
+              if (!inline) e.currentTarget.style.boxShadow = "0 2px 10px rgba(0,0,0,0.14)";
             }}
           >
             <span

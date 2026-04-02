@@ -30,7 +30,6 @@ import { MilestonePanel } from "@/components/projects/MilestonePanel";
 import { CollaboratorsPanel } from "@/components/projects/CollaboratorsPanel";
 import { getProjectMembers } from "@/lib/db/members";
 import { GanttChart } from "@/components/projects/GanttChart";
-import { ProjectNav } from "@/components/projects/ProjectNav";
 import { TourGuide } from "@/components/projects/TourGuide";
 import { getProjectDetailChatPresets } from "@/lib/ai/chat-presets";
 import { BeaconProvider } from "@/components/beacon/BeaconProvider";
@@ -504,9 +503,7 @@ export default async function ProjectPage({
     <BeaconProvider>
     <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
     <div style={{ flex: 1, minWidth: 0 }}>
-      <ProjectNav />
       <WorkspaceBeaconSync />
-      <TourGuide dealType={project.dealType} stage={project.stage} />
 
       {/* Breadcrumb */}
       <div style={{ marginBottom: "32px" }}>
@@ -654,7 +651,24 @@ export default async function ProjectPage({
           </p>
         </div>
 
-        <ProjectWorkspaceTabs />
+        <div
+          style={{
+            position: "sticky",
+            top: "12px",
+            zIndex: 24,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "20px",
+            padding: "8px 0 10px",
+            marginBottom: "24px",
+            borderBottom: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
+            backgroundColor: "var(--bg)",
+          }}
+        >
+          <ProjectWorkspaceTabs />
+          <TourGuide dealType={project.dealType} stage={project.stage} inline />
+        </div>
 
         <DecisionDesk
           projectSlug={project.slug}

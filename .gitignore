@@ -23,6 +23,8 @@ Thumbs.db
 
 # Local Claude/Codex agent workspaces
 .claude/worktrees/
+.claude/settings.local.json
+.clerk/
 
 # TypeScript incremental cache
 *.tsbuildinfo

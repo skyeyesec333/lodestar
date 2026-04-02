@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
-import { PROJECT_SECTIONS } from "@/components/projects/ProjectNav";
+import { PROJECT_SECTIONS } from "@/components/projects/projectSections";
 
 function pillStyle(active: boolean): CSSProperties {
   return {
@@ -51,17 +51,12 @@ export function ProjectWorkspaceTabs() {
     <nav
       aria-label="Project workspaces"
       style={{
-        position: "sticky",
-        top: "70px",
-        zIndex: 20,
         display: "flex",
         gap: "22px",
         overflowX: "auto",
         alignItems: "center",
-        padding: "0 0 10px",
-        borderBottom: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
-        backgroundColor: "color-mix(in srgb, var(--bg) 94%, transparent)",
-        marginBottom: "24px",
+        flex: 1,
+        minWidth: 0,
       }}
     >
       {PROJECT_SECTIONS.map((section) => (

@@ -1,21 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-
-export type NavSection = {
-  id: string;
-  label: string;
-};
-
-export const PROJECT_SECTIONS: NavSection[] = [
-  { id: "section-overview",     label: "Overview"  },
-  { id: "section-concept",      label: "Concept"   },
-  { id: "section-stakeholders", label: "Parties"   },
-  { id: "section-capital",      label: "Capital"   },
-  { id: "section-workplan",     label: "Workplan"  },
-  { id: "section-documents",    label: "Evidence"  },
-  { id: "section-execution",    label: "Execution" },
-];
+import { PROJECT_SECTIONS } from "@/components/projects/projectSections";
 
 const PROJECT_NAV_WIDTH = 166;
 const PROJECT_CONTENT_MAX_WIDTH = 1200;
