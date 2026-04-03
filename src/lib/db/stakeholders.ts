@@ -57,6 +57,7 @@ export type StakeholderRow = {
   documentsOwedCount: number;
   lastContactAt: Date | null;
   lastMeetingOutcome: string | null;
+  lastContactedAt: Date | null;
   needsFollowUp: boolean;
   followUpReason: string | null;
 };
@@ -66,7 +67,7 @@ export async function getProjectStakeholders(
 ): Promise<Result<StakeholderRow[]>> {
   try {
     const roles = await db.stakeholderRole.findMany({
-      where: { projectId },
+      where: { projectId, stakeholder: { deletedAt: null } },
       orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
       select: {
         id: true,
@@ -80,6 +81,7 @@ export async function getProjectStakeholders(
             email: true,
             phone: true,
             title: true,
+            lastContactedAt: true,
             organization: {
               select: {
                 id: true,
@@ -223,6 +225,7 @@ export async function getProjectStakeholders(
         roleId: r.id,
         roleDescription: r.description,
         isPrimary: r.isPrimary,
+        lastContactedAt: r.stakeholder.lastContactedAt ?? null,
       })),
     };
   } catch (err) {
@@ -366,13 +369,14 @@ export async function updateStakeholderInProject(
 export async function removeStakeholderRole(
   roleId: string,
   projectId: string,
-  replacementRoleId?: string | null
+  replacementRoleId?: string | null,
+  userId?: string | null
 ): Promise<Result<void>> {
   try {
     await db.$transaction(async (tx) => {
       const role = await tx.stakeholderRole.findFirst({
         where: { id: roleId, projectId },
-        select: { id: true, roleType: true, isPrimary: true },
+        select: { id: true, roleType: true, isPrimary: true, stakeholderId: true },
       });
 
       if (!role) {
@@ -417,6 +421,28 @@ export async function removeStakeholderRole(
       await tx.stakeholderRole.delete({
         where: { id: role.id },
       });
+
+      await tx.stakeholder.update({
+        where: { id: role.stakeholderId },
+        data: { deletedAt: new Date(), deletedBy: userId ?? null },
+        select: { id: true },
+      });
+    });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+export async function updateLastContacted(
+  stakeholderId: string
+): Promise<Result<void>> {
+  try {
+    await db.stakeholder.update({
+      where: { id: stakeholderId },
+      data: { lastContactedAt: new Date() },
+      select: { id: true },
     });
     return { ok: true, value: undefined };
   } catch (err) {

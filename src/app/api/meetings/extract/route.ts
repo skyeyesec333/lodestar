@@ -12,7 +12,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { allowed, resetMs } = checkRateLimit(`${userId}:meetings-extract`, EXTRACT_MAX_REQUESTS, EXTRACT_WINDOW_MS);
+  const { allowed, resetMs } = await checkRateLimit(`${userId}:meetings-extract`, EXTRACT_MAX_REQUESTS, EXTRACT_WINDOW_MS);
   if (!allowed) {
     return Response.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
   }

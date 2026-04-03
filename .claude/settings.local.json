@@ -12,7 +12,30 @@
       "Bash(node -e \":*)",
       "Bash(npm test:*)",
       "Bash(node -e \"const p = require\\(''./package.json''\\); console.log\\(JSON.stringify\\({...p.dependencies, ...p.devDependencies}, null, 2\\)\\)\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\(''''packages'''',{}\\).keys\\(\\)\\)[:30]\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(list\\(d.get\\(''''packages'''',{}\\).keys\\(\\)\\)[:30]\\)\")",
+      "Bash(npx vitest:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:Yadayadayada!1@db.jldvikzoevadtnnhdltw.supabase.co:5432/postgres\" npx prisma db push --accept-data-loss)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:Yadayadayada!1@db.jldvikzoevadtnnhdltw.supabase.co:5432/postgres\" npx prisma db pull)",
+      "Bash(/Users/bryanalexandros/Documents/lodestar/prisma/schema.prisma:*)",
+      "Bash(curl -s http://localhost:3002/projects -H \"Cookie: __clerk_db_jwt=test\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(curl -s \"http://localhost:3002/projects\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(python3 -c \" import sys, json for line in sys.stdin: line = line.strip\\(\\) if not line: continue try: obj = json.loads\\(line\\) msg = obj.get\\('message', {}\\) content = msg.get\\('content', []\\) for item in content: if isinstance\\(item, dict\\) and item.get\\('type'\\) == 'text': text = item.get\\('text', ''\\) if len\\(text\\) > 100: print\\(text[-3000:]\\) except: pass \")",
+      "Bash(python3 -c \" import sys, json for line in sys.stdin: line = line.strip\\(\\) if not line: continue try: obj = json.loads\\(line\\) msg = obj.get\\('message', {}\\) content = msg.get\\('content', []\\) for item in content: if isinstance\\(item, dict\\) and item.get\\('type'\\) == 'text': print\\(item.get\\('text', ''\\)[-500:]\\) except: pass \")",
+      "Bash(node -e ':*)",
+      "Bash(nc -zv db.jldvikzoevadtnnhdltw.supabase.co 5432)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(pkill -f \"prisma\")",
+      "Bash(wait 33572)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(sed -i '' 's/id=\"section-executive-summary\" style={{ marginBottom: \"40px\" }}/id=\"section-executive-summary\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
+      "Bash(sed -i '' 's/id=\"section-collaborators\" style={{ marginBottom: \"32px\" }}/id=\"section-collaborators\" style={{ marginBottom: \"32px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
+      "Bash(sed -i '' 's/id=\"section-overview\" style={{ marginBottom: \"40px\" }}/id=\"section-overview\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
+      "Bash(sed -i '' 's/id=\"section-concept\" style={{ marginBottom: \"40px\" }}/id=\"section-concept\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
+      "Bash(sed -i '' 's/id=\"section-stakeholders\" style={{ marginBottom: \"40px\" }}/id=\"section-stakeholders\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')"
     ]
   }
 }

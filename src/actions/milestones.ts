@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { db } from "@/lib/db";
 import {
   createMilestone,
   updateMilestone,
@@ -71,6 +72,15 @@ export async function createMilestoneAction(
   }
 
   const { projectId, slug, name, description, linkedPhase, targetDate } = parsed.data;
+
+  const existing = await db.dealMilestone.findFirst({
+    where: { projectId, name },
+    select: { id: true },
+  });
+  if (existing) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: `A milestone named "${name}" already exists for this project.` } };
+  }
+
   const result = await createMilestone(projectId, userId, {
     name,
     description: description ?? null,

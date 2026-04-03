@@ -10,6 +10,7 @@ import type { CommentRow } from "@/lib/db/comments";
 import type { TeamMember } from "@/types/collaboration";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { WatchButton } from "@/components/collaboration/WatchButton";
+import { ActionItemsPanel } from "@/components/meetings/ActionItemsPanel";
 
 // ── Provider Connector Banner ─────────────────────────────────────────────────
 
@@ -1214,9 +1215,7 @@ function MeetingCard({
   initialWatching?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [actionItems, setActionItems] = useState<ActionItemRow[]>(meeting.actionItems);
   const [showAddAction, setShowAddAction] = useState(false);
-  const [showExtract, setShowExtract] = useState(false);
 
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: "4px", marginBottom: "12px", overflow: "hidden" }}>
@@ -1236,9 +1235,9 @@ function MeetingCard({
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-          {actionItems.length > 0 && (
+          {meeting.actionItems.length > 0 && (
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.06em", color: "var(--gold)" }}>
-              {actionItems.filter((a) => a.status === "open" || a.status === "in_progress").length} open
+              {meeting.actionItems.filter((a) => a.status === "open" || a.status === "in_progress").length} open
             </span>
           )}
           {/* Watch toggle — stop propagation so click doesn't toggle expand */}
@@ -1290,64 +1289,39 @@ function MeetingCard({
           )}
 
           {/* Action Items */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-              <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 500, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--ink-muted)", margin: 0 }}>
-                Action Items
-              </p>
-              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                {canEdit && (
-                  <>
-                    <button
-                      onClick={() => setShowExtract((v) => !v)}
-                      style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--teal)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                    >
-                      ✦ Extract Insights
-                    </button>
-                    <button
-                      onClick={() => setShowAddAction((v) => !v)}
-                      style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
-                    >
-                      + Add
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+          <ActionItemsPanel
+            meetingId={meeting.id}
+            projectId={projectId}
+            slug={slug}
+            initialActionItems={meeting.actionItems}
+            canEdit={canEdit}
+          />
 
-            {actionItems.length === 0 && !showAddAction && (
-              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink-muted)", margin: 0 }}>No action items yet.</p>
-            )}
-
-            {actionItems.map((item) => (
-              <ActionItemCard key={item.id} item={item} projectId={projectId} slug={slug} canEdit={canEdit} />
-            ))}
-
-            {showAddAction && canEdit && (
+          {/* Manual add form */}
+          {showAddAction && canEdit && (
+            <div style={{ marginTop: "12px" }}>
               <AddActionItemForm
                 projectId={projectId}
                 slug={slug}
                 meetingId={meeting.id}
                 stakeholders={stakeholders}
                 requirements={requirements}
-                onCreated={(a) => { setActionItems((prev) => [...prev, a]); setShowAddAction(false); }}
+                onCreated={() => { setShowAddAction(false); }}
                 onCancel={() => setShowAddAction(false)}
               />
-            )}
-          </div>
+            </div>
+          )}
+          {canEdit && !showAddAction && (
+            <div style={{ marginTop: "10px" }}>
+              <button
+                onClick={() => setShowAddAction(true)}
+                style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--accent)", backgroundColor: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+              >
+                + Add manually
+              </button>
+            </div>
+          )}
         </div>
-      )}
-
-      {/* Extract Insights Panel */}
-      {expanded && showExtract && canEdit && (
-        <ExtractInsightsPanel
-          meetingId={meeting.id}
-          projectId={projectId}
-          slug={slug}
-          requirements={requirements}
-          stakeholders={stakeholders}
-          onActionItemAdded={(a) => setActionItems((prev) => [...prev, a])}
-        />
       )}
 
       {/* Collaboration comment thread */}

@@ -50,6 +50,122 @@ function getReadinessColor(score: number | null): string {
   return "var(--accent)";
 }
 
+type RagStatus = "on_track" | "at_risk" | "stalled" | "no_data";
+
+type RagConfig = {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+};
+
+const RAG_CONFIG: Record<RagStatus, RagConfig> = {
+  on_track: {
+    label: "On Track",
+    color: "var(--teal)",
+    bg: "color-mix(in srgb, var(--teal) 12%, var(--bg-card))",
+    border: "var(--teal)",
+  },
+  at_risk: {
+    label: "At Risk",
+    color: "var(--gold)",
+    bg: "color-mix(in srgb, var(--gold) 12%, var(--bg-card))",
+    border: "var(--gold)",
+  },
+  stalled: {
+    label: "Stalled",
+    color: "var(--accent)",
+    bg: "color-mix(in srgb, var(--accent) 12%, var(--bg-card))",
+    border: "var(--accent)",
+  },
+  no_data: {
+    label: "No Data",
+    color: "var(--ink-muted)",
+    bg: "var(--bg-card)",
+    border: "var(--border)",
+  },
+};
+
+function computeRagStatus(project: ProjectsStageGridItem): RagStatus {
+  const score = project.cachedReadinessScore;
+  const stage = project.stage;
+  const now = new Date();
+
+  // GREEN: advanced stages always on track
+  if (
+    stage === "loi_approved" ||
+    stage === "final_commitment" ||
+    stage === "financial_close"
+  ) {
+    return "on_track";
+  }
+
+  // GREEN: readiness >= 75%
+  if (score != null && score >= 7500) {
+    return "on_track";
+  }
+
+  // NO DATA: no readiness score and no LOI date
+  if ((score == null || score === 0) && !project.targetLoiDate) {
+    return "no_data";
+  }
+
+  const loiDate = project.targetLoiDate ? new Date(project.targetLoiDate) : null;
+  const loiDaysFromNow = loiDate
+    ? Math.ceil((loiDate.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / msPerDay)
+    : null;
+
+  const lastActivity = project.lastActivityAt ? new Date(project.lastActivityAt) : null;
+  const daysSinceActivity = lastActivity
+    ? Math.floor((Date.now() - lastActivity.getTime()) / msPerDay)
+    : null;
+
+  // RED: LOI date is in the past and stage is still pre-LOI
+  const preLoiStages: ProjectPhase[] = ["concept", "pre_loi", "loi_submitted", "pre_commitment"];
+  if (loiDaysFromNow != null && loiDaysFromNow < 0 && preLoiStages.includes(stage)) {
+    return "stalled";
+  }
+
+  // RED: last activity > 21 days ago and readiness < 75%
+  if (daysSinceActivity != null && daysSinceActivity > 21 && (score == null || score < 7500)) {
+    return "stalled";
+  }
+
+  // AMBER: readiness 30–74.99% and (LOI within 60 days OR activity > 14 days ago)
+  if (score != null && score >= 3000 && score < 7500) {
+    const loiSoon = loiDaysFromNow != null && loiDaysFromNow >= 0 && loiDaysFromNow <= 60;
+    const recentlyQuiet = daysSinceActivity != null && daysSinceActivity > 14;
+    if (loiSoon || recentlyQuiet) {
+      return "at_risk";
+    }
+  }
+
+  return "no_data";
+}
+
+function RagBadge({ status }: { status: RagStatus }) {
+  const cfg = RAG_CONFIG[status];
+  return (
+    <span
+      style={{
+        fontFamily: "'DM Mono', monospace",
+        fontSize: "9px",
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        color: cfg.color,
+        border: `1px solid ${cfg.border}`,
+        borderRadius: "999px",
+        padding: "5px 9px",
+        flexShrink: 0,
+        backgroundColor: cfg.bg,
+      }}
+    >
+      {cfg.label}
+    </span>
+  );
+}
+
 function getLoiCountdown(targetLoiDate: string | null): {
   text: string;
   subtext: string;
@@ -222,7 +338,8 @@ export function ProjectsStageGridClient({
                 backgroundColor: isActive ? "var(--teal)" : "var(--bg-card)",
                 border: `1px solid ${isActive ? "var(--teal)" : "var(--border)"}`,
                 borderRadius: "999px",
-                padding: "7px 10px",
+                padding: "10px 12px",
+                minHeight: "44px",
                 cursor: "pointer",
               }}
             >
@@ -310,6 +427,7 @@ export function ProjectsStageGridClient({
               loiDays >= 0 &&
               loiDays <= 60;
 
+            const ragStatus = computeRagStatus(project);
             const capexLabel = formatCapex(project.capexUsdCents);
             const daysSinceActivity = formatDaysSinceLastActivity(project.lastActivityAt);
 
@@ -371,25 +489,35 @@ export function ProjectsStageGridClient({
                         {project.slug}
                       </span>
                     </div>
-                    <span
+                    <div
                       style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "9px",
-                        letterSpacing: "0.12em",
-                        textTransform: "uppercase",
-                        whiteSpace: "nowrap",
-                        color: isAtRisk ? "var(--accent)" : "var(--ink-muted)",
-                        border: `1px solid ${isAtRisk ? "var(--accent)" : "var(--border)"}`,
-                        borderRadius: "999px",
-                        padding: "6px 10px",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: "6px",
                         flexShrink: 0,
-                        backgroundColor: isAtRisk
-                          ? "color-mix(in srgb, var(--accent) 10%, var(--bg-card))"
-                          : "color-mix(in srgb, var(--teal) 6%, var(--bg-card))",
                       }}
                     >
-                      {stageLabel}
-                    </span>
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "9px",
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                          color: isAtRisk ? "var(--accent)" : "var(--ink-muted)",
+                          border: `1px solid ${isAtRisk ? "var(--accent)" : "var(--border)"}`,
+                          borderRadius: "999px",
+                          padding: "6px 10px",
+                          backgroundColor: isAtRisk
+                            ? "color-mix(in srgb, var(--accent) 10%, var(--bg-card))"
+                            : "color-mix(in srgb, var(--teal) 6%, var(--bg-card))",
+                        }}
+                      >
+                        {stageLabel}
+                      </span>
+                      <RagBadge status={ragStatus} />
+                    </div>
                   </div>
 
                   <div

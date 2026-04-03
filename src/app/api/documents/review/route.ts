@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { assertProjectAccess } from "@/lib/db/project-access";
 import { reviewDocument } from "@/lib/ai/document-review";
+import { REQUIREMENTS_BY_ID } from "@/lib/exim/requirements";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -46,19 +47,24 @@ export async function POST(req: Request) {
 
   const project = await db.project.findFirst({
     where: { id: projectId },
-    select: { id: true, sector: true, countryCode: true },
+    select: { id: true, sector: true, countryCode: true, stage: true },
   });
   if (!project) return new Response("Not found", { status: 404 });
 
-  // Fetch document with requirement and project context
+  // Fetch document with state, size, upload date, and linked requirement
   const doc = await db.document.findUnique({
     where: { id: documentId },
     select: {
       filename: true,
       contentType: true,
+      sizeBytes: true,
+      state: true,
+      createdAt: true,
       projectRequirement: {
         select: {
-          requirement: { select: { name: true, category: true } },
+          requirement: {
+            select: { id: true, name: true, category: true },
+          },
         },
       },
     },
@@ -70,14 +76,25 @@ export async function POST(req: Request) {
   const requirementCategory =
     doc.projectRequirement?.requirement.category ?? null;
 
+  // Look up the full requirement definition from the static taxonomy to get the description
+  const requirementId = doc.projectRequirement?.requirement.id ?? null;
+  const taxonomyEntry =
+    requirementId !== null ? (REQUIREMENTS_BY_ID.get(requirementId) ?? null) : null;
+  const requirementDescription = taxonomyEntry?.description ?? null;
+
   try {
     const result = await reviewDocument({
       filename: doc.filename,
       requirementName,
       requirementCategory,
+      requirementDescription,
       documentType: doc.contentType,
+      documentState: doc.state,
+      documentSizeBytes: doc.sizeBytes,
+      documentUploadedAt: doc.createdAt,
       projectSector: project.sector,
       projectCountry: project.countryCode,
+      projectStage: project.stage,
       additionalContext:
         typeof additionalContext === "string" ? additionalContext : undefined,
     });

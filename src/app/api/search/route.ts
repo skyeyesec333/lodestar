@@ -17,7 +17,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { allowed, resetMs } = checkRateLimit(`${userId}:search`, SEARCH_MAX_REQUESTS, SEARCH_WINDOW_MS);
+  const { allowed, resetMs } = await checkRateLimit(`${userId}:search`, SEARCH_MAX_REQUESTS, SEARCH_WINDOW_MS);
   if (!allowed) {
     return NextResponse.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
   }

@@ -22,6 +22,20 @@
   --nav-bg:       #111110;
   --nav-text:     #f0ece3;
   --nav-link:     #9a9990;
+  /* Tailwind semantic token overrides */
+  --color-background:        #f4f1eb;
+  --color-foreground:        #0d0d0b;
+  --color-border:            #d9d4c8;
+  --color-input:             #d9d4c8;
+  --color-ring:              #c24a1e;
+  --color-muted:             #f4f1eb;
+  --color-muted-foreground:  #6b6b64;
+  --color-accent:            #f5e8e2;
+  --color-accent-foreground: #0d0d0b;
+  --color-primary:           #c24a1e;
+  --color-destructive:       #c24a1e;
+  --color-card:              #ffffff;
+  --color-card-foreground:   #0d0d0b;
 }
 
 [data-theme="slate"] {
@@ -42,6 +56,20 @@
   --nav-bg:       #111110;
   --nav-text:     #f0ece3;
   --nav-link:     #6a6a62;
+  /* Tailwind semantic token overrides */
+  --color-background:        #1c1c1a;
+  --color-foreground:        #f0ece3;
+  --color-border:            #3a3a36;
+  --color-input:             #3a3a36;
+  --color-ring:              #b07d2a;
+  --color-muted:             #1c1c1a;
+  --color-muted-foreground:  #8a8880;
+  --color-accent:            #2e2410;
+  --color-accent-foreground: #f0ece3;
+  --color-primary:           #b07d2a;
+  --color-destructive:       #b07d2a;
+  --color-card:              #252522;
+  --color-card-foreground:   #f0ece3;
 }
 
 [data-theme="navy"] {
@@ -62,6 +90,20 @@
   --nav-bg:       #0f1f3d;
   --nav-text:     #f0ece3;
   --nav-link:     #7a90b0;
+  /* Tailwind semantic token overrides */
+  --color-background:        #f8f7f4;
+  --color-foreground:        #0f1f3d;
+  --color-border:            #dde3ec;
+  --color-input:             #dde3ec;
+  --color-ring:              #1a5276;
+  --color-muted:             #f8f7f4;
+  --color-muted-foreground:  #6b7a90;
+  --color-accent:            #e8f0f8;
+  --color-accent-foreground: #0f1f3d;
+  --color-primary:           #1a5276;
+  --color-destructive:       #1a5276;
+  --color-card:              #ffffff;
+  --color-card-foreground:   #0f1f3d;
 }
 
 [data-theme="forest"] {
@@ -82,6 +124,20 @@
   --nav-bg:       #1a2e1a;
   --nav-text:     #f0ece3;
   --nav-link:     #7a9a7a;
+  /* Tailwind semantic token overrides */
+  --color-background:        #f5f3ee;
+  --color-foreground:        #1a2e1a;
+  --color-border:            #d4ddd4;
+  --color-input:             #d4ddd4;
+  --color-ring:              #2d6a4f;
+  --color-muted:             #f5f3ee;
+  --color-muted-foreground:  #6b806b;
+  --color-accent:            #e8f4ee;
+  --color-accent-foreground: #1a2e1a;
+  --color-primary:           #2d6a4f;
+  --color-destructive:       #2d6a4f;
+  --color-card:              #ffffff;
+  --color-card-foreground:   #1a2e1a;
 }
 
 [data-theme="minimal"] {
@@ -102,6 +158,20 @@
   --nav-bg:       #2c2c2a;
   --nav-text:     #f0ece3;
   --nav-link:     #8a8880;
+  /* Tailwind semantic token overrides */
+  --color-background:        #faf9f7;
+  --color-foreground:        #1a1a18;
+  --color-border:            #e8e6e0;
+  --color-input:             #e8e6e0;
+  --color-ring:              #c24a1e;
+  --color-muted:             #faf9f7;
+  --color-muted-foreground:  #6b6b64;
+  --color-accent:            #f5e8e2;
+  --color-accent-foreground: #1a1a18;
+  --color-primary:           #c24a1e;
+  --color-destructive:       #c24a1e;
+  --color-card:              #ffffff;
+  --color-card-foreground:   #1a1a18;
 }
 
 [data-theme="obsidian"] {
@@ -122,6 +192,20 @@
   --nav-bg:       #090a0c;
   --nav-text:     #edf0ea;
   --nav-link:     #74807a;
+  /* Tailwind semantic token overrides */
+  --color-background:        #0f1113;
+  --color-foreground:        #edf0ea;
+  --color-border:            #2b3137;
+  --color-input:             #2b3137;
+  --color-ring:              #d26a3d;
+  --color-muted:             #0f1113;
+  --color-muted-foreground:  #8d948c;
+  --color-accent:            #2b1813;
+  --color-accent-foreground: #edf0ea;
+  --color-primary:           #d26a3d;
+  --color-destructive:       #d26a3d;
+  --color-card:              #171b1f;
+  --color-card-foreground:   #edf0ea;
 }
 
 [data-theme="midnight"] {
@@ -142,6 +226,20 @@
   --nav-bg:       #090e18;
   --nav-text:     #eef2fb;
   --nav-link:     #7885a3;
+  /* Tailwind semantic token overrides */
+  --color-background:        #101626;
+  --color-foreground:        #eef2fb;
+  --color-border:            #2b3550;
+  --color-input:             #2b3550;
+  --color-ring:              #d28743;
+  --color-muted:             #101626;
+  --color-muted-foreground:  #8c99b5;
+  --color-accent:            #312113;
+  --color-accent-foreground: #eef2fb;
+  --color-primary:           #d28743;
+  --color-destructive:       #d28743;
+  --color-card:              #171f33;
+  --color-card-foreground:   #eef2fb;
 }
 
 [data-theme="ember"] {
@@ -162,6 +260,20 @@
   --nav-bg:       #0d0908;
   --nav-text:     #f3ece4;
   --nav-link:     #8f7d73;
+  /* Tailwind semantic token overrides */
+  --color-background:        #181311;
+  --color-foreground:        #f3ece4;
+  --color-border:            #3a2d28;
+  --color-input:             #3a2d28;
+  --color-ring:              #db6f2d;
+  --color-muted:             #181311;
+  --color-muted-foreground:  #9b8d83;
+  --color-accent:            #381b10;
+  --color-accent-foreground: #f3ece4;
+  --color-primary:           #db6f2d;
+  --color-destructive:       #db6f2d;
+  --color-card:              #221a17;
+  --color-card-foreground:   #f3ece4;
 }
 
 [data-theme="sky_blue"] {
@@ -182,6 +294,20 @@
   --nav-bg:       #12324b;
   --nav-text:     #f2f9ff;
   --nav-link:     #8eb7d6;
+  /* Tailwind semantic token overrides */
+  --color-background:        #eef8ff;
+  --color-foreground:        #16344b;
+  --color-border:            #cfe2ef;
+  --color-input:             #cfe2ef;
+  --color-ring:              #2f89c7;
+  --color-muted:             #eef8ff;
+  --color-muted-foreground:  #6a8aa3;
+  --color-accent:            #dff1fb;
+  --color-accent-foreground: #16344b;
+  --color-primary:           #2f89c7;
+  --color-destructive:       #2f89c7;
+  --color-card:              #ffffff;
+  --color-card-foreground:   #16344b;
 }
 
 /* ── Tailwind theme tokens ──────────────────────────────────────────────────── */
@@ -281,4 +407,98 @@
 
   .project-row { transition: border-color 0.15s; }
   .project-row:hover { border-color: var(--border-strong) !important; }
+
+  /* ── Responsive layout helpers ─────────────────────────────────────────────── */
+
+  .ls-header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .ls-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .ls-main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 16px;
+  }
+
+  /* Table scroll wrapper to prevent horizontal page overflow */
+  .ls-table-scroll {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  @media (min-width: 640px) {
+    .ls-header-inner {
+      padding: 0 24px;
+    }
+
+    .ls-main-content {
+      padding: 48px 24px;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .ls-header-inner {
+      padding: 0 32px;
+    }
+
+    .ls-main-content {
+      padding: 48px 32px;
+    }
+
+    .ls-nav-hide-sm {
+      display: inline;
+    }
+  }
+
+  /* Hide secondary nav links on small screens */
+  @media (max-width: 767px) {
+    .ls-nav-hide-sm {
+      display: none;
+    }
+  }
+}
+
+/* ── Component-level layout ─────────────────────────────────────────────────── */
+
+@layer components {
+  /* Filter form on projects list — stacks on mobile, row on desktop */
+  .ls-filter-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 24px;
+    padding: 18px;
+    background-color: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  @media (min-width: 640px) {
+    .ls-filter-form {
+      grid-template-columns: minmax(180px, 1.4fr) repeat(2, minmax(120px, 1fr)) auto auto;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .ls-filter-form {
+      grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(140px, 1fr)) auto;
+    }
+  }
 }

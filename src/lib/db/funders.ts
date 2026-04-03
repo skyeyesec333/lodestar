@@ -76,7 +76,7 @@ export async function getProjectFunders(
 ): Promise<Result<FunderRelationshipRow[]>> {
   try {
     const relationships = await db.funderRelationship.findMany({
-      where: { projectId },
+      where: { projectId, deletedAt: null },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,
@@ -256,9 +256,13 @@ export async function updateFunderRelationship(
   }
 }
 
-export async function deleteFunderRelationship(id: string): Promise<Result<void>> {
+export async function deleteFunderRelationship(id: string, userId?: string | null): Promise<Result<void>> {
   try {
-    await db.funderRelationship.delete({ where: { id } });
+    await db.funderRelationship.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedBy: userId ?? null },
+      select: { id: true },
+    });
     return { ok: true, value: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
@@ -317,10 +321,28 @@ export async function updateFunderConditionStatus(
   satisfiedAt?: Date | null
 ): Promise<Result<void>> {
   try {
+    // Fetch the current condition to validate transition
+    const existingCondition = await db.funderCondition.findUnique({
+      where: { id },
+      select: { status: true, satisfiedAt: true },
+    });
+    if (!existingCondition) {
+      return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+    }
+
+    // Block reverting a satisfied condition
+    if (existingCondition.status === "satisfied" && status !== "satisfied") {
+      return { ok: false, error: { code: "VALIDATION_ERROR", message: "Cannot revert a satisfied condition. Create a new condition if requirements have changed." } };
+    }
+
     const updateData: Parameters<typeof db.funderCondition.update>[0]["data"] = {
       status: status as import("@prisma/client").FunderConditionStatus,
     };
-    if (satisfiedAt !== undefined) {
+
+    // Auto-set satisfiedAt when transitioning to satisfied
+    if (status === "satisfied" && !existingCondition.satisfiedAt) {
+      updateData.satisfiedAt = new Date();
+    } else if (satisfiedAt !== undefined) {
       updateData.satisfiedAt = satisfiedAt;
     }
 

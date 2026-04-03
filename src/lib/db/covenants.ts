@@ -13,6 +13,10 @@ export type CovenantRow = {
   nextDueAt: Date | null;
   lastSatisfiedAt: Date | null;
   status: string;
+  waiverGrantedAt: Date | null;
+  waiverGrantedBy: string | null;
+  waiverReason: string | null;
+  waiverExpiresAt: Date | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +32,10 @@ const covenantSelect = {
   nextDueAt: true,
   lastSatisfiedAt: true,
   status: true,
+  waiverGrantedAt: true,
+  waiverGrantedBy: true,
+  waiverReason: true,
+  waiverExpiresAt: true,
   notes: true,
   createdAt: true,
   updatedAt: true,
@@ -46,6 +54,10 @@ function mapRow(r: {
   nextDueAt: Date | null;
   lastSatisfiedAt: Date | null;
   status: string;
+  waiverGrantedAt: Date | null;
+  waiverGrantedBy: string | null;
+  waiverReason: string | null;
+  waiverExpiresAt: Date | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -62,6 +74,10 @@ function mapRow(r: {
     nextDueAt: r.nextDueAt,
     lastSatisfiedAt: r.lastSatisfiedAt,
     status: r.status,
+    waiverGrantedAt: r.waiverGrantedAt,
+    waiverGrantedBy: r.waiverGrantedBy,
+    waiverReason: r.waiverReason,
+    waiverExpiresAt: r.waiverExpiresAt,
     notes: r.notes,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
@@ -158,19 +174,38 @@ export async function updateCovenant(
     nextDueAt: Date | null;
     notes: string | null;
     status: string;
-  }>
+    waiverReason: string | null;
+    waiverExpiresAt: Date | null;
+  }>,
+  userId?: string
 ): Promise<Result<void>> {
   try {
+    if (data.status === "waived" && !data.waiverReason) {
+      return { ok: false, error: { code: "VALIDATION_ERROR", message: "waiverReason required when status is waived" } };
+    }
+
+    const updateData: Record<string, unknown> = {};
+
+    if (data.title !== undefined) updateData.title = data.title;
+    if (data.covenantType !== undefined) updateData.covenantType = data.covenantType as CovenantType;
+    if (data.frequency !== undefined) updateData.frequency = data.frequency as CovenantFrequency;
+    if (data.nextDueAt !== undefined) updateData.nextDueAt = data.nextDueAt;
+    if (data.notes !== undefined) updateData.notes = data.notes;
+    if (data.status !== undefined) updateData.status = data.status as CovenantStatus;
+
+    if (data.status === "waived") {
+      updateData.waiverGrantedAt = new Date();
+      updateData.waiverGrantedBy = userId || null;
+      updateData.waiverReason = data.waiverReason;
+      if (data.waiverExpiresAt !== undefined) updateData.waiverExpiresAt = data.waiverExpiresAt;
+    } else {
+      if (data.waiverReason !== undefined) updateData.waiverReason = data.waiverReason;
+      if (data.waiverExpiresAt !== undefined) updateData.waiverExpiresAt = data.waiverExpiresAt;
+    }
+
     await db.covenant.update({
       where: { id },
-      data: {
-        ...(data.title !== undefined && { title: data.title }),
-        ...(data.covenantType !== undefined && { covenantType: data.covenantType as CovenantType }),
-        ...(data.frequency !== undefined && { frequency: data.frequency as CovenantFrequency }),
-        ...(data.nextDueAt !== undefined && { nextDueAt: data.nextDueAt }),
-        ...(data.notes !== undefined && { notes: data.notes }),
-        ...(data.status !== undefined && { status: data.status as CovenantStatus }),
-      },
+      data: updateData,
     });
     return { ok: true, value: undefined };
   } catch (err) {

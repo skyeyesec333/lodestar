@@ -1,9 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { OnboardingWizard } from "@/components/projects/OnboardingWizard";
+import { OnboardingWizard, type ExistingProjectOption } from "@/components/projects/OnboardingWizard";
 
-export function NewProjectPage({ templateId }: { templateId?: string }) {
+export function NewProjectPage({
+  templateId,
+  existingProjects,
+}: {
+  templateId?: string;
+  existingProjects?: ExistingProjectOption[];
+}) {
   const router = useRouter();
 
   function handleExit() {
@@ -13,6 +19,7 @@ export function NewProjectPage({ templateId }: { templateId?: string }) {
   return (
     <OnboardingWizard
       templateId={templateId}
+      existingProjects={existingProjects}
       onComplete={(slug) => router.push(`/projects/${slug}`)}
       onBack={handleExit}
     />

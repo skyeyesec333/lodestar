@@ -1,18 +1,22 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useTransition } from "react";
 import {
   detailMicroMonoStyle,
   detailMonoLabelStyle,
   detailSerifTitleStyle,
   detailSurfaceCardStyle,
 } from "./projectDetailStyles";
+import { recalculateReadiness } from "@/actions/projects";
 
 type Props = {
   scoreBps: number;
   loiReady: boolean;
   categoryScores: Record<string, number>;
   dealType?: string;
+  projectId: string;
+  projectSlug: string;
+  cachedScoreUpdatedAt: Date | null;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -39,14 +43,29 @@ function scoreColor(bps: number): string {
   return "var(--accent)";
 }
 
+function getRelativeTime(date: Date | null): string {
+  if (!date) return "Never";
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} min ago`;
+  if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+}
+
 const DURATION = 900; // ms
 
-export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealType }: Props) {
+export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealType, projectId, projectSlug, cachedScoreUpdatedAt }: Props) {
   const isExim = !dealType || dealType === "exim_project_finance";
   const [displayed, setDisplayed] = useState(0);
   const [mounted, setMounted] = useState(false);
   const startTime = useRef<number | null>(null);
   const raf = useRef<number | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setMounted(true);
@@ -194,6 +213,41 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
               ))}
             </div>
           ) : null}
+
+          <div style={{ marginTop: "20px", display: "flex", alignItems: "center", gap: "10px", justifyContent: "space-between" }}>
+            <span
+              style={{
+                ...detailMicroMonoStyle,
+                color: "var(--ink-muted)",
+              }}
+            >
+              Last updated: {getRelativeTime(cachedScoreUpdatedAt)}
+            </span>
+            <button
+              onClick={() => {
+                startTransition(async () => {
+                  await recalculateReadiness(projectId, projectSlug);
+                });
+              }}
+              disabled={isPending}
+              style={{
+                padding: "6px 12px",
+                fontSize: "11px",
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+                border: "1px solid var(--border)",
+                borderRadius: "4px",
+                backgroundColor: isPending ? "var(--bg-card)" : "var(--bg)",
+                color: isPending ? "var(--ink-muted)" : "var(--ink)",
+                cursor: isPending ? "default" : "pointer",
+                opacity: isPending ? 0.6 : 1,
+                transition: "all 0.2s ease",
+              }}
+            >
+              {isPending ? "Calculating..." : "Recalculate"}
+            </button>
+          </div>
         </div>
 
         {/* Progress bar */}

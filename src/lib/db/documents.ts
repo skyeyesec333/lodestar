@@ -14,6 +14,7 @@ export type DocumentRow = {
   projectRequirementId: string | null;
   expiresAt: Date | null;
   expiryAlertDismissedAt: Date | null;
+  documentHash: string | null;
   createdAt: Date;
 };
 
@@ -30,6 +31,7 @@ const documentSelect = {
   projectRequirementId: true,
   expiresAt: true,
   expiryAlertDismissedAt: true,
+  documentHash: true,
   createdAt: true,
 } as const;
 
@@ -107,6 +109,7 @@ export async function createDocumentRecord(input: {
   contentType: string;
   sizeBytes: number;
   uploadedBy: string;
+  documentHash?: string;
 }): Promise<Result<DocumentRow>> {
   try {
     const row = await db.document.create({

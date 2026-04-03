@@ -2,6 +2,49 @@ import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
 import type { SerializableProject } from "@/components/projects/ProjectEditForm";
 
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function buildOverdueBlock(rows: ProjectRequirementRow[]): string {
+  const today = new Date();
+  const overdue = rows.filter((r) => {
+    if (!r.targetDate) return false;
+    if (r.status === "executed" || r.status === "waived" || r.status === "not_applicable") return false;
+    return new Date(r.targetDate) < today;
+  });
+
+  if (overdue.length === 0) return "No overdue requirements";
+
+  return overdue
+    .map((r) => {
+      const daysLate = daysBetween(new Date(r.targetDate!), today);
+      return `- ${r.name}: ${REQUIREMENT_STATUS_LABELS[r.status]}, ${daysLate} days overdue (target ${formatDate(r.targetDate!.toString())})`;
+    })
+    .join("\n");
+}
+
+function buildMilestoneSlippageBlock(targetLoiDate: string | null): string {
+  if (!targetLoiDate) return "LOI target date not set";
+
+  const today = new Date();
+  const target = new Date(targetLoiDate);
+  const daysToLoi = daysBetween(today, target);
+
+  if (daysToLoi < 0) {
+    return `WARNING: LOI target date passed ${Math.abs(daysToLoi)} days ago`;
+  }
+  if (daysToLoi <= 30) {
+    return `ALERT: LOI target date is ${daysToLoi} days away`;
+  }
+  return "LOI target is on track";
+}
+
 function getDealTypeGuidance(dealType: string): string {
   switch (dealType) {
     case "exim_project_finance":
@@ -58,7 +101,19 @@ PROJECT: ${project.name}
 Country: ${project.countryCode} | Sector: ${project.sector} | Stage: ${project.stage.replace(/_/g, " ")}
 ${project.capexUsdCents ? `CAPEX: $${(project.capexUsdCents / 100_000_000).toFixed(0)}M` : ""}
 ${project.eximCoverType ? `EXIM Cover: ${project.eximCoverType.replace(/_/g, " ")}` : ""}
-${project.targetLoiDate ? `Target LOI: ${project.targetLoiDate.slice(0, 10)}` : ""}
+
+PROJECT CONTEXT
+- Sector: ${project.sector || "not specified"}
+- Host Country: ${project.countryCode || "not specified"}
+- Current Stage: ${project.stage.replace(/_/g, " ")}
+- Target LOI Date: ${project.targetLoiDate ? formatDate(project.targetLoiDate) : "not set"}
+- Days to LOI: ${project.targetLoiDate ? (() => { const d = daysBetween(new Date(), new Date(project.targetLoiDate)); return d >= 0 ? `${d} days remaining` : `${Math.abs(d)} days overdue`; })() : "N/A"}
+
+OVERDUE REQUIREMENTS (target date passed, not yet executed)
+${buildOverdueBlock(rows)}
+
+MILESTONE SLIPPAGE
+${buildMilestoneSlippageBlock(project.targetLoiDate)}
 
 READINESS SCORE: ${pct}% (${scoreBps} bps)
 

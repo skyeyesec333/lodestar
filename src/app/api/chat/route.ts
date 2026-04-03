@@ -8,17 +8,20 @@ import {
 import { getPortfolioChatContext, getProjectChatContext } from "@/lib/db/chat";
 import { chatRequestSchema } from "@/types/chat";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { requestLogger } from "@/lib/logger";
 
 const CHAT_MAX_REQUESTS = 20;
 const CHAT_WINDOW_MS = 60_000;
 
 export async function POST(req: Request) {
   const { userId } = await auth();
+  const log = requestLogger({ userId, route: "/api/chat" });
+
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const { allowed, resetMs } = checkRateLimit(`${userId}:chat`, CHAT_MAX_REQUESTS, CHAT_WINDOW_MS);
+  const { allowed, resetMs } = await checkRateLimit(`${userId}:chat`, CHAT_MAX_REQUESTS, CHAT_WINDOW_MS);
   if (!allowed) {
     return Response.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
   }

@@ -52,6 +52,7 @@ import { getProjectCovenants } from "@/lib/db/covenants";
 import { ResponsibilityMatrix } from "@/components/projects/ResponsibilityMatrix";
 import { ExpiryTimeline } from "@/components/documents/ExpiryTimeline";
 import { ReadinessBreakdown } from "@/components/projects/ReadinessBreakdown";
+import { ScenarioSimulator } from "@/components/projects/ScenarioSimulator";
 import { ShareLinksPanel } from "@/components/projects/ShareLinksPanel";
 import { getShareLinksForProject } from "@/lib/db/share-links";
 import type { CategoryBreakdown } from "@/lib/db/requirements";
@@ -61,9 +62,21 @@ import { DecisionDesk } from "@/components/projects/DecisionDesk";
 import { checkStageGate } from "@/lib/projects/stage-gate";
 import { buildProjectOperatingMetrics } from "@/lib/projects/operating-metrics";
 import { WorkplanQueue } from "@/components/projects/WorkplanQueue";
+import { StaleAssignmentsPanel } from "@/components/projects/StaleAssignmentsPanel";
 import { ProjectWorkspaceTabs } from "@/components/projects/ProjectWorkspaceTabs";
 import { EvidenceActionBoard } from "@/components/projects/EvidenceActionBoard";
 import { ExecutionCommitmentsBoard } from "@/components/projects/ExecutionCommitmentsBoard";
+import { getTimelineRisks } from "@/lib/db/timeline-risks";
+import { TimelineRiskBadge } from "@/components/projects/TimelineRiskBadge";
+import { ExecutiveSummary } from "@/components/projects/ExecutiveSummary";
+import { assessFinancingReadiness } from "@/lib/scoring/financing";
+import { FinancingRiskBadge } from "@/components/projects/FinancingRiskBadge";
+import type { FinancingRisk } from "@/lib/scoring/financing";
+import { getUpcomingMilestones } from "@/lib/db/milestones-upcoming";
+import { UpcomingMilestonesWidget } from "@/components/projects/UpcomingMilestonesWidget";
+import { ReadinessTrendlineChart } from "@/components/projects/ReadinessTrendlineChart";
+import { ApprovalsPanel } from "@/components/projects/ApprovalsPanel";
+import { StatusReportButton } from "@/components/projects/StatusReportButton";
 
 function roleLabel(role: TeamMember["role"]): string {
   switch (role) {
@@ -230,7 +243,7 @@ export default async function ProjectPage({
   if (!projectResult.ok) notFound();
   const project = projectResult.value;
 
-  const reqResult = await getProjectRequirements(project.id, project.dealType);
+  const reqResult = await getProjectRequirements(project.id, project.dealType, project.sector);
   if (!reqResult.ok) {
     throw new Error(`Failed to load requirements: ${reqResult.error.message}`);
   }
@@ -253,6 +266,9 @@ export default async function ProjectPage({
     externalEvidenceResult,
     covenantsResult,
     shareLinksResult,
+    timelineRisksResult,
+    financingRiskResult,
+    upcomingMilestonesResult,
   ] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
@@ -270,6 +286,9 @@ export default async function ProjectPage({
     getProjectExternalEvidence(project.id),
     getProjectCovenants(project.id),
     getShareLinksForProject(project.id),
+    getTimelineRisks(project.id),
+    assessFinancingReadiness(project.id),
+    getUpcomingMilestones(userId),
   ]);
   const activityEvents = activityResult.ok ? activityResult.value.items : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
@@ -287,6 +306,10 @@ export default async function ProjectPage({
   const externalEvidence = externalEvidenceResult.ok ? externalEvidenceResult.value : [];
   const covenants = covenantsResult.ok ? covenantsResult.value : [];
   const shareLinks = shareLinksResult.ok ? shareLinksResult.value : [];
+  const timelineRisks = timelineRisksResult.ok ? timelineRisksResult.value : [];
+  const upcomingMilestones = upcomingMilestonesResult.ok ? upcomingMilestonesResult.value : [];
+  const DEFAULT_FINANCING_RISK: FinancingRisk = { level: "none", penaltyBps: 0, flags: [] };
+  const financingRisk = financingRiskResult.ok ? financingRiskResult.value : DEFAULT_FINANCING_RISK;
   const currentMembership = members.find((member) => member.clerkUserId === userId);
   const currentProjectRole =
     project.ownerClerkId === userId
@@ -372,14 +395,36 @@ export default async function ProjectPage({
     environmental_social: "Env & Social",
   };
   const categoryBreakdown: CategoryBreakdown[] = (() => {
-    const groups: Record<string, { total: number; completed: number; inProgress: number }> = {};
+    const groups: Record<
+      string,
+      {
+        total: number;
+        completed: number;
+        inProgress: number;
+        blockingRequirements: Array<{ id: string; label: string; status: string }>;
+      }
+    > = {};
     for (const row of rows) {
       if (!row.isApplicable) continue;
       const cat = row.category;
-      if (!groups[cat]) groups[cat] = { total: 0, completed: 0, inProgress: 0 };
+      if (!groups[cat]) {
+        groups[cat] = { total: 0, completed: 0, inProgress: 0, blockingRequirements: [] };
+      }
       groups[cat].total++;
-      if (["substantially_final", "executed", "waived"].includes(row.status)) groups[cat].completed++;
-      else if (["in_progress", "draft"].includes(row.status)) groups[cat].inProgress++;
+      if (["substantially_final", "executed", "waived"].includes(row.status)) {
+        groups[cat].completed++;
+      } else if (["in_progress", "draft"].includes(row.status)) {
+        groups[cat].inProgress++;
+      }
+
+      // Collect blocking requirements (not yet in final state)
+      if (!["substantially_final", "executed", "waived"].includes(row.status)) {
+        groups[cat].blockingRequirements.push({
+          id: row.requirementId,
+          label: row.name,
+          status: row.status,
+        });
+      }
     }
     return Object.entries(groups).map(([cat, counts]) => ({
       category: cat,
@@ -388,6 +433,7 @@ export default async function ProjectPage({
       completed: counts.completed,
       inProgress: counts.inProgress,
       scorePct: counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0,
+      blockingRequirements: counts.blockingRequirements,
     }));
   })();
 
@@ -431,7 +477,9 @@ export default async function ProjectPage({
   const { scoreBps, loiReady, loiBlockers, categoryScores } = computeReadiness(
     rows.map((r) => ({
       requirementId: r.requirementId,
-      status: r.status as RequirementStatusValue,
+      status: r.isApplicable === false
+        ? ("not_applicable" as RequirementStatusValue)
+        : (r.status as RequirementStatusValue),
     })),
     project.dealType
   );
@@ -522,7 +570,77 @@ export default async function ProjectPage({
         </Link>
       </div>
 
-      <section id="section-collaborators" style={{ marginBottom: "32px" }}>
+      <div
+        style={{
+          position: "sticky",
+          top: "0",
+          zIndex: 30,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "8px 20px",
+          padding: "8px 0 10px",
+          borderBottom: "1px solid var(--border)",
+          backgroundColor: "var(--bg)",
+        }}
+      >
+        <ProjectWorkspaceTabs />
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <StatusReportButton projectSlug={project.slug} />
+          <TourGuide dealType={project.dealType} stage={project.stage} inline />
+        </div>
+      </div>
+      <div style={{ height: "32px" }} />
+
+      <TimelineRiskBadge risks={timelineRisks} />
+      <FinancingRiskBadge risk={financingRisk} />
+
+      <section id="section-executive-summary" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
+        <div style={{ marginBottom: "16px" }}>
+          <p className="eyebrow" style={{ marginBottom: "8px" }}>Executive summary</p>
+          <h2
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "24px",
+              fontWeight: 400,
+              color: "var(--ink)",
+              margin: "0 0 8px",
+            }}
+          >
+            Deal brief
+          </h2>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "14px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+              margin: 0,
+              maxWidth: "680px",
+            }}
+          >
+            A single-page snapshot covering the deal thesis, current stage, next gate conditions, active blockers, and key dates.
+          </p>
+        </div>
+        <ExecutiveSummary
+          project={project}
+          readinessScoreBps={scoreBps}
+          breakdown={categoryBreakdown}
+          gateReview={gateReview}
+          timelineRisks={timelineRisks}
+          upcomingMilestones={milestones
+            .filter((m) => !m.completedAt && m.targetDate !== null)
+            .sort((a, b) => {
+              const aTime = a.targetDate ? new Date(a.targetDate).getTime() : Infinity;
+              const bTime = b.targetDate ? new Date(b.targetDate).getTime() : Infinity;
+              return aTime - bTime;
+            })
+            .slice(0, 3)}
+        />
+      </section>
+
+      <section id="section-collaborators" style={{ marginBottom: "32px", scrollMarginTop: "72px" }}>
         <div
           style={{
             display: "flex",
@@ -621,7 +739,7 @@ export default async function ProjectPage({
         />
       </section>
 
-      <section id="section-overview" style={{ marginBottom: "40px" }}>
+      <section id="section-overview" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "22px" }}>
           <p className="eyebrow" style={{ marginBottom: "10px" }}>
             {dealTypeLabel} · {project.countryCode} · {project.sector}
@@ -649,25 +767,6 @@ export default async function ProjectPage({
           >
             {project.description ?? "This overview keeps the current stage, next gate, and operating pressure in one place so the team can orient quickly before moving into the deeper workspaces."}
           </p>
-        </div>
-
-        <div
-          style={{
-            position: "sticky",
-            top: "12px",
-            zIndex: 24,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "20px",
-            padding: "8px 0 10px",
-            marginBottom: "24px",
-            borderBottom: "1px solid color-mix(in srgb, var(--border) 72%, transparent)",
-            backgroundColor: "var(--bg)",
-          }}
-        >
-          <ProjectWorkspaceTabs />
-          <TourGuide dealType={project.dealType} stage={project.stage} inline />
         </div>
 
         <DecisionDesk
@@ -749,7 +848,7 @@ export default async function ProjectPage({
         </div>
       </section>
 
-      <section id="section-concept" style={{ marginBottom: "40px" }}>
+      <section id="section-concept" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "16px" }}>
           <p className="eyebrow" style={{ marginBottom: "8px" }}>Concept workspace</p>
           <h2
@@ -1102,7 +1201,7 @@ export default async function ProjectPage({
         </div>
       </section>
 
-      <section id="section-stakeholders" style={{ marginBottom: "40px" }}>
+      <section id="section-stakeholders" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "16px" }}>
           <p className="eyebrow" style={{ marginBottom: "8px" }}>Parties workspace</p>
           <h2
@@ -1154,7 +1253,7 @@ export default async function ProjectPage({
         )}
       </section>
 
-      <section id="section-capital" style={{ marginBottom: "40px" }}>
+      <section id="section-capital" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "16px" }}>
           <p className="eyebrow" style={{ marginBottom: "8px" }}>Capital workspace</p>
           <h2
@@ -1263,7 +1362,7 @@ export default async function ProjectPage({
         />
       </section>
 
-      <section id="section-workplan" style={{ marginBottom: "40px" }}>
+      <section id="section-workplan" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "18px" }}>
           <p className="eyebrow" style={{ marginBottom: "8px" }}>Workplan workspace</p>
           <h2
@@ -1297,13 +1396,32 @@ export default async function ProjectPage({
             loiReady={loiReady}
             categoryScores={categoryScores}
             dealType={project.dealType}
+            projectId={project.id}
+            projectSlug={project.slug}
+            cachedScoreUpdatedAt={project.cachedScoreUpdatedAt}
           />
         </section>
 
         {isExim && !loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
 
+        <ReadinessTrendlineChart projectSlug={project.slug} />
+
+        <ScenarioSimulator
+          projectSlug={project.slug}
+          requirements={rows.map((r) => ({
+            requirementId: r.requirementId,
+            name: r.name,
+            category: r.category,
+            status: r.status,
+            isApplicable: r.isApplicable,
+            isLoiCritical: r.isLoiCritical,
+          }))}
+        />
+
         <div id="section-gap-analysis" />
         <GapAnalysis projectId={project.id} />
+
+        <StaleAssignmentsPanel projectId={project.id} />
 
         <WorkplanQueue
           projectId={project.id}
@@ -1432,7 +1550,7 @@ export default async function ProjectPage({
         <ResponsibilityMatrix requirements={rows} />
       </section>
 
-      <section id="section-documents" style={{ marginBottom: "40px" }}>
+      <section id="section-documents" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "18px" }}>
           <p className="eyebrow" style={{ marginBottom: "8px" }}>Evidence workspace</p>
           <h2
@@ -1522,9 +1640,15 @@ export default async function ProjectPage({
         />
 
         <ExpiryTimeline documents={expiringDocuments} projectSlug={project.slug} />
+
+        <ApprovalsPanel
+          approvals={approvals}
+          requirementRows={rows}
+          documents={documents}
+        />
       </section>
 
-      <section id="section-execution" style={{ marginBottom: "40px" }}>
+      <section id="section-execution" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "16px" }}>
           <p className="eyebrow" style={{ marginBottom: "8px" }}>Execution workspace</p>
           <h2
@@ -1640,6 +1764,8 @@ export default async function ProjectPage({
           initialMilestones={milestones}
           anchorDate={project.targetLoiDate?.toISOString() ?? project.createdAt.toISOString()}
         />
+
+        <UpcomingMilestonesWidget milestones={upcomingMilestones} />
 
         <section
           id="section-timeline"

@@ -16,6 +16,7 @@ function makeReq(overrides: Partial<ProjectRequirementRow> = {}): ProjectRequire
     status: "not_started",
     notes: null,
     isApplicable: true,
+    autoFiltered: false,
     responsibleOrganizationId: null,
     responsibleOrganizationName: null,
     responsibleStakeholderId: null,

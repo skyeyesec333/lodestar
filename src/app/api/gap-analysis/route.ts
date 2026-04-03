@@ -7,21 +7,20 @@ import { anthropic } from "@/lib/ai/client";
 import { buildGapAnalysisPrompt } from "@/lib/ai/prompts";
 import type { RequirementStatusValue } from "@/types/requirements";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { requestLogger } from "@/lib/logger";
 
 const schema = z.object({ projectId: z.string().min(1) });
 
-const GAP_MAX_REQUESTS = 10;
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+const GAP_MAX_REQUESTS = 5;
 const GAP_WINDOW_MS = 60_000;
 
 export async function POST(req: Request) {
   const { userId } = await auth();
+  const log = requestLogger({ userId, route: "/api/gap-analysis" });
+
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
-  }
-
-  const { allowed, resetMs } = checkRateLimit(`${userId}:gap-analysis`, GAP_MAX_REQUESTS, GAP_WINDOW_MS);
-  if (!allowed) {
-    return Response.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
   }
 
   const body = await req.json().catch(() => null);
@@ -53,14 +52,24 @@ export async function POST(req: Request) {
     return new Response("Not found", { status: 404 });
   }
 
-  const reqResult = await getProjectRequirements(projectId, projectRow.dealType);
+  const { allowed, resetMs } = await checkRateLimit(`${userId}:gap-analysis:${projectId}`, GAP_MAX_REQUESTS, GAP_WINDOW_MS);
+  if (!allowed) {
+    return Response.json({ error: "Rate limit exceeded. Please wait before retrying.", resetMs }, { status: 429 });
+  }
+
+  const reqResult = await getProjectRequirements(projectId, projectRow.dealType, projectRow.sector);
   if (!reqResult.ok) {
     return new Response("Failed to load requirements", { status: 500 });
   }
 
   const rows = reqResult.value;
   const { scoreBps } = computeReadiness(
-    rows.map((r) => ({ requirementId: r.requirementId, status: r.status as RequirementStatusValue })),
+    rows.map((r) => ({
+      requirementId: r.requirementId,
+      status: r.isApplicable === false
+        ? ("not_applicable" as RequirementStatusValue)
+        : (r.status as RequirementStatusValue),
+    })),
     projectRow.dealType
   );
 
@@ -81,7 +90,7 @@ export async function POST(req: Request) {
   const prompt = buildGapAnalysisPrompt(serializableProject, rows, scoreBps);
 
   const stream = await anthropic.messages.stream({
-    model: "claude-sonnet-4-6",
+    model: MODEL,
     max_tokens: 1024,
     messages: [{ role: "user", content: prompt }],
   });

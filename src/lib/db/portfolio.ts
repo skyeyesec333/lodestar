@@ -36,6 +36,7 @@ const documentSelect = {
   projectRequirementId: true,
   expiresAt: true,
   expiryAlertDismissedAt: true,
+  documentHash: true,
   createdAt: true,
 } as const;
 
@@ -76,6 +77,7 @@ function buildRequirementRowsForProject(
       status: (status?.status ?? "not_started") as RequirementStatusValue,
       notes: status?.notes ?? null,
       isApplicable: status?.isApplicable ?? true,
+      autoFiltered: false,
       responsibleOrganizationId: status?.responsibleOrganizationId ?? null,
       responsibleOrganizationName: status?.responsibleOrganization?.name ?? null,
       responsibleStakeholderId: status?.responsibleStakeholderId ?? null,

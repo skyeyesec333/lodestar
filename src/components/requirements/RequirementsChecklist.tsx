@@ -4,8 +4,6 @@ import { useState, useTransition, useRef } from "react";
 import { updateRequirementStatus, addRequirementNoteAction, updateRequirementResponsibilityAction } from "@/actions/requirements";
 import { REQUIREMENT_STATUS_LABELS, REQUIREMENT_STATUS_ORDER } from "@/types/requirements";
 import type { RequirementStatusValue, ProgramId } from "@/types/requirements";
-import { IFC_REQUIREMENTS } from "@/lib/ifc/requirements";
-import type { IfcRequirementDef } from "@/lib/ifc/requirements";
 import type { ProjectRequirementRow, RequirementNoteRow } from "@/lib/db/requirements";
 import type { DocumentRow } from "@/lib/db/documents";
 import type { CommentRow } from "@/lib/db/comments";
@@ -52,8 +50,8 @@ const EXIM_PHASE_LABELS: Record<string, string> = {
 };
 
 const IFC_PHASE_LABELS: Record<string, string> = {
-  loi: "IFC Board Approval",
-  final_commitment: "IFC Financial Close",
+  board_approval: "Board Approval",
+  financial_close: "Financial Close",
 };
 
 const GENERIC_PHASE_LABELS: Record<string, string> = {
@@ -65,6 +63,7 @@ const IFC_CATEGORY_LABELS: Record<string, string> = {
   environmental_social: "Environmental & Social",
   contracts: "Contracts",
   financial: "Financial",
+  studies: "Studies",
   permits: "Permits",
   corporate: "Corporate",
 };
@@ -73,6 +72,7 @@ const IFC_CATEGORY_ORDER = [
   "environmental_social",
   "contracts",
   "financial",
+  "studies",
   "permits",
   "corporate",
 ] as const;
@@ -1051,6 +1051,12 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
     items: rows.filter((r) => r.category === cat),
   }));
 
+  const ifcGrouped = IFC_CATEGORY_ORDER.map((cat) => ({
+    category: cat,
+    label: IFC_CATEGORY_LABELS[cat] ?? cat,
+    items: rows.filter((r) => r.category === cat),
+  }));
+
   const allNotStarted = rows.every((r) => r.status === "not_started");
 
   return (
@@ -1117,153 +1123,443 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
         ))}
       </div>
 
-      {/* IFC read-only checklist */}
+      {/* IFC interactive checklist — uses live rows from the same rows prop */}
       {activeProgram === "ifc" && (
-        <div>
-          {/* Advisory banner */}
-          <div
-            style={{
-              backgroundColor: "var(--gold-soft)",
-              border: "1px solid var(--gold)",
-              borderRadius: "4px",
-              padding: "14px 20px",
-              marginBottom: "28px",
-            }}
-          >
-            <p
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "10px",
-                fontWeight: 500,
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--gold)",
-                margin: "0 0 4px",
-              }}
-            >
-              Preview
-            </p>
-            <p
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: "13px",
-                color: "var(--ink-mid)",
-                margin: 0,
-                lineHeight: 1.6,
-              }}
-            >
-              IFC deal workplan tracking coming soon — database integration will be enabled in a future update.
-            </p>
-          </div>
-
-          {/* IFC requirement groups */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-            {IFC_CATEGORY_ORDER.map((cat) => {
-              const items: readonly IfcRequirementDef[] = IFC_REQUIREMENTS.filter((r) => r.category === cat);
-              if (items.length === 0) return null;
-              return (
-                <div key={cat}>
-                  {/* Category header */}
-                  <div
+        <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+          {ifcGrouped.map(({ category, label, items }) => {
+            if (items.length === 0) return null;
+            return (
+              <div key={category}>
+                {/* Category header */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 160px",
+                    gap: "16px",
+                    padding: compact ? "0 20px 8px" : "0 24px 10px",
+                    borderBottom: "1px solid var(--border)",
+                    marginBottom: "2px",
+                  }}
+                >
+                  <span
                     style={{
-                      padding: "0 24px 10px",
-                      borderBottom: "1px solid var(--border)",
-                      marginBottom: "2px",
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      fontWeight: 500,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: "var(--ink)",
                     }}
                   >
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: "10px",
-                        fontWeight: 500,
-                        letterSpacing: "0.12em",
-                        textTransform: "uppercase",
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {IFC_CATEGORY_LABELS[cat] ?? cat}
-                    </span>
-                  </div>
+                    {label}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      letterSpacing: "0.10em",
+                      textTransform: "uppercase",
+                      color: "var(--ink-muted)",
+                    }}
+                  >
+                    Status
+                  </span>
+                </div>
 
-                  {/* Requirement rows */}
-                  {items.map((req) => (
+                {/* Rows */}
+                {items.map((row) => {
+                  const status = statuses[row.requirementId] ?? row.status;
+                  const isUpdating = pendingId === row.requirementId;
+                  const isExpandedNotes = expandedNotes.has(row.requirementId);
+                  const isExpandedDocs = expandedDocs.has(row.projectRequirementId);
+                  const isExpandedResponsibility = expandedResponsibility.has(row.requirementId);
+                  const threadNotes = noteThreads[row.requirementId] ?? [];
+                  const reqComments = commentsByRequirementId[row.projectRequirementId] ?? [];
+                  const reqApproval = approvalsByRequirementId[row.projectRequirementId] ?? null;
+                  const isWatched = watchedRequirementIds.has(row.projectRequirementId);
+                  const showCollab = !!(currentUserId && row.projectRequirementId);
+                  const hasNote = threadNotes.length > 0;
+                  const reqDocs = docsByReq[row.projectRequirementId] ?? [];
+                  const docCount = reqDocs.length;
+                  const isUploadingThis = uploadingReq === row.requirementId;
+                  const uploadError = uploadErrors[row.requirementId];
+                  const responsibility = responsibilities[row.requirementId] ?? {
+                    responsibleOrganizationId: null,
+                    responsibleOrganizationName: null,
+                    responsibleStakeholderId: null,
+                    responsibleStakeholderName: null,
+                    targetDate: null,
+                    isApplicable: true,
+                    applicabilityReason: null,
+                  };
+                  const hasResponsibility =
+                    responsibility.responsibleStakeholderId !== null ||
+                    responsibility.responsibleOrganizationId !== null ||
+                    responsibility.targetDate !== null ||
+                    !responsibility.isApplicable;
+
+                  return (
                     <div
-                      key={req.id}
+                      key={row.requirementId}
+                      id={`req-${row.requirementId}`}
                       style={{
                         backgroundColor: "var(--bg-card)",
                         border: "1px solid var(--border)",
                         borderTop: "none",
-                        borderLeft: req.isLoiCritical ? "3px solid var(--accent)" : "1px solid var(--border)",
-                        padding: "14px 24px",
+                        borderLeft: row.isLoiCritical ? "3px solid var(--accent)" : "1px solid var(--border)",
+                        opacity: isUpdating ? 0.6 : 1,
+                        transition: "opacity 0.15s, box-shadow 0.2s",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                        <span
-                          style={{
-                            fontFamily: "'Inter', sans-serif",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "var(--ink)",
-                          }}
-                        >
-                          {req.name}
-                        </span>
-                        {req.isLoiCritical ? (
-                          <span
+                      {/* Main row */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 160px",
+                          gap: "16px",
+                          alignItems: "center",
+                          padding: compact ? "10px 20px" : "16px 24px",
+                        }}
+                      >
+                        {/* Requirement info */}
+                        <div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: compact ? "0" : "2px", flexWrap: "wrap" }}>
+                            <span
+                              style={{
+                                fontFamily: "'Inter', sans-serif",
+                                fontSize: "14px",
+                                fontWeight: 500,
+                                color: "var(--ink)",
+                              }}
+                              title={row.description}
+                            >
+                              {row.name}
+                            </span>
+                            {row.isLoiCritical ? (
+                              <span
+                                style={{
+                                  fontFamily: "'DM Mono', monospace",
+                                  fontSize: "9px",
+                                  fontWeight: 500,
+                                  letterSpacing: "0.10em",
+                                  textTransform: "uppercase",
+                                  color: "var(--accent)",
+                                  backgroundColor: "var(--accent-soft)",
+                                  padding: "2px 6px",
+                                  borderRadius: "2px",
+                                }}
+                              >
+                                Board Gate
+                              </span>
+                            ) : (
+                              <span
+                                style={{
+                                  fontFamily: "'DM Mono', monospace",
+                                  fontSize: "9px",
+                                  letterSpacing: "0.08em",
+                                  textTransform: "uppercase",
+                                  color: "var(--ink-muted)",
+                                  backgroundColor: "var(--bg)",
+                                  padding: "2px 6px",
+                                  borderRadius: "2px",
+                                }}
+                              >
+                                {IFC_PHASE_LABELS[row.phaseRequired] ?? row.phaseRequired}
+                              </span>
+                            )}
+                          </div>
+                          {!compact && row.description && (
+                            <p
+                              style={{
+                                fontFamily: "'Inter', sans-serif",
+                                fontSize: "12px",
+                                color: "var(--ink-muted)",
+                                margin: "4px 0 0",
+                                lineHeight: 1.5,
+                                maxWidth: "560px",
+                              }}
+                            >
+                              {row.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Status selector */}
+                        <div>
+                          <select
+                            value={status}
+                            disabled={!canEdit || isUpdating || status === "executed" || status === "waived" || status === "not_applicable"}
+                            onChange={(e) => handleStatusChange(row.requirementId, e.target.value as RequirementStatusValue)}
                             style={{
+                              width: "100%",
                               fontFamily: "'DM Mono', monospace",
-                              fontSize: "9px",
+                              fontSize: "10px",
                               fontWeight: 500,
-                              letterSpacing: "0.10em",
-                              textTransform: "uppercase",
-                              color: "var(--accent)",
-                              backgroundColor: "var(--accent-soft)",
-                              padding: "2px 6px",
-                              borderRadius: "2px",
-                            }}
-                          >
-                            LOI Critical
-                          </span>
-                        ) : (
-                          <span
-                            style={{
-                              fontFamily: "'DM Mono', monospace",
-                              fontSize: "9px",
                               letterSpacing: "0.08em",
                               textTransform: "uppercase",
-                              color: "var(--ink-muted)",
-                              backgroundColor: "var(--bg)",
-                              padding: "2px 6px",
-                              borderRadius: "2px",
+                              color: statusColor(status),
+                              backgroundColor: statusBg(status),
+                              border: `1px solid ${statusColor(status)}`,
+                              borderRadius: "3px",
+                              padding: "5px 8px",
+                              cursor: canEdit && !isUpdating ? "pointer" : "default",
+                              outline: "none",
                             }}
                           >
-                            {IFC_PHASE_LABELS[req.phaseRequired]}
-                          </span>
-                        )}
-                        {req.applicableSectors && (
-                          <span
-                            style={{
-                              fontFamily: "'DM Mono', monospace",
-                              fontSize: "9px",
-                              letterSpacing: "0.06em",
-                              textTransform: "uppercase",
-                              color: "var(--ink-muted)",
-                              backgroundColor: "var(--bg)",
-                              padding: "2px 6px",
-                              borderRadius: "2px",
-                              border: "1px solid var(--border)",
-                            }}
-                          >
-                            {req.applicableSectors.join(", ")}
-                          </span>
-                        )}
+                            {REQUIREMENT_STATUS_ORDER.map((s) => (
+                              <option key={s} value={s}>
+                                {REQUIREMENT_STATUS_LABELS[s]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
+
+                      {/* Collaboration row */}
+                      {showCollab && row.isApplicable && (
+                        <>
+                          {row.isLoiCritical && (
+                            <ApprovalBadge
+                              projectId={projectId}
+                              slug={slug}
+                              targetType="requirement"
+                              targetId={row.projectRequirementId}
+                              approval={reqApproval}
+                              currentUserId={currentUserId!}
+                              actorName={actorName}
+                              canAct={canApprove}
+                            />
+                          )}
+                          <WatchButton
+                            projectId={projectId}
+                            slug={slug}
+                            targetType="requirement"
+                            targetId={row.projectRequirementId}
+                            initialWatching={isWatched}
+                            actorName={actorName}
+                            variant="icon"
+                          />
+                        </>
+                      )}
+
+                      {/* Expandable notes */}
+                      {isExpandedNotes && (
+                        <RequirementNoteThread
+                          projectId={projectId}
+                          requirementId={row.requirementId}
+                          currentStatus={status}
+                          notes={threadNotes}
+                          onNoteAdded={(n) => {
+                            setNoteThreads((prev) => ({
+                              ...prev,
+                              [row.requirementId]: [n, ...(prev[row.requirementId] ?? [])],
+                            }));
+                          }}
+                          canEdit={canEdit}
+                        />
+                      )}
+
+                      {/* Documents shelf */}
+                      {isExpandedDocs && row.projectRequirementId && (
+                        <div
+                          style={{
+                            borderTop: "1px solid var(--border)",
+                            backgroundColor: "var(--bg)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "10px 24px",
+                              borderBottom: reqDocs.length > 0 ? "1px solid var(--border)" : undefined,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: "9px",
+                                fontWeight: 500,
+                                letterSpacing: "0.10em",
+                                textTransform: "uppercase",
+                                color: "var(--ink-muted)",
+                              }}
+                            >
+                              Supporting Documents
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              {uploadError && (
+                                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "11px", color: "var(--accent)" }}>
+                                  {uploadError}
+                                </span>
+                              )}
+                              {canEdit && (
+                                <>
+                                  <button
+                                    onClick={() => fileInputRefs.current[row.requirementId]?.click()}
+                                    disabled={isUploadingThis}
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      fontWeight: 500,
+                                      letterSpacing: "0.10em",
+                                      textTransform: "uppercase",
+                                      color: "var(--teal)",
+                                      backgroundColor: "transparent",
+                                      border: "1px solid var(--teal)",
+                                      borderRadius: "3px",
+                                      padding: "4px 10px",
+                                      cursor: isUploadingThis ? "not-allowed" : "pointer",
+                                      opacity: isUploadingThis ? 0.5 : 1,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {isUploadingThis ? "Uploading…" : "+ Attach"}
+                                  </button>
+                                  <input
+                                    ref={(el) => { fileInputRefs.current[row.requirementId] = el; }}
+                                    type="file"
+                                    style={{ display: "none" }}
+                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.gif,.webp"
+                                    onChange={(e) => handleDocUpload(row.requirementId, row.projectRequirementId, e.target.files)}
+                                  />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {reqDocs.length === 0 ? (
+                            <p
+                              style={{
+                                fontFamily: "'Inter', sans-serif",
+                                fontSize: "12px",
+                                color: "var(--ink-muted)",
+                                padding: "14px 24px",
+                                margin: 0,
+                              }}
+                            >
+                              {canEdit ? "No documents attached yet. Click Attach to link a file to this requirement." : "No documents attached yet."}
+                            </p>
+                          ) : (
+                            reqDocs.map((doc, i) => (
+                              <div
+                                key={doc.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "10px",
+                                  padding: "10px 24px",
+                                  borderBottom: i < reqDocs.length - 1 ? "1px solid var(--border)" : undefined,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: "9px",
+                                    fontWeight: 600,
+                                    letterSpacing: "0.06em",
+                                    color: "var(--teal)",
+                                    backgroundColor: "var(--teal-soft)",
+                                    borderRadius: "3px",
+                                    padding: "2px 5px",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {fileIcon(doc.contentType)}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p
+                                    style={{
+                                      fontFamily: "'Inter', sans-serif",
+                                      fontSize: "12px",
+                                      fontWeight: 500,
+                                      color: "var(--ink)",
+                                      margin: 0,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {doc.filename}
+                                  </p>
+                                  <p
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      color: "var(--ink-muted)",
+                                      margin: "1px 0 0",
+                                      letterSpacing: "0.04em",
+                                    }}
+                                  >
+                                    {formatBytes(doc.sizeBytes)} · {new Date(doc.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  </p>
+                                </div>
+                                <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                                  <button
+                                    onClick={() => handleDocDownload(doc.id, doc.filename)}
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      letterSpacing: "0.06em",
+                                      color: "var(--ink-muted)",
+                                      backgroundColor: "transparent",
+                                      border: "1px solid var(--border)",
+                                      borderRadius: "3px",
+                                      padding: "3px 8px",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Download
+                                  </button>
+                                  {canEdit && (
+                                    <button
+                                      onClick={() => handleDocDelete(row.requirementId, row.projectRequirementId, doc.id)}
+                                      style={{
+                                        fontFamily: "'DM Mono', monospace",
+                                        fontSize: "9px",
+                                        letterSpacing: "0.06em",
+                                        color: "var(--accent)",
+                                        backgroundColor: "transparent",
+                                        border: "1px solid var(--accent)",
+                                        borderRadius: "3px",
+                                        padding: "3px 8px",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+
+                      {/* Responsibility panel */}
+                      {isExpandedResponsibility && (
+                        <RequirementResponsibilityPanel
+                          projectId={projectId}
+                          requirementId={row.requirementId}
+                          slug={slug}
+                          responsibility={responsibility}
+                          stakeholders={stakeholders}
+                          organizations={organizations}
+                          canEdit={canEdit}
+                          onSaved={(next) => {
+                            setResponsibilities((prev) => ({
+                              ...prev,
+                              [row.requirementId]: next,
+                            }));
+                          }}
+                        />
+                      )}
                     </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       )}
 

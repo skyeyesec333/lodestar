@@ -5,7 +5,8 @@ import { recordActivity } from "@/lib/db/activity";
 import { assertProjectAccess } from "@/lib/db/project-access";
 import { uploadFile } from "@/lib/storage/client";
 import { revalidatePath } from "next/cache";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
+import { requestLogger } from "@/lib/logger";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -24,8 +25,28 @@ const ALLOWED_TYPES = new Set([
   "image/webp",
 ]);
 
+const MAGIC_BYTES: Record<string, number[][]> = {
+  "application/pdf": [[0x25, 0x50, 0x44, 0x46]], // %PDF
+  "image/png": [[0x89, 0x50, 0x4e, 0x47]], // PNG
+  "image/jpeg": [[0xff, 0xd8, 0xff]], // JPEG
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    [0x50, 0x4b, 0x03, 0x04], // ZIP (docx is a zip)
+  ],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    [0x50, 0x4b, 0x03, 0x04], // ZIP (xlsx is a zip)
+  ],
+};
+
+function validateMagicBytes(buffer: Buffer, contentType: string): boolean {
+  const signatures = MAGIC_BYTES[contentType];
+  if (!signatures) return true; // unknown type, allow through
+  return signatures.some((sig) => sig.every((byte, i) => buffer[i] === byte));
+}
+
 export async function POST(req: Request) {
   const { userId } = await auth();
+  const log = requestLogger({ userId, route: "/api/documents/upload" });
+
   if (!userId) return new Response("Unauthorized", { status: 401 });
 
   const formData = await req.formData().catch(() => null);
@@ -53,6 +74,31 @@ export async function POST(req: Request) {
   }
   if (!ALLOWED_TYPES.has(file.type)) {
     return new Response("File type not allowed", { status: 415 });
+  }
+
+  // Read file buffer for magic byte validation and hash computation
+  const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Validate magic bytes
+  if (!validateMagicBytes(buffer, file.type)) {
+    return new Response("File content does not match declared type.", { status: 400 });
+  }
+
+  // Compute SHA-256 hash
+  const documentHash = createHash("sha256").update(buffer).digest("hex");
+
+  // Check for duplicate in this project
+  const existing = await db.document.findFirst({
+    where: { projectId, documentHash },
+    select: { id: true, filename: true },
+  });
+  if (existing) {
+    return new Response(
+      JSON.stringify({
+        error: `A duplicate document already exists: "${existing.filename}"`,
+      }),
+      { status: 409 }
+    );
   }
 
   // Resolve projectRequirementId if a requirementId was provided
@@ -86,6 +132,7 @@ export async function POST(req: Request) {
     contentType: file.type,
     sizeBytes: file.size,
     uploadedBy: userId,
+    documentHash,
   });
 
   if (!dbResult.ok) {

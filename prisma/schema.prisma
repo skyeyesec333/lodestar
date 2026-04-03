@@ -38,8 +38,12 @@ model Project {
   capexUsdCents         BigInt?
   eximCoverType         EximCoverType?
   stage                 ProjectPhase             @default(concept)
-  targetLoiDate         DateTime?                @db.Date
-  targetCloseDate       DateTime?                @db.Date
+  targetLoiDate            DateTime?                @db.Date
+  targetCloseDate          DateTime?                @db.Date
+  actualLoiSubmittedDate   DateTime?
+  actualLoiApprovedDate    DateTime?
+  actualCommitmentDate     DateTime?
+  actualCloseDate          DateTime?
   ownerClerkId          String
   /// Readiness score in basis points (e.g. 7543 = 75.43%).
   /// Updated by application layer on every requirement status change.
@@ -66,6 +70,7 @@ model Project {
   funderRelationships   FunderRelationship[]
   meetings              Meeting[]
   concept               ProjectConcept?
+  dealConfig            DealConfig?
   members               ProjectMember[]
   sponsors              ProjectSponsor[]
   requirementNotes      RequirementNote[]
@@ -147,6 +152,9 @@ model Stakeholder {
   organizationId            String?
   createdAt                 DateTime             @default(now())
   updatedAt                 DateTime             @updatedAt
+  lastContactedAt           DateTime?
+  deletedAt                 DateTime?
+  deletedBy                 String?
   actionItems               ActionItem[]
   documentRequests          DocumentRequest[]
   attendances               MeetingAttendee[]
@@ -283,6 +291,7 @@ model Document {
   state                    DocumentState       @default(current)
   expiresAt                DateTime?
   expiryAlertDismissedAt   DateTime?
+  documentHash             String?
   createdAt                DateTime            @default(now())
   funderConditions         FunderCondition[]
   approval                 Approval?
@@ -421,6 +430,8 @@ model FunderRelationship {
   nextFollowupDate DateTime?             @db.Date
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
+  deletedAt        DateTime?
+  deletedBy        String?
   conditions       FunderCondition[]
   debtTranches     DebtTranche[]
   covenants        Covenant[]
@@ -469,6 +480,7 @@ model DealMilestone {
 
   @@index([projectId, sortOrder])
   @@index([projectId, targetDate])
+  @@unique([projectId, name])
   @@map("deal_milestones")
 }
 
@@ -618,6 +630,19 @@ model ExternalEvidenceSource {
   @@index([projectId, linkedAt(sort: Desc)])
   @@index([projectRequirementId])
   @@map("external_evidence_sources")
+}
+
+model DealConfig {
+  id                      String   @id @default(cuid())
+  projectId               String   @unique
+  project                 Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  readinessThresholdBps   Int      @default(6500)
+  requireConcept          Boolean  @default(true)
+  requireMilestoneDate    Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("deal_configs")
 }
 
 enum ProjectPhase {
@@ -915,6 +940,10 @@ model Covenant {
   nextDueAt        DateTime?
   lastSatisfiedAt  DateTime?
   status           CovenantStatus   @default(active)
+  waiverGrantedAt  DateTime?
+  waiverGrantedBy  String?
+  waiverReason     String?
+  waiverExpiresAt  DateTime?
   notes            String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt

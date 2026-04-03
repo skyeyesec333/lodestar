@@ -302,7 +302,8 @@ export async function advanceProjectStage(
 
   const requirementsResult = await getProjectRequirements(
     projectId,
-    projectResult.value.dealType
+    projectResult.value.dealType,
+    projectResult.value.sector
   );
   if (!requirementsResult.ok) return requirementsResult;
   const conceptResult = await getProjectConcept(projectId);
@@ -311,7 +312,9 @@ export async function advanceProjectStage(
   const { scoreBps } = computeReadiness(
     requirementsResult.value.map((row) => ({
       requirementId: row.requirementId,
-      status: row.status as RequirementStatusValue,
+      status: row.isApplicable === false
+        ? ("not_applicable" as RequirementStatusValue)
+        : (row.status as RequirementStatusValue),
     })),
     projectResult.value.dealType
   );
@@ -341,7 +344,20 @@ export async function advanceProjectStage(
 
   const nextStage = PHASE_VALUES[currentIndex + 1] as ProjectPhase;
 
-  const result = await updateProjectRecord(projectId, userId, { stage: nextStage });
+  const stageToDateField: Partial<Record<ProjectPhase, "actualLoiSubmittedDate" | "actualLoiApprovedDate" | "actualCommitmentDate" | "actualCloseDate">> = {
+    loi_submitted:   "actualLoiSubmittedDate",
+    loi_approved:    "actualLoiApprovedDate",
+    pre_commitment:  "actualCommitmentDate",
+    financial_close: "actualCloseDate",
+  };
+
+  const stageUpdateData: Parameters<typeof updateProjectRecord>[2] = { stage: nextStage };
+  const dateField = stageToDateField[nextStage];
+  if (dateField !== undefined && projectResult.value[dateField] == null) {
+    stageUpdateData[dateField] = new Date();
+  }
+
+  const result = await updateProjectRecord(projectId, userId, stageUpdateData);
   if (!result.ok) return result;
 
   const stageLabel = nextStage.replace(/_/g, " ");
@@ -396,4 +412,53 @@ export async function createDemoPortfolio(): Promise<Result<{ slug: string }>> {
   revalidatePath(`/projects/${result.value.leadSlug}`);
 
   return { ok: true, value: { slug: result.value.leadSlug } };
+}
+
+export async function recalculateReadiness(
+  projectId: string,
+  slug: string
+): Promise<Result<number>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be signed in.",
+      },
+    };
+  }
+
+  const projectResult = await getProjectById(projectId, userId);
+  if (!projectResult.ok) return projectResult;
+
+  const requirementsResult = await getProjectRequirements(
+    projectId,
+    projectResult.value.dealType,
+    projectResult.value.sector
+  );
+  if (!requirementsResult.ok) return requirementsResult;
+
+  const { scoreBps } = computeReadiness(
+    requirementsResult.value.map((row) => ({
+      requirementId: row.requirementId,
+      status: row.isApplicable === false
+        ? ("not_applicable" as RequirementStatusValue)
+        : (row.status as RequirementStatusValue),
+    })),
+    projectResult.value.dealType
+  );
+
+  const result = await updateProjectRecord(projectId, userId, {
+    cachedReadinessScore: scoreBps,
+    cachedScoreUpdatedAt: new Date(),
+  });
+
+  if (!result.ok) return result;
+
+  await recordActivity(projectId, userId, "readiness_recalculated", "Readiness score recalculated");
+
+  revalidatePath(`/projects/${slug}`);
+
+  return { ok: true, value: scoreBps };
 }

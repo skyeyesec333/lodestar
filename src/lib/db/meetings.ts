@@ -234,6 +234,43 @@ export async function createActionItemRecord(input: {
   }
 }
 
+export async function getMeetingById(
+  meetingId: string,
+  projectId: string
+): Promise<Result<MeetingRow & { projectId: string }>> {
+  try {
+    const row = await db.meeting.findUnique({
+      where: { id: meetingId },
+      select: { ...meetingSelect, projectId: true },
+    });
+    if (!row || row.projectId !== projectId) {
+      return { ok: false, error: { code: "NOT_FOUND", message: "Meeting not found." } };
+    }
+    return { ok: true, value: { ...shapeMeeting(row), projectId: row.projectId } };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+export async function getMeetingByIdNoProject(
+  meetingId: string
+): Promise<Result<{ projectId: string; summary: string | null }>> {
+  try {
+    const row = await db.meeting.findUnique({
+      where: { id: meetingId },
+      select: { projectId: true, summary: true },
+    });
+    if (!row) {
+      return { ok: false, error: { code: "NOT_FOUND", message: "Meeting not found." } };
+    }
+    return { ok: true, value: { projectId: row.projectId, summary: row.summary } };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
 export async function updateActionItemStatus(
   actionItemId: string,
   projectId: string,

@@ -8,6 +8,7 @@ import {
   addStakeholderToProject,
   removeStakeholderRole,
   updateStakeholderInProject,
+  updateLastContacted,
 } from "@/lib/db/stakeholders";
 import { recordActivity } from "@/lib/db/activity";
 import type { Result } from "@/types";
@@ -128,7 +129,7 @@ export async function removeStakeholder(input: unknown): Promise<Result<void>> {
     return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
   }
 
-  const result = await removeStakeholderRole(roleId, projectId, replacementRoleId ?? null);
+  const result = await removeStakeholderRole(roleId, projectId, replacementRoleId ?? null, userId);
   if (!result.ok) return result;
 
   await recordActivity(projectId, userId, "stakeholder_removed",
@@ -177,6 +178,45 @@ export async function updateStakeholder(input: unknown): Promise<Result<void>> {
     `${name} updated`,
     { roleId, name }
   );
+
+  revalidatePath(`/projects/${slug}`);
+  return { ok: true, value: undefined };
+}
+
+const markContactedSchema = z.object({
+  projectId: z.string().min(1),
+  slug: z.string().min(1),
+  stakeholderId: z.string().min(1),
+  stakeholderName: z.string().min(1),
+});
+
+export async function markStakeholderContacted(input: unknown): Promise<Result<void>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return { ok: false, error: { code: "UNAUTHORIZED", message: "You must be signed in." } };
+  }
+
+  const parsed = markContactedSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." },
+    };
+  }
+
+  const { projectId, slug, stakeholderId, stakeholderName } = parsed.data;
+
+  if (!(await verifyOwnership(projectId, userId))) {
+    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
+  }
+
+  const result = await updateLastContacted(stakeholderId);
+  if (!result.ok) return result;
+
+  recordActivity(projectId, userId, "stakeholder_contacted",
+    `${stakeholderName} marked as contacted`,
+    { stakeholderId }
+  ).catch(() => {});
 
   revalidatePath(`/projects/${slug}`);
   return { ok: true, value: undefined };

@@ -48,6 +48,8 @@ const updateSchema = z.object({
   nextDueAt: z.coerce.date().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   status: z.enum(["active", "satisfied", "waived"]).optional(),
+  waiverReason: z.string().trim().max(1000).nullable().optional(),
+  waiverExpiresAt: z.coerce.date().nullable().optional(),
 });
 
 const satisfySchema = z.object({
@@ -103,7 +105,7 @@ export async function updateCovenantAction(
   }
 
   const { covenantId, slug, ...data } = parsed.data;
-  const result = await updateCovenant(covenantId, data);
+  const result = await updateCovenant(covenantId, data, userId);
 
   if (result.ok) revalidatePath(`/projects/${slug}`);
   return result;

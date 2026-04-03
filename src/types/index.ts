@@ -11,7 +11,7 @@ export type { ProjectSector, EximCoverType, ProjectPhase, DealType };
 // ── Result / error types ──────────────────────────────────────────────────────
 
 export type AppError = {
-  code: "UNAUTHORIZED" | "NOT_FOUND" | "VALIDATION_ERROR" | "DATABASE_ERROR";
+  code: "UNAUTHORIZED" | "NOT_FOUND" | "VALIDATION_ERROR" | "DATABASE_ERROR" | "INVALID_TRANSITION";
   message: string;
 };
 
@@ -34,6 +34,10 @@ export type Project = {
   stage: ProjectPhase;
   targetLoiDate: Date | null;
   targetCloseDate: Date | null;
+  actualLoiSubmittedDate?: Date | null;
+  actualLoiApprovedDate?: Date | null;
+  actualCommitmentDate?: Date | null;
+  actualCloseDate?: Date | null;
   ownerClerkId: string;
   cachedReadinessScore: number | null;
   cachedScoreUpdatedAt: Date | null;
@@ -64,7 +68,8 @@ export type ProjectListSort =
   | "created_desc"
   | "name_asc"
   | "readiness_desc"
-  | "loi_asc";
+  | "loi_asc"
+  | "last_activity_desc";
 
 export type ProjectReadinessFilter =
   | "all"
@@ -93,3 +98,69 @@ export type {
 export type {
   TeamMember,
 } from "@/types/collaboration";
+
+// ── Stakeholder domain types ──────────────────────────────────────────────────
+
+export type Stakeholder = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+  organizationId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  lastContactedAt?: Date | null;
+  deletedAt?: Date | null;
+  deletedBy?: string | null;
+};
+
+// ── Funder domain types ───────────────────────────────────────────────────────
+
+export type FunderRelationship = {
+  id: string;
+  projectId: string;
+  organizationId: string;
+  funderType: string;
+  engagementStage: string;
+  amountUsdCents: number | null;
+  notes: string | null;
+  lastContactDate: Date | null;
+  nextFollowupDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+  deletedBy?: string | null;
+};
+
+// ── Deal configuration types ──────────────────────────────────────────────────
+
+export type DealConfig = {
+  id: string;
+  projectId: string;
+  readinessThresholdBps: number;
+  requireConcept: boolean;
+  requireMilestoneDate: boolean;
+};
+
+// ── Covenant domain types ────────────────────────────────────────────────────
+
+export type Covenant = {
+  id: string;
+  projectId: string;
+  funderId: string | null;
+  funderName: string | null;
+  title: string;
+  covenantType: string;
+  frequency: string;
+  nextDueAt: Date | null;
+  lastSatisfiedAt: Date | null;
+  status: string;
+  waiverGrantedAt: Date | null;
+  waiverGrantedBy: string | null;
+  waiverReason: string | null;
+  waiverExpiresAt: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};

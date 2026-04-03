@@ -23,22 +23,44 @@ export type DocumentReviewResult = {
   nextSteps: string[];
 };
 
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+
 const SYSTEM_PROMPT =
   "You are an EXIM project finance document reviewer. Assess whether documents meet EXIM's substantially final standard. Return valid JSON only — no markdown, no explanation outside the JSON.";
+
+function formatFileSize(bytes: bigint): string {
+  const n = Number(bytes);
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(date: Date): string {
+  return date.toISOString().split("T")[0] ?? date.toISOString();
+}
 
 function buildUserPrompt(input: {
   filename: string;
   requirementName: string | null;
   requirementCategory: string | null;
+  requirementDescription: string | null;
   documentType: string;
+  documentState: string;
+  documentSizeBytes: bigint;
+  documentUploadedAt: Date;
   projectSector: string;
   projectCountry: string;
+  projectStage: string;
   additionalContext?: string;
 }): string {
-  const requirementLine =
+  const requirementSection =
     input.requirementName !== null
-      ? `Linked EXIM Requirement: ${input.requirementName} (category: ${input.requirementCategory ?? "unknown"})`
-      : "Linked EXIM Requirement: None — this document is not linked to a specific requirement.";
+      ? `REQUIREMENT BEING SATISFIED
+- Category: ${input.requirementCategory ?? "unknown"}
+- Label: ${input.requirementName}${input.requirementDescription ? `\n- Description: ${input.requirementDescription}` : ""}
+- EXIM Standard: Must be in "substantially final form" — near-executed, not summaries or outlines`
+      : `REQUIREMENT BEING SATISFIED
+- None — this document is not linked to a specific EXIM requirement.`;
 
   const contextLine =
     input.additionalContext && input.additionalContext.trim().length > 0
@@ -49,18 +71,27 @@ function buildUserPrompt(input: {
 
 IMPORTANT: You cannot read the file contents. Your assessment is based entirely on metadata provided below. You must be transparent about this limitation in your summary.
 
-Document metadata:
+DOCUMENT CONTEXT
 - Filename: ${input.filename}
-- Document type: ${input.documentType}
-- Project sector: ${input.projectSector}
-- Project host country: ${input.projectCountry}
-- ${requirementLine}${contextLine}
+- Document Type: ${input.documentType}
+- File Size: ${formatFileSize(input.documentSizeBytes)}
+- Current State: ${input.documentState} (current = active version; superseded = replaced by a newer upload)
+- Uploaded: ${formatDate(input.documentUploadedAt)}
 
-Assess whether this document is likely to meet EXIM's "substantially final" standard for project finance, based on:
-1. The filename and document type (as signals of document maturity and purpose)
-2. The linked EXIM requirement it is meant to satisfy (if any)
-3. Any additional context provided by the project team
-4. EXIM's standard requirements for the project's sector and country
+PROJECT CONTEXT
+- Sector: ${input.projectSector}
+- Country: ${input.projectCountry}
+- Stage: ${input.projectStage}
+
+${requirementSection}
+
+REVIEW CRITERIA
+Based on the requirement type and document metadata, assess:
+1. Is this document type appropriate for this requirement?
+2. Does the filename suggest it contains the right content?
+3. Is the document state appropriate? (superseded documents cannot satisfy executed requirements; draft filenames signal immaturity)
+4. Are there any red flags (e.g., "draft", "template", "placeholder", "v1", "wip" in the filename)?
+5. Does the file size seem reasonable for this document type? (e.g., a 5 KB "Financial Model" is suspicious)${contextLine}
 
 Return a JSON object matching this exact schema — no markdown, no code fences, raw JSON only:
 
@@ -81,7 +112,7 @@ Return a JSON object matching this exact schema — no markdown, no code fences,
   "nextSteps": string[] (concrete, numbered actions the team should take)
 }
 
-Use "cannot_assess" if you have insufficient metadata to form a meaningful view. Always be conservative — EXIM's standard is high and documents must be near-executed form, not summaries or outlines.`;
+Use "cannot_assess" if you have insufficient metadata to form a meaningful view. Always be conservative — EXIM's standard is high and documents must be in near-executed form, not summaries or outlines.`;
 }
 
 function buildFallbackResult(
@@ -104,13 +135,18 @@ export async function reviewDocument(input: {
   filename: string;
   requirementName: string | null;
   requirementCategory: string | null;
+  requirementDescription: string | null;
   documentType: string;
+  documentState: string;
+  documentSizeBytes: bigint;
+  documentUploadedAt: Date;
   projectSector: string;
   projectCountry: string;
+  projectStage: string;
   additionalContext?: string;
 }): Promise<DocumentReviewResult> {
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: MODEL,
     max_tokens: 2000,
     system: SYSTEM_PROMPT,
     messages: [

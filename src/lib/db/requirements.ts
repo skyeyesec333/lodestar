@@ -40,6 +40,8 @@ export type ProjectRequirementRow = {
   status: RequirementStatusValue;
   notes: string | null;
   isApplicable: boolean;
+  /** True when isApplicable was set to false automatically due to sector mismatch (not a manual user override). */
+  autoFiltered: boolean;
   responsibleOrganizationId: string | null;
   responsibleOrganizationName: string | null;
   responsibleStakeholderId: string | null;
@@ -66,10 +68,28 @@ type StatusRow = {
 function buildRows(
   requirements: readonly RequirementDef[],
   statusMap: Map<string, StatusRow>,
-  notesMap: Map<string, RequirementNoteRow[]>
+  notesMap: Map<string, RequirementNoteRow[]>,
+  sector?: string | null
 ): ProjectRequirementRow[] {
   return requirements.map((req) => {
     const live = statusMap.get(req.id);
+    const dbIsApplicable = live?.isApplicable ?? true;
+
+    // Auto-filter by sector at read time — does not persist to the DB and does
+    // not override a requirement the user has already manually set to false.
+    let isApplicable = dbIsApplicable;
+    let autoFiltered = false;
+    if (
+      sector &&
+      req.applicableSectors &&
+      req.applicableSectors.length > 0 &&
+      !req.applicableSectors.includes(sector) &&
+      dbIsApplicable === true
+    ) {
+      isApplicable = false;
+      autoFiltered = true;
+    }
+
     return {
       projectRequirementId: live?.id ?? "",
       requirementId: req.id,
@@ -82,7 +102,8 @@ function buildRows(
       sortOrder: req.sortOrder,
       status: (live?.status ?? "not_started") as RequirementStatusValue,
       notes: live?.notes ?? null,
-      isApplicable: live?.isApplicable ?? true,
+      isApplicable,
+      autoFiltered,
       responsibleOrganizationId: live?.responsibleOrganizationId ?? null,
       responsibleOrganizationName: live?.responsibleOrganization?.name ?? null,
       responsibleStakeholderId: live?.responsibleStakeholderId ?? null,
@@ -138,7 +159,8 @@ async function fetchNotesMap(projectId: string): Promise<Map<string, Requirement
 
 export async function getProjectRequirements(
   projectId: string,
-  dealType?: string
+  dealType?: string,
+  sector?: string | null
 ): Promise<Result<ProjectRequirementRow[]>> {
   try {
     // Resolve the taxonomy for this deal type (falls back to EXIM if omitted)
@@ -190,7 +212,8 @@ export async function getProjectRequirements(
         value: buildRows(
           requirements,
           new Map(all.map((r) => [r.requirementId, r])),
-          notesMap
+          notesMap,
+          sector
         ),
       };
     }
@@ -200,7 +223,8 @@ export async function getProjectRequirements(
       value: buildRows(
         requirements,
         new Map(existing.map((r) => [r.requirementId, r])),
-        notesMap
+        notesMap,
+        sector
       ),
     };
   } catch (err) {
@@ -349,6 +373,12 @@ export async function updateProjectCachedScore(
   }
 }
 
+export type BlockingRequirement = {
+  id: string;
+  label: string;
+  status: string;
+};
+
 export type CategoryBreakdown = {
   category: string;
   label: string;
@@ -356,6 +386,7 @@ export type CategoryBreakdown = {
   completed: number;
   inProgress: number;
   scorePct: number;
+  blockingRequirements: BlockingRequirement[];
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -367,6 +398,74 @@ const CATEGORY_LABELS: Record<string, string> = {
   environmental_social: "Env & Social",
 };
 
+// ── Stale assignments ─────────────────────────────────────────────────────────
+
+export type StaleAssignment = {
+  requirementId: string;
+  projectRequirementId: string;
+  name: string;
+  category: string;
+  assignedTo: string | null;
+  responsibleParty: string | null;
+  updatedAt: Date;
+  status: string;
+  daysSinceUpdate: number;
+};
+
+/**
+ * Returns requirements that are assigned but have not been updated in staleDays days.
+ * Excludes terminal statuses: executed, waived, not_applicable.
+ */
+export async function getStaleAssignments(
+  projectId: string,
+  staleDays: number = 14
+): Promise<Result<StaleAssignment[]>> {
+  try {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - staleDays);
+
+    const rows = await db.projectRequirement.findMany({
+      where: {
+        projectId,
+        status: { notIn: ["executed", "waived", "not_applicable"] },
+        updatedAt: { lt: cutoff },
+        OR: [
+          { responsibleStakeholderId: { not: null } },
+          { responsibleOrganizationId: { not: null } },
+        ],
+      },
+      select: {
+        id: true,
+        requirementId: true,
+        status: true,
+        updatedAt: true,
+        responsibleStakeholder: { select: { name: true } },
+        responsibleOrganization: { select: { name: true } },
+        requirement: { select: { name: true, category: true } },
+      },
+      orderBy: { updatedAt: "asc" },
+    });
+
+    const now = Date.now();
+    const value: StaleAssignment[] = rows.map((r) => ({
+      requirementId: r.requirementId,
+      projectRequirementId: r.id,
+      name: r.requirement.name,
+      category: r.requirement.category,
+      assignedTo: r.responsibleStakeholder?.name ?? null,
+      responsibleParty: r.responsibleOrganization?.name ?? null,
+      updatedAt: r.updatedAt,
+      status: r.status,
+      daysSinceUpdate: Math.floor((now - r.updatedAt.getTime()) / (1000 * 60 * 60 * 24)),
+    }));
+
+    return { ok: true, value };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
 export async function getRequirementCategoryBreakdown(
   projectId: string
 ): Promise<Result<CategoryBreakdown[]>> {
@@ -374,23 +473,43 @@ export async function getRequirementCategoryBreakdown(
     const rows = await db.projectRequirement.findMany({
       where: { projectId },
       select: {
+        requirementId: true,
         status: true,
         isApplicable: true,
-        requirement: { select: { category: true } },
+        requirement: { select: { category: true, name: true } },
       },
     });
 
-    const groups: Record<string, { total: number; completed: number; inProgress: number }> = {};
+    const groups: Record<
+      string,
+      {
+        total: number;
+        completed: number;
+        inProgress: number;
+        blockingRequirements: BlockingRequirement[];
+      }
+    > = {};
 
     for (const row of rows) {
       if (!row.isApplicable) continue;
       const cat = row.requirement.category;
-      if (!groups[cat]) groups[cat] = { total: 0, completed: 0, inProgress: 0 };
+      if (!groups[cat]) {
+        groups[cat] = { total: 0, completed: 0, inProgress: 0, blockingRequirements: [] };
+      }
       groups[cat].total++;
       if (["substantially_final", "executed", "waived"].includes(row.status)) {
         groups[cat].completed++;
       } else if (["in_progress", "draft"].includes(row.status)) {
         groups[cat].inProgress++;
+      }
+
+      // Collect blocking requirements (not yet in final state)
+      if (!["substantially_final", "executed", "waived"].includes(row.status)) {
+        groups[cat].blockingRequirements.push({
+          id: row.requirementId,
+          label: row.requirement.name,
+          status: row.status,
+        });
       }
     }
 
@@ -401,6 +520,7 @@ export async function getRequirementCategoryBreakdown(
       completed: counts.completed,
       inProgress: counts.inProgress,
       scorePct: counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0,
+      blockingRequirements: counts.blockingRequirements,
     }));
 
     breakdown.sort((a, b) => a.scorePct - b.scorePct);

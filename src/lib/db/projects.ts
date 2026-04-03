@@ -53,6 +53,10 @@ const projectFullSelect = {
   stage: true,
   targetLoiDate: true,
   targetCloseDate: true,
+  actualLoiSubmittedDate: true,
+  actualLoiApprovedDate: true,
+  actualCommitmentDate: true,
+  actualCloseDate: true,
   ownerClerkId: true,
   cachedReadinessScore: true,
   cachedScoreUpdatedAt: true,
@@ -166,6 +170,10 @@ function getProjectListOrderBy(sort: ProjectListSort) {
         { targetLoiDate: { sort: "asc" as const, nulls: "last" as const } },
         { createdAt: "desc" as const },
       ];
+    case "last_activity_desc":
+      return [
+        { createdAt: "desc" as const },
+      ];
     case "created_desc":
     default:
       return [{ createdAt: "desc" as const }];
@@ -231,6 +239,12 @@ export async function updateProjectRecord(
     targetLoiDate?: Date | null;
     targetCloseDate?: Date | null;
     stage?: import("@prisma/client").ProjectPhase;
+    cachedReadinessScore?: number | null;
+    cachedScoreUpdatedAt?: Date | null;
+    actualLoiSubmittedDate?: Date | null;
+    actualLoiApprovedDate?: Date | null;
+    actualCommitmentDate?: Date | null;
+    actualCloseDate?: Date | null;
   }
 ): Promise<Result<Project>> {
   try {
@@ -240,6 +254,59 @@ export async function updateProjectRecord(
       select: projectFullSelect,
     });
     return { ok: true, value: row };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+// ── Overdue LOI query ─────────────────────────────────────────────────────────
+
+export type OverdueLoiProject = {
+  id: string;
+  name: string;
+  slug: string;
+  targetLoiDate: Date;
+};
+
+/**
+ * Returns projects where targetLoiDate is in the past and the project has not
+ * yet reached loi_submitted or any later phase.
+ */
+export async function getOverdueLoiProjects(
+  clerkUserId: string
+): Promise<Result<OverdueLoiProject[]>> {
+  try {
+    const closedPhases: ProjectPhase[] = [
+      "loi_submitted",
+      "loi_approved",
+      "pre_commitment",
+      "final_commitment",
+      "financial_close",
+    ];
+    const rows = await db.project.findMany({
+      where: {
+        OR: [
+          { ownerClerkId: clerkUserId },
+          { members: { some: { clerkUserId } } },
+        ],
+        targetLoiDate: { lt: new Date() },
+        stage: { notIn: closedPhases },
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        targetLoiDate: true,
+      },
+      orderBy: { targetLoiDate: "asc" },
+    });
+    return {
+      ok: true,
+      value: rows.filter(
+        (r): r is OverdueLoiProject => r.targetLoiDate !== null
+      ),
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };

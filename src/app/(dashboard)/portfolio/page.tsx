@@ -2,7 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getPortfolioStats } from "@/lib/db/portfolio";
+import { getUpcomingMilestones } from "@/lib/db/milestones-upcoming";
 import { PortfolioTriageBoard } from "@/components/projects/PortfolioTriageBoard";
+import { UpcomingMilestonesWidget } from "@/components/projects/UpcomingMilestonesWidget";
 import {
   Card,
   CardContent,
@@ -63,6 +65,7 @@ export default async function PortfolioPage() {
   if (!userId) redirect("/sign-in");
 
   const result = await getPortfolioStats(userId);
+  const milestonesResult = await getUpcomingMilestones(userId);
 
   if (!result.ok) {
     return (
@@ -280,6 +283,10 @@ export default async function PortfolioPage() {
       </div>
 
       <PortfolioTriageBoard projects={projects} />
+
+      <UpcomingMilestonesWidget
+        milestones={milestonesResult.ok ? milestonesResult.value : []}
+      />
 
       {/* Projects table */}
       <Card>

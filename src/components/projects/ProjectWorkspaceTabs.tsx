@@ -32,7 +32,7 @@ export function ProjectWorkspaceTabs() {
       for (const section of PROJECT_SECTIONS) {
         const element = document.getElementById(section.id);
         if (!element) continue;
-        if (element.getBoundingClientRect().top <= 180) currentId = section.id;
+        if (element.getBoundingClientRect().top <= 120) currentId = section.id;
       }
 
       setActiveId(currentId);

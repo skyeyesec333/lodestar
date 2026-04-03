@@ -72,6 +72,7 @@ export function buildGateReview({
   requirements,
   scoreBps,
   concept,
+  thresholdBps,
 }: {
   project: Pick<Project, "stage" | "dealType" | "targetLoiDate" | "targetCloseDate" | "eximCoverType">;
   requirements: ProjectRequirementRow[];
@@ -80,6 +81,7 @@ export function buildGateReview({
     ProjectConceptRow,
     "thesis" | "targetOutcome" | "goNoGoRecommendation" | "nextActions"
   > | null;
+  thresholdBps?: number;
 }): GateReview {
   const isExim = project.dealType === "exim_project_finance";
   const currentIndex = PHASE_ORDER.indexOf(project.stage);
@@ -106,7 +108,7 @@ export function buildGateReview({
     (row) => !row.responsibleOrganizationId && !row.responsibleStakeholderId
   );
   const undatedGateRows = applicableGateRows.filter((row) => !row.targetDate);
-  const readinessThreshold = isExim ? 6500 : 6000;
+  const readinessThreshold = thresholdBps ?? (isExim ? 6500 : 6000);
 
   const criteria: GateCriterion[] = [
     {

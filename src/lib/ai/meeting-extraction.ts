@@ -32,6 +32,8 @@ type RequirementRef = {
   category: string;
 };
 
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
+
 const SYSTEM_PROMPT =
   "You are an EXIM project finance assistant. Extract structured information from meeting notes. Return valid JSON only. Do not include any text before or after the JSON object.";
 
@@ -147,12 +149,95 @@ function parseExtraction(raw: string): MeetingExtractionResult {
   return { summary, actionItems, commitments, requirementIds };
 }
 
+export type ActionItem = {
+  description: string;
+  assignee: string | null;
+  dueDate: string | null;
+  priority: "high" | "medium" | "low";
+};
+
+function buildActionItemsMessage(transcript: string, projectContext: string): string {
+  return `You are an EXIM project finance meeting assistant.
+
+PROJECT CONTEXT:
+${projectContext}
+
+MEETING TRANSCRIPT / NOTES:
+${transcript}
+
+Extract all clear, specific action items from the meeting notes above. For each action item, identify:
+- The specific task or deliverable
+- Who is responsible (if mentioned)
+- When it is due (if mentioned, as raw text)
+- How urgent/important it is
+
+Return a JSON array of action items matching this exact schema:
+[
+  {
+    "description": "specific action item description",
+    "assignee": "person name or null",
+    "dueDate": "raw due date text like 'end of month' or 'March 15' or null",
+    "priority": "high | medium | low"
+  }
+]
+
+Rules:
+- Only extract concrete tasks, not vague discussion points
+- If no due date is mentioned, set dueDate to null
+- If no assignee is mentioned, set assignee to null
+- Priority: high = blocking/urgent/EXIM submission critical, medium = important but not blocking, low = nice to have
+- Return valid JSON array only — no markdown, no prose`;
+}
+
+function parseActionItems(raw: string): ActionItem[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed
+    .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    .map((item) => ({
+      description: typeof item.description === "string" ? item.description : "Untitled action item",
+      assignee: typeof item.assignee === "string" ? item.assignee : null,
+      dueDate: typeof item.dueDate === "string" ? item.dueDate : null,
+      priority: coercePriority(item.priority),
+    }));
+}
+
+export async function extractActionItems(
+  transcript: string,
+  projectContext: string
+): Promise<ActionItem[]> {
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system:
+      "You are an EXIM project finance assistant. Extract action items from meeting notes. Return valid JSON only. Do not include any text before or after the JSON array.",
+    messages: [
+      {
+        role: "user",
+        content: buildActionItemsMessage(transcript, projectContext),
+      },
+    ],
+  });
+
+  const firstBlock = message.content[0];
+  if (!firstBlock || firstBlock.type !== "text") return [];
+
+  return parseActionItems(firstBlock.text.trim());
+}
+
 export async function extractMeetingInsights(
   transcript: string,
   requirements: RequirementRef[]
 ): Promise<MeetingExtractionResult> {
   const message = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    model: MODEL,
     max_tokens: 2000,
     system: SYSTEM_PROMPT,
     messages: [

@@ -22,6 +22,7 @@ function makeRequirement(
     status: "not_started",
     notes: null,
     isApplicable: true,
+    autoFiltered: false,
     responsibleOrganizationId: null,
     responsibleOrganizationName: null,
     responsibleStakeholderId: null,
@@ -47,6 +48,7 @@ function makeDocument(overrides: Partial<DocumentRow> = {}): DocumentRow {
     projectRequirementId: null,
     expiresAt: null,
     expiryAlertDismissedAt: null,
+    documentHash: null,
     createdAt: new Date("2026-01-01"),
     ...overrides,
   };

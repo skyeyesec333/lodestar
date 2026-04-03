@@ -13,6 +13,7 @@ import { getProjectsListChatPresets } from "@/lib/ai/chat-presets";
 import { CreateDemoProjectButton } from "@/components/projects/CreateDemoProjectButton";
 import { DailyPriorityWidget } from "@/components/projects/DailyPriorityWidget";
 import { ProjectsStageGridClient } from "@/components/projects/ProjectsStageGridClient";
+import { ExportButton } from "@/components/projects/ExportButton";
 
 const STAGE_OPTIONS = [
   { value: "all", label: "All stages" },
@@ -50,6 +51,7 @@ const SORT_OPTIONS: ReadonlyArray<{
   value: ProjectListSort;
   label: string;
 }> = [
+  { value: "last_activity_desc", label: "Recently active" },
   { value: "created_desc", label: "Newest first" },
   { value: "loi_asc", label: "Nearest LOI" },
   { value: "readiness_desc", label: "Highest readiness" },
@@ -82,7 +84,7 @@ function parseProjectListQuery(searchParams: SearchParams): Required<ProjectList
       : "all",
     sort: SORT_OPTIONS.some((option) => option.value === sort)
       ? (sort as ProjectListSort)
-      : "created_desc",
+      : "last_activity_desc",
   };
 }
 
@@ -97,7 +99,7 @@ function getActiveFilterCount(
     query.sector !== "all",
     includeStage && query.stage !== "all",
     query.readiness !== "all",
-    query.sort !== "created_desc",
+    query.sort !== "last_activity_desc",
   ].filter(Boolean).length;
 }
 
@@ -175,8 +177,9 @@ export default async function ProjectsPage({
           </h1>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", alignItems: "start", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
           <CreateDemoProjectButton />
+          <ExportButton params={{ q: query.q, sector: query.sector, readiness: query.readiness, sort: query.sort }} />
           <Link
             href="/templates"
             style={{
@@ -189,6 +192,9 @@ export default async function ProjectsPage({
               backgroundColor: "transparent",
               border: "1px solid var(--border)",
               padding: "10px 18px",
+              minHeight: "44px",
+              display: "inline-flex",
+              alignItems: "center",
               borderRadius: "3px",
               textDecoration: "none",
             }}
@@ -206,6 +212,9 @@ export default async function ProjectsPage({
               color: "#ffffff",
               backgroundColor: "var(--accent)",
               padding: "10px 20px",
+              minHeight: "44px",
+              display: "inline-flex",
+              alignItems: "center",
               borderRadius: "3px",
               textDecoration: "none",
             }}
@@ -219,17 +228,7 @@ export default async function ProjectsPage({
 
       <form
         method="get"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(220px, 1.4fr) repeat(3, minmax(140px, 1fr)) auto",
-          gap: "12px",
-          alignItems: "end",
-          marginBottom: "24px",
-          padding: "18px",
-          backgroundColor: "var(--bg-card)",
-          border: "1px solid var(--border)",
-          borderRadius: "4px",
-        }}
+        className="ls-filter-form"
       >
         <label style={{ display: "block" }}>
           <span className="label-mono" style={{ display: "block", marginBottom: "6px" }}>
@@ -325,6 +324,7 @@ const primaryButtonStyle: CSSProperties = {
   border: "none",
   borderRadius: "3px",
   padding: "11px 16px",
+  minHeight: "44px",
   textDecoration: "none",
   cursor: "pointer",
 };
@@ -340,5 +340,6 @@ const secondaryButtonStyle: CSSProperties = {
   border: "1px solid var(--border)",
   borderRadius: "3px",
   padding: "10px 16px",
+  minHeight: "44px",
   textDecoration: "none",
 };

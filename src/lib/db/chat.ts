@@ -16,7 +16,7 @@ export async function getProjectChatContext(
   if (!projectResult.ok) return projectResult;
 
   const [requirementsResult, stakeholdersResult, meetingsResult] = await Promise.all([
-    getProjectRequirements(projectId),
+    getProjectRequirements(projectId, projectResult.value.dealType, projectResult.value.sector),
     getProjectStakeholders(projectId),
     getProjectMeetings(projectId),
   ]);
@@ -33,7 +33,9 @@ export async function getProjectChatContext(
   const readiness = computeReadiness(
     requirements.map((row) => ({
       requirementId: row.requirementId,
-      status: row.status as RequirementStatusValue,
+      status: row.isApplicable === false
+        ? ("not_applicable" as RequirementStatusValue)
+        : (row.status as RequirementStatusValue),
     }))
   );
 

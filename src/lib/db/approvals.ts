@@ -88,6 +88,64 @@ export async function upsertApproval(
   }
 }
 
+export type ApprovalHistoryEntry = {
+  id: string;
+  actorClerkId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  createdAt: Date;
+};
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+export async function getApprovalHistory(
+  approvalId: string,
+  projectId: string
+): Promise<Result<ApprovalHistoryEntry[]>> {
+  try {
+    const rows = await db.activityEvent.findMany({
+      where: {
+        projectId,
+        eventType: "approval_status_changed",
+      },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        clerkUserId: true,
+        metadata: true,
+        createdAt: true,
+      },
+    });
+
+    const entries: ApprovalHistoryEntry[] = rows
+      .filter((row) => {
+        const meta = isRecord(row.metadata) ? row.metadata : null;
+        return meta?.approvalId === approvalId;
+      })
+      .map((row) => {
+        const meta = isRecord(row.metadata) ? row.metadata : null;
+        return {
+          id: row.id,
+          actorClerkId: row.clerkUserId,
+          fromStatus: typeof meta?.fromStatus === "string" ? meta.fromStatus : null,
+          toStatus: typeof meta?.toStatus === "string" ? meta.toStatus : "draft",
+          note: typeof meta?.note === "string" ? meta.note : null,
+          createdAt: row.createdAt,
+        };
+      });
+
+    return { ok: true, value: entries };
+  } catch (err) {
+    return {
+      ok: false,
+      error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" },
+    };
+  }
+}
+
 export async function getApprovalsByProject(
   projectId: string
 ): Promise<Result<ApprovalRow[]>> {

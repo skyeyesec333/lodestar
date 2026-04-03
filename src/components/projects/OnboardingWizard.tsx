@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createProject } from "@/actions/projects";
+import { copyRequirementsFromProject } from "@/actions/requirements";
 import {
   DealTypeOption,
   type DealTypeValue,
@@ -177,10 +178,17 @@ function buildInitialState(template: WorkspaceTemplate | null): WizardState {
   };
 }
 
+export type ExistingProjectOption = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
 interface OnboardingWizardProps {
   onComplete: (projectSlug: string) => void;
   onBack: () => void;
   templateId?: string;
+  existingProjects?: ExistingProjectOption[];
 }
 
 const inputStyle: React.CSSProperties = {
@@ -413,7 +421,7 @@ function Field({
   );
 }
 
-export function OnboardingWizard({ onComplete, onBack, templateId }: OnboardingWizardProps) {
+export function OnboardingWizard({ onComplete, onBack, templateId, existingProjects }: OnboardingWizardProps) {
   const selectedTemplate = getWorkspaceTemplate(templateId);
   const [step, setStep] = useState(1);
   const [state, setState] = useState<WizardState>(() => buildInitialState(selectedTemplate));
@@ -423,9 +431,15 @@ export function OnboardingWizard({ onComplete, onBack, templateId }: OnboardingW
   const [isPending, startTransition] = useTransition();
   const [eligibilityResult, setEligibilityResult] = useState<EligibilityResult | null>(null);
   const [showEximEligibility, setShowEximEligibility] = useState(false);
+  const [createdProject, setCreatedProject] = useState<{ id: string; slug: string } | null>(null);
+  const [selectedSourceProjectId, setSelectedSourceProjectId] = useState<string>("");
+  const [copyError, setCopyError] = useState<string | null>(null);
 
+  const hasCopyStep = (existingProjects ?? []).length > 0;
   const isExim = state.dealType === "exim_project_finance";
-  const steps = ["Workspace", "Concept", "Capital", "Launch"];
+  const steps = hasCopyStep
+    ? ["Workspace", "Concept", "Capital", "Launch", "Copy"]
+    : ["Workspace", "Concept", "Capital", "Launch"];
 
   function setField<K extends keyof WizardState>(key: K, value: WizardState[K]) {
     setState((prev) => ({ ...prev, [key]: value }));
@@ -556,8 +570,35 @@ export function OnboardingWizard({ onComplete, onBack, templateId }: OnboardingW
         return;
       }
 
-      onComplete(result.value.slug);
+      if (hasCopyStep) {
+        setCreatedProject({ id: result.value.id, slug: result.value.slug });
+        setStep(5);
+      } else {
+        onComplete(result.value.slug);
+      }
     });
+  }
+
+  function handleCopyAndFinish() {
+    if (!createdProject || !selectedSourceProjectId) return;
+    setCopyError(null);
+    startTransition(async () => {
+      const result = await copyRequirementsFromProject(
+        selectedSourceProjectId,
+        createdProject.id,
+        createdProject.slug
+      );
+      if (!result.ok) {
+        setCopyError(result.error.message);
+        return;
+      }
+      onComplete(createdProject.slug);
+    });
+  }
+
+  function handleSkipCopy() {
+    if (!createdProject) return;
+    onComplete(createdProject.slug);
   }
 
   function sectorLabel(value: string) {
@@ -1238,6 +1279,137 @@ export function OnboardingWizard({ onComplete, onBack, templateId }: OnboardingW
             </div>
           ) : null}
 
+          {step === 5 && hasCopyStep ? (
+            <div>
+              <p
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  fontWeight: 500,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--teal)",
+                  margin: "0 0 6px 0",
+                }}
+              >
+                Step 5 of 5 — Optional
+              </p>
+              <h2
+                style={{
+                  fontFamily: "'DM Serif Display', serif",
+                  fontSize: "24px",
+                  fontWeight: 400,
+                  color: "var(--ink)",
+                  margin: "0 0 10px 0",
+                }}
+              >
+                Copy requirements from an existing project
+              </h2>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "14px",
+                  color: "var(--ink-mid)",
+                  lineHeight: 1.6,
+                  margin: "0 0 24px",
+                }}
+              >
+                Seed this workspace with the applicable requirements from one of your existing projects. All statuses will be reset to not started — only the requirement applicability structure is copied. This step is optional.
+              </p>
+
+              <div
+                className="wizard-layout"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
+                  gap: "24px",
+                }}
+              >
+                <div>
+                  <Field id="sourceProject" label="Source project">
+                    <select
+                      id="sourceProject"
+                      value={selectedSourceProjectId}
+                      onChange={(event) => setSelectedSourceProjectId(event.target.value)}
+                      style={{ ...selectStyle, ...getFocusStyle("sourceProject") }}
+                      onFocus={() => setFocusedField("sourceProject")}
+                      onBlur={() => setFocusedField(null)}
+                    >
+                      <option value="">Select a project to copy from…</option>
+                      {(existingProjects ?? []).map((project) => (
+                        <option key={project.id} value={project.id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  {copyError ? (
+                    <p style={errorStyle}>{copyError}</p>
+                  ) : null}
+                </div>
+
+                <ContextBox label="What gets copied">
+                  Only requirements marked as applicable in the source project are copied. Status is always reset to not started. Assignments, target dates, and notes are not copied — this is a structural seed, not a clone.
+                </ContextBox>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "12px",
+                  marginTop: "24px",
+                  paddingTop: "20px",
+                  borderTop: "1px solid var(--border)",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleSkipCopy}
+                  disabled={isPending}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "var(--ink-mid)",
+                    backgroundColor: "transparent",
+                    border: "1px solid var(--border)",
+                    borderRadius: "3px",
+                    padding: "10px 20px",
+                    cursor: isPending ? "not-allowed" : "pointer",
+                    opacity: isPending ? 0.6 : 1,
+                  }}
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopyAndFinish}
+                  disabled={isPending || !selectedSourceProjectId}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "#ffffff",
+                    backgroundColor: isPending || !selectedSourceProjectId ? "var(--ink-muted)" : "var(--teal)",
+                    border: "none",
+                    borderRadius: "3px",
+                    padding: "10px 24px",
+                    cursor: isPending || !selectedSourceProjectId ? "not-allowed" : "pointer",
+                    transition: "background-color 0.15s",
+                  }}
+                >
+                  {isPending ? "Copying…" : "Copy and open workspace →"}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {step === 4 ? (
             <div>
               <p
@@ -1373,62 +1545,20 @@ export function OnboardingWizard({ onComplete, onBack, templateId }: OnboardingW
             </div>
           ) : null}
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: "32px",
-              paddingTop: "20px",
-              borderTop: "1px solid var(--border)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={handleBack}
-              disabled={isPending}
+          {step !== 5 ? (
+            <div
               style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "11px",
-                fontWeight: 500,
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--ink-mid)",
-                backgroundColor: "transparent",
-                border: "1px solid var(--border)",
-                borderRadius: "3px",
-                padding: "10px 20px",
-                cursor: isPending ? "not-allowed" : "pointer",
-                opacity: isPending ? 0.6 : 1,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: "32px",
+                paddingTop: "20px",
+                borderTop: "1px solid var(--border)",
               }}
             >
-              ← Back
-            </button>
-
-            {step < 4 ? (
               <button
                 type="button"
-                onClick={handleNext}
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "11px",
-                  fontWeight: 500,
-                  letterSpacing: "0.10em",
-                  textTransform: "uppercase",
-                  color: "#ffffff",
-                  backgroundColor: "var(--teal)",
-                  border: "none",
-                  borderRadius: "3px",
-                  padding: "10px 24px",
-                  cursor: "pointer",
-                }}
-              >
-                Next →
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
+                onClick={handleBack}
                 disabled={isPending}
                 style={{
                   fontFamily: "'DM Mono', monospace",
@@ -1436,19 +1566,63 @@ export function OnboardingWizard({ onComplete, onBack, templateId }: OnboardingW
                   fontWeight: 500,
                   letterSpacing: "0.10em",
                   textTransform: "uppercase",
-                  color: "#ffffff",
-                  backgroundColor: isPending ? "var(--ink-muted)" : "var(--teal)",
-                  border: "none",
+                  color: "var(--ink-mid)",
+                  backgroundColor: "transparent",
+                  border: "1px solid var(--border)",
                   borderRadius: "3px",
-                  padding: "10px 24px",
+                  padding: "10px 20px",
                   cursor: isPending ? "not-allowed" : "pointer",
-                  transition: "background-color 0.15s",
+                  opacity: isPending ? 0.6 : 1,
                 }}
               >
-                {isPending ? "Creating workspace…" : "Launch Workspace →"}
+                ← Back
               </button>
-            )}
-          </div>
+
+              {step < 4 ? (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "#ffffff",
+                    backgroundColor: "var(--teal)",
+                    border: "none",
+                    borderRadius: "3px",
+                    padding: "10px 24px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Next →
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isPending}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "#ffffff",
+                    backgroundColor: isPending ? "var(--ink-muted)" : "var(--teal)",
+                    border: "none",
+                    borderRadius: "3px",
+                    padding: "10px 24px",
+                    cursor: isPending ? "not-allowed" : "pointer",
+                    transition: "background-color 0.15s",
+                  }}
+                >
+                  {isPending ? "Creating workspace…" : "Launch Workspace →"}
+                </button>
+              )}
+            </div>
+          ) : null}
 
           {submitError ? (
             <p

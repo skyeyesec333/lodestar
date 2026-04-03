@@ -2,7 +2,7 @@
 
 import { CSSProperties, useState, useTransition } from "react";
 import { upsertApprovalAction } from "@/actions/approvals";
-import type { ApprovalRow } from "@/lib/db/approvals";
+import type { ApprovalRow, ApprovalHistoryEntry } from "@/lib/db/approvals";
 import type { ApprovalStatus, ApprovalTargetType } from "@prisma/client";
 
 interface ApprovalBadgeProps {
@@ -15,6 +15,8 @@ interface ApprovalBadgeProps {
   actorName?: string;
   /** If false, show read-only badge with no action buttons */
   canAct?: boolean;
+  /** Ordered list of approval history entries (oldest first) */
+  history?: ApprovalHistoryEntry[];
 }
 
 const STATUS_CONFIG: Record<ApprovalStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -53,12 +55,14 @@ export function ApprovalBadge({
   currentUserId,
   actorName,
   canAct = true,
+  history,
 }: ApprovalBadgeProps) {
   const [optimisticApproval, setOptimisticApproval] = useState(approval);
   const [showMenu, setShowMenu] = useState(false);
   const [noteInput, setNoteInput] = useState("");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const currentStatus: ApprovalStatus = optimisticApproval?.status ?? "draft";
   const config = STATUS_CONFIG[currentStatus];
@@ -213,6 +217,53 @@ export function ApprovalBadge({
           {error}
         </p>
       )}
+
+      {history && history.length > 0 && (
+        <div style={{ marginTop: "6px" }}>
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 0,
+              fontSize: "11px",
+              color: "var(--ink-muted)",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+              style={{ width: "10px", height: "10px", transform: showHistory ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}
+            >
+              <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            History ({history.length})
+          </button>
+
+          {showHistory && (
+            <div
+              style={{
+                marginTop: "8px",
+                paddingLeft: "8px",
+                borderLeft: "2px solid var(--border)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              {history.map((entry) => (
+                <ApprovalHistoryRow key={entry.id} entry={entry} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -239,5 +290,46 @@ function ChevronGlyph() {
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ width: "10px", height: "10px" }}>
       <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function statusLabel(status: string): string {
+  if (status === "in_review") return "In Review";
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  return "Draft";
+}
+
+function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
+    new Date(date)
+  );
+}
+
+function ApprovalHistoryRow({ entry }: { entry: ApprovalHistoryEntry }) {
+  const fromLabel = entry.fromStatus ? statusLabel(entry.fromStatus) : null;
+  const toLabel = statusLabel(entry.toStatus);
+
+  return (
+    <div style={{ fontSize: "11px", color: "var(--ink-muted)", lineHeight: "1.4" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+        {fromLabel && (
+          <>
+            <span style={{ color: "var(--ink)" }}>{fromLabel}</span>
+            <span aria-hidden="true">→</span>
+          </>
+        )}
+        <span style={{ color: "var(--ink)", fontWeight: 500 }}>{toLabel}</span>
+        <span style={{ color: "var(--ink-muted)" }}>·</span>
+        <time dateTime={new Date(entry.createdAt).toISOString()} style={{ color: "var(--ink-muted)" }}>
+          {formatDate(entry.createdAt)}
+        </time>
+      </div>
+      {entry.note && (
+        <p style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontStyle: "italic" }}>
+          &ldquo;{entry.note}&rdquo;
+        </p>
+      )}
+    </div>
   );
 }

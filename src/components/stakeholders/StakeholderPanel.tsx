@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { addStakeholder, removeStakeholder, updateStakeholder } from "@/actions/stakeholders";
+import { addStakeholder, removeStakeholder, updateStakeholder, markStakeholderContacted } from "@/actions/stakeholders";
 import type { StakeholderRow } from "@/lib/db/stakeholders";
 import { StakeholderGraph } from "@/components/stakeholders/StakeholderGraph";
 import { DealPartyChecklist } from "@/components/stakeholders/DealPartyChecklist";
@@ -135,6 +135,26 @@ function getLastTouchLabel(stakeholder: StakeholderRow) {
   if (!meeting) return "No meetings yet";
   const type = MEETING_TYPE_LABELS[meeting.meetingType] ?? meeting.meetingType;
   return `${type} · ${formatDate(meeting.meetingDate)}`;
+}
+
+function getContactBadge(stakeholder: StakeholderRow): {
+  label: string;
+  color: string;
+  background: string;
+} | null {
+  if (!stakeholder.lastContactedAt) {
+    return { label: "Follow up", color: "var(--gold)", background: "var(--gold-soft)" };
+  }
+
+  const daysSinceContact = Math.floor(
+    (Date.now() - new Date(stakeholder.lastContactedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysSinceContact > 14) {
+    return { label: "Follow up", color: "var(--gold)", background: "var(--gold-soft)" };
+  }
+
+  return { label: "Recent", color: "var(--teal)", background: "var(--teal-soft)" };
 }
 
 function withDerivedFollowUp(stakeholder: StakeholderRow): StakeholderRow {
@@ -320,6 +340,7 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
             documentsOwed: [],
             documentsOwedCount: 0,
             lastContactAt: null,
+            lastContactedAt: null,
             lastMeetingOutcome: null,
             needsFollowUp: false,
             followUpReason: null,
@@ -417,8 +438,144 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
     });
   }
 
+  const OVERDUE_DAYS = 14;
+  const overdueStakeholders = stakeholders.filter((s) => {
+    const ref = s.lastContactedAt ?? s.lastContactAt;
+    if (!ref) return true;
+    const daysSince = Math.floor((Date.now() - new Date(ref).getTime()) / (1000 * 60 * 60 * 24));
+    return daysSince >= OVERDUE_DAYS;
+  });
+
   return (
     <div style={{ marginBottom: "40px" }}>
+      {/* Overdue Contacts */}
+      {overdueStakeholders.length > 0 && (
+        <div
+          style={{
+            backgroundColor: "var(--gold-soft)",
+            border: "1px solid var(--gold)",
+            borderRadius: "4px",
+            padding: "16px 20px",
+            marginBottom: "20px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--gold)",
+              margin: "0 0 12px",
+            }}
+          >
+            Overdue Contacts — {overdueStakeholders.length} contact{overdueStakeholders.length === 1 ? "" : "s"} not reached in 14+ days
+          </p>
+          <div style={{ display: "grid", gap: "8px" }}>
+            {overdueStakeholders.map((s) => {
+              const ref = s.lastContactedAt ?? s.lastContactAt;
+              const daysSince = ref
+                ? Math.floor((Date.now() - new Date(ref).getTime()) / (1000 * 60 * 60 * 24))
+                : null;
+              const roleLabel = ROLE_OPTIONS.find((r) => r.value === s.roleType)?.label ?? s.roleType;
+              return (
+                <div
+                  key={s.roleId}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "3px",
+                    padding: "10px 14px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                    <div>
+                      <span
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "var(--ink)",
+                          display: "block",
+                        }}
+                      >
+                        {s.name}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "9px",
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "var(--ink-muted)",
+                        }}
+                      >
+                        {roleLabel}
+                        {s.organizationName ? ` · ${s.organizationName}` : ""}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "10px",
+                        color: "var(--gold)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {daysSince !== null ? `${daysSince}d ago` : "Never contacted"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        startTransition(async () => {
+                          const result = await markStakeholderContacted({
+                            projectId,
+                            slug,
+                            stakeholderId: s.id,
+                            stakeholderName: s.name,
+                          });
+                          if (result.ok) {
+                            setStakeholders((prev) =>
+                              prev.map((sh) =>
+                                sh.id === s.id ? { ...sh, lastContactedAt: new Date() } : sh
+                              )
+                            );
+                          }
+                        });
+                      }}
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        fontWeight: 500,
+                        letterSpacing: "0.10em",
+                        textTransform: "uppercase",
+                        color: "var(--teal)",
+                        backgroundColor: "var(--teal-soft)",
+                        border: "1px solid var(--teal)",
+                        borderRadius: "3px",
+                        padding: "5px 10px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Mark Contacted
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Deal Party Checklist */}
       <DealPartyChecklist
         projectId={projectId}
@@ -730,13 +887,22 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
             const recommendedFollowUp = getRecommendedFollowUpDate(s);
 
             return (
-              <button
+              <div
                 key={s.roleId}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setError(null);
                   setSelectedRoleId(s.roleId);
                   setConfirmingDelete(false);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setError(null);
+                    setSelectedRoleId(s.roleId);
+                    setConfirmingDelete(false);
+                  }
                 }}
                 style={{
                   backgroundColor: "var(--bg-card)",
@@ -771,17 +937,41 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
                 </span>
 
                 {/* Name */}
-                <p
-                  style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    margin: "0 0 10px",
-                  }}
-                >
-                  {s.name}
-                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "10px" }}>
+                  <p
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "16px",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      margin: 0,
+                    }}
+                  >
+                    {s.name}
+                  </p>
+                  {(() => {
+                    const badge = getContactBadge(s);
+                    return badge ? (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "8px",
+                          fontWeight: 500,
+                          letterSpacing: "0.10em",
+                          textTransform: "uppercase",
+                          color: badge.color,
+                          backgroundColor: badge.background,
+                          padding: "2px 6px",
+                          borderRadius: "2px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {badge.label}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
 
                 {/* Contact */}
                 <div style={{ display: "grid", gap: "8px", marginBottom: "10px" }}>
@@ -901,6 +1091,7 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
                     gap: "12px",
                     paddingTop: "10px",
                     borderTop: "1px solid var(--border)",
+                    marginBottom: "8px",
                   }}
                 >
                     <span
@@ -926,7 +1117,45 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
                     →
                   </span>
                 </div>
-              </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startTransition(async () => {
+                      const result = await markStakeholderContacted({
+                        projectId,
+                        slug,
+                        stakeholderId: s.id,
+                        stakeholderName: s.name,
+                      });
+                      if (result.ok) {
+                        setStakeholders((prev) =>
+                          prev.map((sh) =>
+                            sh.id === s.id ? { ...sh, lastContactedAt: new Date() } : sh
+                          )
+                        );
+                      }
+                    });
+                  }}
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "10px",
+                    fontWeight: 500,
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "var(--teal)",
+                    backgroundColor: "var(--teal-soft)",
+                    border: "1px solid var(--teal)",
+                    borderRadius: "3px",
+                    padding: "6px 12px",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  Mark contacted
+                </button>
+              </div>
             );
           })}
         </div>

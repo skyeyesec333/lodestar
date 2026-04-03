@@ -1,4 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+vi.mock("@/lib/db", () => ({ db: {} }));
+vi.mock("../scoring/trendline", () => ({
+  computeReadinessTrendline: vi.fn(),
+}));
 import { computeReadiness } from "./index";
 import { EXIM_REQUIREMENTS, LOI_CRITICAL_IDS, TOTAL_WEIGHT } from "../exim/requirements";
 import type { RequirementStatusValue } from "../../types/requirements";

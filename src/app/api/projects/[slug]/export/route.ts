@@ -58,7 +58,7 @@ export async function GET(
     milestonesResult,
     dealPartiesResult,
   ] = await Promise.all([
-    getProjectRequirements(project.id),
+    getProjectRequirements(project.id, project.dealType, project.sector),
     getProjectStakeholders(project.id),
     getProjectDocuments(project.id),
     getProjectFunders(project.id),

@@ -157,3 +157,6 @@ export function computeReadiness(
 // Re-export for code that imports these directly from scoring/index
 export { LOI_CRITICAL_IDS };
 export type { ReadinessResult };
+
+export { computeReadinessTrendline } from "./trendline";
+export type { ReadinessTrendline } from "./trendline";
