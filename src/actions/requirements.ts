@@ -19,6 +19,7 @@ import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
 import type { Result, AppError } from "@/types";
 import type { RequirementStatusValue } from "@/types/requirements";
 import { assertProjectAccess } from "@/lib/db/project-access";
+import { sendEmail, sendRequirementAssignedEmail } from "@/lib/notifications/email";
 
 const STATUS_VALUES = [
   "not_started",
@@ -141,6 +142,24 @@ export async function updateRequirementStatus(
   }
 
   revalidatePath(`/projects/${access.value.slug}`);
+
+  db.projectRequirement.findUnique({
+    where: { projectId_requirementId: { projectId, requirementId } },
+    select: {
+      responsibleStakeholder: { select: { email: true } },
+      project: { select: { name: true } },
+    },
+  }).then((row) => {
+    const email = row?.responsibleStakeholder?.email;
+    const projectName = row?.project?.name;
+    if (email && projectName) {
+      sendEmail({
+        to: email,
+        subject: `Requirement updated: ${reqName}`,
+        html: `<p>The requirement <strong>${reqName}</strong> on <strong>${projectName}</strong> has been updated to <strong>${REQUIREMENT_STATUS_LABELS[status]}</strong>.</p>`,
+      }).catch(() => {});
+    }
+  }).catch(() => {});
 
   return { ok: true, value: { scoreBps } };
 }
@@ -424,6 +443,32 @@ export async function updateRequirementResponsibilityAction(
     `Responsibility updated for requirement ${requirementId}`,
     { requirementId }
   ).catch(() => {});
+
+  if (responsibleStakeholderId) {
+    const newStakeholderId = responsibleStakeholderId;
+    db.stakeholder.findUnique({
+      where: { id: newStakeholderId },
+      select: { email: true },
+    }).then(async (stakeholder) => {
+      if (!stakeholder?.email) return;
+      const proj = await db.project.findUnique({
+        where: { id: projectId },
+        select: { name: true, slug: true },
+      });
+      if (!proj) return;
+      const reqDef = await db.projectRequirement.findUnique({
+        where: { projectId_requirementId: { projectId, requirementId } },
+        select: { requirement: { select: { name: true } } },
+      });
+      const reqName = reqDef?.requirement?.name ?? requirementId;
+      sendRequirementAssignedEmail({
+        to: stakeholder.email,
+        projectName: proj.name,
+        requirementName: reqName,
+        projectSlug: proj.slug,
+      }).catch(() => {});
+    }).catch(() => {});
+  }
 
   revalidatePath(`/projects/${slug || access.value.slug}`);
 

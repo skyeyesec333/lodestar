@@ -63,6 +63,15 @@ export default async function DashboardLayout({
           </Link>
 
           <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "16px",
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+          <div
             className="ls-nav-links"
             style={{
               display: "flex",
@@ -70,6 +79,7 @@ export default async function DashboardLayout({
               gap: "16px",
               minWidth: 0,
               overflow: "hidden",
+              flex: 1,
             }}
           >
             <Link
@@ -120,15 +130,16 @@ export default async function DashboardLayout({
               Templates
             </Link>
             <SearchBar />
-            <NotificationBell />
-            <ThemeSwitcher current={theme} />
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: { width: "28px", height: "28px" },
-                },
-              }}
-            />
+          </div>
+          <NotificationBell />
+          <ThemeSwitcher current={theme} />
+          <UserButton
+            appearance={{
+              elements: {
+                avatarBox: { width: "28px", height: "28px" },
+              },
+            }}
+          />
           </div>
         </div>
       </header>

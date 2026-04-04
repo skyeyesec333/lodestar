@@ -11,7 +11,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useBeacon, type BeaconTab } from "./BeaconProvider";
-import type { ChatCitation, ChatRuntimeContext } from "@/types";
+import type { ChatCitation, ChatRuntimeContext, BeaconSignal, BeaconDocumentCoverage } from "@/types";
 import type { ChatPresetQuestion } from "@/components/chat/ChatWidget";
 import { getWorkspaceChatPresets } from "@/lib/ai/chat-presets";
 
@@ -41,69 +41,10 @@ export interface BeaconPanelProps {
   dealType?: string;
   readinessPct?: number;
   loiBlockerCount?: number;
+  signals?: BeaconSignal[];
+  documentCoverage?: BeaconDocumentCoverage[];
 }
 
-// ─── Mock data for non-assistant tabs ───────────────────────────────────────
-
-const MOCK_SIGNALS = [
-  {
-    level: "critical" as const,
-    label: "EPC Contract",
-    detail: "3d overdue — no linked evidence",
-    category: "Contracts",
-  },
-  {
-    level: "critical" as const,
-    label: "Financial Model",
-    detail: "No assigned owner",
-    category: "Financial",
-  },
-  {
-    level: "warning" as const,
-    label: "Off-take Agreement",
-    detail: "Due in 12d",
-    category: "Contracts",
-  },
-  {
-    level: "warning" as const,
-    label: "Environmental Impact Study",
-    detail: "In progress — no linked file",
-    category: "Studies",
-  },
-  {
-    level: "info" as const,
-    label: "Corporate Authorization",
-    detail: "Draft stage",
-    category: "Corporate",
-  },
-];
-
-const MOCK_DOCUMENTS = [
-  {
-    category: "Contracts",
-    covered: 2,
-    total: 6,
-    gap: ["EPC Contract", "Off-take Agreement", "Implementation Agreement", "Concession Agreement"],
-  },
-  {
-    category: "Financial",
-    covered: 1,
-    total: 4,
-    gap: ["Financial Model", "Financial Projections", "Debt Term Sheet"],
-  },
-  {
-    category: "Studies",
-    covered: 0,
-    total: 3,
-    gap: ["Environmental Impact Study", "Feasibility Study", "Market Study"],
-  },
-  {
-    category: "Permits",
-    covered: 3,
-    total: 4,
-    gap: ["Grid Connection Permit"],
-  },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -582,7 +523,7 @@ function AssistantTab({
 
 // ─── Signals tab ──────────────────────────────────────────────────────────────
 
-function SignalsTab({ readinessPct, loiBlockerCount }: Pick<BeaconPanelProps, "readinessPct" | "loiBlockerCount">) {
+function SignalsTab({ readinessPct, loiBlockerCount, signals }: Pick<BeaconPanelProps, "readinessPct" | "loiBlockerCount" | "signals">) {
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Summary row */}
@@ -632,7 +573,12 @@ function SignalsTab({ readinessPct, loiBlockerCount }: Pick<BeaconPanelProps, "r
           Top pressure items
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          {MOCK_SIGNALS.map((s, i) => (
+          {(signals ?? []).length === 0 && (
+            <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-muted)" }}>
+              No active pressure items — all requirements are on track.
+            </p>
+          )}
+          {(signals ?? []).map((s, i) => (
             <div
               key={i}
               style={{
@@ -693,8 +639,9 @@ function SignalsTab({ readinessPct, loiBlockerCount }: Pick<BeaconPanelProps, "r
 
 // ─── Documents tab ────────────────────────────────────────────────────────────
 
-function DocumentsTab() {
+function DocumentsTab({ documentCoverage }: Pick<BeaconPanelProps, "documentCoverage">) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const coverage = documentCoverage ?? [];
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -702,7 +649,13 @@ function DocumentsTab() {
         Coverage by category
       </p>
 
-      {MOCK_DOCUMENTS.map((cat) => {
+      {coverage.length === 0 && (
+        <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-muted)" }}>
+          No requirement categories found for this project.
+        </p>
+      )}
+
+      {coverage.map((cat) => {
         const pct = Math.round((cat.covered / cat.total) * 100);
         const isOpen = expanded === cat.category;
         return (
@@ -1017,9 +970,10 @@ export function BeaconPanel(props: BeaconPanelProps) {
               <SignalsTab
                 readinessPct={props.readinessPct}
                 loiBlockerCount={props.loiBlockerCount}
+                signals={props.signals}
               />
             )}
-            {activeTab === "documents" && <DocumentsTab />}
+            {activeTab === "documents" && <DocumentsTab documentCoverage={props.documentCoverage} />}
           </motion.aside>
         )}
       </AnimatePresence>

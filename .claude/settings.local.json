@@ -35,7 +35,13 @@
       "Bash(sed -i '' 's/id=\"section-collaborators\" style={{ marginBottom: \"32px\" }}/id=\"section-collaborators\" style={{ marginBottom: \"32px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
       "Bash(sed -i '' 's/id=\"section-overview\" style={{ marginBottom: \"40px\" }}/id=\"section-overview\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
       "Bash(sed -i '' 's/id=\"section-concept\" style={{ marginBottom: \"40px\" }}/id=\"section-concept\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
-      "Bash(sed -i '' 's/id=\"section-stakeholders\" style={{ marginBottom: \"40px\" }}/id=\"section-stakeholders\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')"
+      "Bash(sed -i '' 's/id=\"section-stakeholders\" style={{ marginBottom: \"40px\" }}/id=\"section-stakeholders\" style={{ marginBottom: \"40px\", scrollMarginTop: \"108px\" }}/g' '/Users/bryanalexandros/Documents/lodestar/src/app/\\(dashboard\\)/projects/[slug]/page.tsx')",
+      "Bash(DATABASE_URL=\"postgresql://postgres:Yadayadayada!1@db.jldvikzoevadtnnhdltw.supabase.co:5432/postgres\" npx prisma db push)",
+      "Bash(git merge:*)",
+      "Bash(git -C /Users/bryanalexandros/Documents/lodestar/.claude/worktrees/agent-a7ec3cee log --oneline 3758a4a..HEAD)",
+      "Bash(git -C /Users/bryanalexandros/Documents/lodestar/.claude/worktrees/agent-a7ec3cee log --oneline -5)",
+      "Bash(git -C /Users/bryanalexandros/Documents/lodestar/.claude/worktrees/agent-a15627c1 log --oneline -5)",
+      "Bash(git -C /Users/bryanalexandros/Documents/lodestar/.claude/worktrees/agent-ac749fd3 log --oneline -5)"
     ]
   }
 }

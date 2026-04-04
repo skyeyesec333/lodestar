@@ -145,6 +145,24 @@ export type DealConfig = {
 
 // ── Covenant domain types ────────────────────────────────────────────────────
 
+// ── Beacon AI panel types ─────────────────────────────────────────────────────
+
+export type BeaconSignalLevel = "critical" | "warning" | "info";
+
+export type BeaconSignal = {
+  level: BeaconSignalLevel;
+  label: string;
+  detail: string;
+  category: string;
+};
+
+export type BeaconDocumentCoverage = {
+  category: string;
+  covered: number;
+  total: number;
+  gap: string[];
+};
+
 export type Covenant = {
   id: string;
   projectId: string;

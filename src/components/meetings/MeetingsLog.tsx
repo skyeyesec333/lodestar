@@ -14,13 +14,14 @@ import { ActionItemsPanel } from "@/components/meetings/ActionItemsPanel";
 
 // ── Provider Connector Banner ─────────────────────────────────────────────────
 
-type Provider = { id: string; name: string; color: string; icon: React.ReactNode };
+type Provider = { id: string; name: string; color: string; description: string; icon: React.ReactNode };
 
 const PROVIDERS: Provider[] = [
   {
     id: "zoom",
     name: "Zoom",
     color: "#2D8CFF",
+    description: "Automatically import transcripts from Zoom cloud recordings into your meeting log.",
     icon: (
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
         <rect width="40" height="40" rx="8" fill="#2D8CFF"/>
@@ -32,6 +33,7 @@ const PROVIDERS: Provider[] = [
     id: "teams",
     name: "Teams",
     color: "#5558AF",
+    description: "Pull meeting notes and transcripts directly from your Microsoft Teams channels and recordings.",
     icon: (
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
         <rect width="40" height="40" rx="8" fill="#5558AF"/>
@@ -46,6 +48,7 @@ const PROVIDERS: Provider[] = [
     id: "meet",
     name: "Meet",
     color: "#00897B",
+    description: "Import Google Meet call summaries and transcripts into your project meeting log automatically.",
     icon: (
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
         <rect width="40" height="40" rx="8" fill="#fff"/>
@@ -59,6 +62,7 @@ const PROVIDERS: Provider[] = [
     id: "notion",
     name: "Notion",
     color: "#000",
+    description: "Sync meeting notes written in Notion pages directly into your Lodestar project timeline.",
     icon: (
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
         <rect width="40" height="40" rx="8" fill="#fff" stroke="#e5e5e5"/>
@@ -73,6 +77,7 @@ const PROVIDERS: Provider[] = [
     id: "otter",
     name: "Otter.ai",
     color: "#1A73E8",
+    description: "Connect Otter.ai to automatically import AI-generated transcripts and action items from recorded calls.",
     icon: (
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
         <rect width="40" height="40" rx="8" fill="#1A73E8"/>
@@ -91,8 +96,18 @@ const PROVIDERS: Provider[] = [
 function ProviderConnector() {
   const [dismissed, setDismissed] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [activeProvider, setActiveProvider] = useState<Provider | null>(null);
+  const [notified, setNotified] = useState<Set<string>>(new Set());
 
   if (dismissed) return null;
+
+  function handleProviderClick(p: Provider) {
+    setActiveProvider((prev) => (prev?.id === p.id ? null : p));
+  }
+
+  function handleNotify(p: Provider) {
+    setNotified((prev) => new Set(prev).add(p.id));
+  }
 
   return (
     <div
@@ -162,49 +177,53 @@ function ProviderConnector() {
           padding: "3px 8px",
           flexShrink: 0,
         }}>
-          Coming Soon
+          Beta integrations — click to learn more
         </span>
       </div>
 
       {/* Provider icons */}
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        {PROVIDERS.map((p) => (
-          <button
-            key={p.id}
-            title={p.name}
-            disabled
-            onMouseEnter={() => setHovered(p.id)}
-            onMouseLeave={() => setHovered(null)}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "6px",
-              background: "none",
-              border: `1px solid ${hovered === p.id ? "var(--border-strong)" : "var(--border)"}`,
-              borderRadius: "8px",
-              padding: "12px 16px",
-              cursor: "not-allowed",
-              opacity: hovered === p.id ? 1 : 0.75,
-              transition: "opacity 0.15s, border-color 0.15s, box-shadow 0.15s",
-              boxShadow: hovered === p.id ? "0 2px 10px rgba(0,0,0,0.08)" : "none",
-              minWidth: "68px",
-            }}
-          >
-            {p.icon}
-            <span style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "8px",
-              fontWeight: 500,
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              color: "var(--ink-muted)",
-              whiteSpace: "nowrap",
-            }}>
-              {p.name}
-            </span>
-          </button>
-        ))}
+        {PROVIDERS.map((p) => {
+          const isActive = activeProvider?.id === p.id;
+          const isHovered = hovered === p.id;
+          return (
+            <button
+              key={p.id}
+              title={p.name}
+              onClick={() => handleProviderClick(p)}
+              onMouseEnter={() => setHovered(p.id)}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "6px",
+                background: isActive ? "var(--bg)" : "none",
+                border: `1px solid ${isActive || isHovered ? "var(--border-strong)" : "var(--border)"}`,
+                borderRadius: "8px",
+                padding: "12px 16px",
+                cursor: "pointer",
+                opacity: isActive || isHovered ? 1 : 0.75,
+                transition: "opacity 0.15s, border-color 0.15s, box-shadow 0.15s",
+                boxShadow: isActive || isHovered ? "0 2px 10px rgba(0,0,0,0.08)" : "none",
+                minWidth: "68px",
+              }}
+            >
+              {p.icon}
+              <span style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "8px",
+                fontWeight: 500,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--ink-muted)",
+                whiteSpace: "nowrap",
+              }}>
+                {p.name}
+              </span>
+            </button>
+          );
+        })}
 
         {/* + More placeholder */}
         <button
@@ -237,6 +256,88 @@ function ProviderConnector() {
           </span>
         </button>
       </div>
+
+      {/* Inline detail panel */}
+      {activeProvider && (
+        <div
+          style={{
+            marginTop: "16px",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            padding: "16px 18px",
+            backgroundColor: "var(--bg)",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "14px",
+            animation: "fadeSlideIn 0.15s ease",
+          }}
+        >
+          <div style={{ flexShrink: 0, marginTop: "2px" }}>{activeProvider.icon}</div>
+          <div style={{ flex: 1 }}>
+            <p style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--ink)",
+              margin: "0 0 4px",
+            }}>
+              {activeProvider.name}
+            </p>
+            <p style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "13px",
+              color: "var(--ink-mid)",
+              margin: "0 0 12px",
+              lineHeight: 1.5,
+            }}>
+              {activeProvider.description}
+            </p>
+            {notified.has(activeProvider.id) ? (
+              <p style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                color: "var(--teal)",
+                margin: 0,
+              }}>
+                Got it — we&apos;ll let you know when {activeProvider.name} is ready.
+              </p>
+            ) : (
+              <button
+                onClick={() => handleNotify(activeProvider)}
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  color: "var(--teal)",
+                  background: "none",
+                  border: "1px solid var(--teal)",
+                  borderRadius: "4px",
+                  padding: "5px 12px",
+                  cursor: "pointer",
+                }}
+              >
+                Notify me when available
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setActiveProvider(null)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--ink-muted)",
+              fontSize: "16px",
+              lineHeight: 1,
+              padding: "2px 4px",
+              flexShrink: 0,
+            }}
+            title="Close"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -789,6 +890,8 @@ function ExtractInsightsPanel({
   const [result, setResult] = useState<MeetingExtractionResult | null>(null);
   const [addingIndex, setAddingIndex] = useState<number | null>(null);
   const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
+  const [assigneeMap, setAssigneeMap] = useState<Record<number, string>>({});
+  const [reqMap, setReqMap] = useState<Record<number, string>>({});
   const [, startTransition] = useTransition();
 
   async function handleExtract() {
@@ -831,8 +934,8 @@ function ExtractInsightsPanel({
         description: item.description ?? null,
         priority: item.priority,
         dueDate: null,
-        assignedToId: null,
-        requirementId: item.requirementId ?? null,
+        assignedToId: assigneeMap[index] ?? null,
+        requirementId: reqMap[index] ?? item.requirementId ?? null,
       });
       if (result.ok) {
         onActionItemAdded(result.value);
@@ -866,10 +969,6 @@ function ExtractInsightsPanel({
     display: "block",
     marginBottom: "6px",
   };
-
-  // Suppress unused variable warning — stakeholders prop reserved for future assignee matching
-  void stakeholders;
-  void requirements;
 
   return (
     <div
@@ -1065,6 +1164,58 @@ function ExtractInsightsPanel({
                           >
                             {item.priority}
                           </span>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+                          <select
+                            value={assigneeMap[i] ?? ""}
+                            onChange={(e) =>
+                              setAssigneeMap((prev) => ({ ...prev, [i]: e.target.value }))
+                            }
+                            disabled={addedIndices.has(i)}
+                            style={{
+                              fontFamily: "'Inter', sans-serif",
+                              fontSize: "12px",
+                              color: "var(--ink)",
+                              backgroundColor: "var(--bg)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "3px",
+                              padding: "4px 6px",
+                              minWidth: "140px",
+                            }}
+                          >
+                            <option value="">Assign to…</option>
+                            {stakeholders.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}{s.title ? ` — ${s.title}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          {requirements && requirements.length > 0 && (
+                            <select
+                              value={reqMap[i] ?? item.requirementId ?? ""}
+                              onChange={(e) =>
+                                setReqMap((prev) => ({ ...prev, [i]: e.target.value }))
+                              }
+                              disabled={addedIndices.has(i)}
+                              style={{
+                                fontFamily: "'Inter', sans-serif",
+                                fontSize: "12px",
+                                color: "var(--ink)",
+                                backgroundColor: "var(--bg)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "3px",
+                                padding: "4px 6px",
+                                minWidth: "160px",
+                              }}
+                            >
+                              <option value="">Link requirement…</option>
+                              {requirements.map((r) => (
+                                <option key={r.requirementId} value={r.requirementId}>
+                                  {r.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       </div>
                       <button

@@ -547,6 +547,70 @@ export default async function ProjectPage({
     fatalFlaws: concept?.fatalFlaws,
   });
 
+  // ── Beacon signals: derive from live requirement data ──────────────────────
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const FOURTEEN_DAYS_MS = 14 * 86_400_000;
+  const beaconSignals: import("@/types").BeaconSignal[] = (() => {
+    const signals: import("@/types").BeaconSignal[] = [];
+    for (const row of rows) {
+      if (row.isApplicable === false) continue;
+      const isDone = ["substantially_final", "executed", "waived"].includes(row.status);
+      if (isDone) continue;
+      const isLoiBlocker = loiBlockers.includes(row.requirementId);
+      const hasEvidence =
+        documents.some((d) => d.projectRequirementId === row.projectRequirementId) ||
+        externalEvidence.some((e) => e.projectRequirementId === row.projectRequirementId);
+      const hasOwner = !!row.responsibleStakeholderId || !!row.responsibleOrganizationId;
+      const targetMs = row.targetDate ? new Date(row.targetDate).setHours(0, 0, 0, 0) : null;
+      const isOverdue = targetMs !== null && targetMs < today.getTime();
+      const isDueSoon = targetMs !== null && !isOverdue && targetMs - today.getTime() <= FOURTEEN_DAYS_MS;
+
+      let level: import("@/types").BeaconSignalLevel;
+      let detail: string;
+
+      if (isLoiBlocker && (isOverdue || !hasOwner || !hasEvidence)) {
+        level = "critical";
+        if (isOverdue) detail = `${Math.ceil((today.getTime() - targetMs!) / 86_400_000)}d overdue${!hasEvidence ? " — no linked evidence" : ""}`;
+        else if (!hasOwner) detail = "No assigned owner";
+        else detail = "No linked evidence";
+      } else if (!hasEvidence && (isDueSoon || row.status === "in_progress")) {
+        level = "warning";
+        detail = isDueSoon
+          ? `Due in ${Math.ceil((targetMs! - today.getTime()) / 86_400_000)}d`
+          : "In progress — no linked file";
+      } else if (!hasOwner && row.status === "not_started") {
+        level = "info";
+        detail = "Draft stage";
+      } else {
+        continue;
+      }
+
+      signals.push({
+        level,
+        label: row.name,
+        detail,
+        category: CATEGORY_LABELS_LOCAL[row.category] ?? row.category,
+      });
+    }
+    // Sort: critical first, then warning, then info — cap at 8
+    const ORDER: Record<import("@/types").BeaconSignalLevel, number> = { critical: 0, warning: 1, info: 2 };
+    return signals.sort((a, b) => ORDER[a.level] - ORDER[b.level]).slice(0, 8);
+  })();
+
+  // ── Beacon document coverage: derive from categoryBreakdown + evidenceMissingRows ──
+  const beaconDocumentCoverage: import("@/types").BeaconDocumentCoverage[] = categoryBreakdown.map((cat) => {
+    const gaps = evidenceMissingRows
+      .filter((r) => r.category === cat.category)
+      .map((r) => r.name);
+    return {
+      category: cat.label,
+      covered: cat.completed,
+      total: cat.total,
+      gap: gaps,
+    };
+  });
+
   return (
     <BeaconProvider>
     <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
@@ -1802,6 +1866,8 @@ export default async function ProjectPage({
       dealType={project.dealType}
       readinessPct={scoreBps / 100}
       loiBlockerCount={loiBlockers.length}
+      signals={beaconSignals}
+      documentCoverage={beaconDocumentCoverage}
     />
     </BeaconProvider>
   );
