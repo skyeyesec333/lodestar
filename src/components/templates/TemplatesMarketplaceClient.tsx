@@ -135,8 +135,9 @@ export function TemplatesMarketplaceClient({ templates }: Props) {
           <p style={kickerStyle}>Template marketplace</p>
           <h2 style={heroTitleStyle}>Start from a structure that already matches the deal</h2>
           <p style={heroBodyStyle}>
-            This placeholder marketplace will eventually let sponsors, banks, advisors, and the
-            Lodestar community publish workspace templates for repeatable deal structures.
+            Browse structures built for EXIM project finance, development finance, and private
+            equity deals. More templates from banks, advisors, and the Lodestar community are on the
+            way.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "18px" }}>
             <span style={statPillStyle}>Featured templates: {featured.length}</span>

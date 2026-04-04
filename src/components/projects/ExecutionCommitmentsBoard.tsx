@@ -259,7 +259,7 @@ export function ExecutionCommitmentsBoard({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)",
+            gridTemplateColumns: "minmax(0, 1.2fr) minmax(220px, 0.8fr)",
             gap: "18px",
           }}
         >

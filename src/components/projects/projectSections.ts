@@ -5,6 +5,7 @@ export type NavSection = {
 
 export const PROJECT_SECTIONS: NavSection[] = [
   { id: "section-executive-summary", label: "Summary" },
+  { id: "section-collaborators", label: "Team" },
   { id: "section-overview", label: "Overview" },
   { id: "section-concept", label: "Concept" },
   { id: "section-stakeholders", label: "Parties" },

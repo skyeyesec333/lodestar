@@ -77,6 +77,7 @@ import { UpcomingMilestonesWidget } from "@/components/projects/UpcomingMileston
 import { ReadinessTrendlineChart } from "@/components/projects/ReadinessTrendlineChart";
 import { ApprovalsPanel } from "@/components/projects/ApprovalsPanel";
 import { StatusReportButton } from "@/components/projects/StatusReportButton";
+import { SectionSubNav } from "@/components/projects/SectionSubNav";
 
 function roleLabel(role: TeamMember["role"]): string {
   switch (role) {
@@ -943,7 +944,7 @@ export default async function ProjectPage({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: "18px",
           }}
         >
@@ -1454,6 +1455,13 @@ export default async function ProjectPage({
           </p>
         </div>
 
+        <SectionSubNav
+          items={[
+            { id: "section-readiness", label: "Readiness" },
+            { id: "section-gap-analysis", label: "Gap Analysis" },
+          ]}
+        />
+
         <section id="section-readiness">
           <ReadinessGauge
             scoreBps={scoreBps}
@@ -1642,6 +1650,12 @@ export default async function ProjectPage({
           </p>
         </div>
 
+        <SectionSubNav
+          items={[
+            { id: "section-requirements", label: "Requirements" },
+          ]}
+        />
+
         <WorkspaceFocusStrip
           items={[
             {
@@ -1740,6 +1754,15 @@ export default async function ProjectPage({
           </p>
         </div>
 
+        <SectionSubNav
+          items={[
+            { id: "section-meetings", label: "Meetings" },
+            { id: "section-activity", label: "Activity" },
+            { id: "section-pm-signals", label: "PM Signals" },
+            { id: "section-timeline", label: "Timeline" },
+          ]}
+        />
+
         <WorkspaceFocusStrip
           items={[
             {
@@ -1769,7 +1792,7 @@ export default async function ProjectPage({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
             gap: "20px",
             alignItems: "start",
             marginBottom: "24px",

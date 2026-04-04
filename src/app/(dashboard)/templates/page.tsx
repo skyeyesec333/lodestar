@@ -50,9 +50,9 @@ export default async function TemplatesPage() {
             margin: 0,
           }}
         >
-          Browse starter workspace templates for repeatable deal structures. This placeholder
-          surface is the first step toward official bank templates, private firm standards, and
-          open-source community contributions.
+          Start from a proven deal structure. Each template pre-populates your workspace with the
+          requirements, milestones, and document checklist for that deal type — so you spend less
+          time on setup and more time on execution.
         </p>
       </div>
 

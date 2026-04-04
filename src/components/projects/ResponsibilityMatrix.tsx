@@ -152,11 +152,13 @@ export function ResponsibilityMatrix({ requirements }: Props) {
                     overflow: "hidden",
                   }}
                 >
+                  <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", width: "100%" }}>
                   {/* Table header */}
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 120px 160px 100px 80px",
+                      minWidth: "620px",
                       gap: "0 16px",
                       padding: "8px 16px",
                       borderBottom: "1px solid var(--border)",
@@ -190,6 +192,7 @@ export function ResponsibilityMatrix({ requirements }: Props) {
                       style={{
                         display: "grid",
                         gridTemplateColumns: "1fr 120px 160px 100px 80px",
+                        minWidth: "620px",
                         gap: "0 16px",
                         padding: "10px 16px",
                         alignItems: "center",
@@ -292,6 +295,7 @@ export function ResponsibilityMatrix({ requirements }: Props) {
                       </span>
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
             );

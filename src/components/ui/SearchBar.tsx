@@ -230,7 +230,7 @@ export function SearchBar() {
   }
 
   return (
-    <div ref={containerRef} style={{ position: "relative", width: "208px" }}>
+    <div ref={containerRef} style={{ position: "relative", width: "min(208px, 100%)" }}>
       <div
         style={{
           position: "relative",
