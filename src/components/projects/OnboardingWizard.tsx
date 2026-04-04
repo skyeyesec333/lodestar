@@ -84,6 +84,8 @@ interface WizardState {
   fatalFlaws: string;
   nextActions: string;
   goNoGoRecommendation: string;
+  userRole: "sponsor" | "advisor" | "government" | "lender" | "";
+  subNationalLocation: string;
 }
 
 const initialState: WizardState = {
@@ -105,6 +107,8 @@ const initialState: WizardState = {
   fatalFlaws: "",
   nextActions: "",
   goNoGoRecommendation: "",
+  userRole: "",
+  subNationalLocation: "",
 };
 
 function mapTemplateSector(template: WorkspaceTemplate): SectorValue {
@@ -531,6 +535,8 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
         fatalFlaws: state.fatalFlaws.trim() || null,
         nextActions: state.nextActions.trim() || null,
         goNoGoRecommendation: state.goNoGoRecommendation.trim() || null,
+        userRole: state.userRole || null,
+        subNationalLocation: state.subNationalLocation.trim() || null,
       });
 
       if (!result.ok) {
@@ -789,6 +795,19 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                     </Field>
                   </div>
 
+                  <Field id="subNationalLocation" label="State / Province / Region (optional)">
+                    <input
+                      id="subNationalLocation"
+                      value={state.subNationalLocation}
+                      onChange={(event) => setField("subNationalLocation", event.target.value)}
+                      maxLength={120}
+                      placeholder="e.g. Lagos State, Nairobi County, Punjab"
+                      style={{ ...inputStyle, ...getFocusStyle("subNationalLocation") }}
+                      onFocus={() => setFocusedField("subNationalLocation")}
+                      onBlur={() => setFocusedField(null)}
+                    />
+                  </Field>
+
                   <Field id="description" label="One-sentence concept" required error={errors.description}>
                     <textarea
                       id="description"
@@ -807,6 +826,76 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                       onBlur={() => setFocusedField(null)}
                     />
                   </Field>
+
+                  <div style={{ marginTop: "4px" }}>
+                    <label
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        fontWeight: 500,
+                        letterSpacing: "0.10em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-muted)",
+                        display: "block",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Your role on this deal
+                    </label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      {(
+                        [
+                          { value: "sponsor", label: "Sponsor / Developer", desc: "I own or am developing the project" },
+                          { value: "advisor", label: "Advisor / Consultant", desc: "I advise the sponsor or lender" },
+                          { value: "lender", label: "Lender / Investor", desc: "I'm evaluating this for financing" },
+                          { value: "government", label: "Government / Offtaker", desc: "I represent a public entity or offtaker" },
+                        ] as const
+                      ).map((opt) => {
+                        const selected = state.userRole === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setField("userRole", opt.value)}
+                            style={{
+                              fontFamily: "'Inter', sans-serif",
+                              textAlign: "left",
+                              backgroundColor: selected ? "color-mix(in srgb, var(--teal) 8%, var(--bg))" : "var(--bg)",
+                              border: `1px solid ${selected ? "var(--teal)" : "var(--border)"}`,
+                              borderRadius: "4px",
+                              padding: "10px 12px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontFamily: "'DM Mono', monospace",
+                                fontSize: "10px",
+                                fontWeight: 500,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                color: selected ? "var(--teal)" : "var(--ink)",
+                                margin: "0 0 3px",
+                              }}
+                            >
+                              {opt.label}
+                            </p>
+                            <p
+                              style={{
+                                fontFamily: "'Inter', sans-serif",
+                                fontSize: "12px",
+                                color: "var(--ink-muted)",
+                                margin: 0,
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              {opt.desc}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <ContextBox label="Workspace seed">

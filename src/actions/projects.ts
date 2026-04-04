@@ -102,6 +102,8 @@ const createProjectSchema = z.object({
   fatalFlaws: z.string().max(2000).nullable().optional(),
   nextActions: z.string().max(2000).nullable().optional(),
   goNoGoRecommendation: z.string().max(2000).nullable().optional(),
+  userRole: z.enum(["sponsor", "advisor", "government", "lender"]).nullable().optional(),
+  subNationalLocation: z.string().max(120).nullable().optional(),
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
@@ -170,6 +172,8 @@ export async function createProject(
     fatalFlaws,
     nextActions,
     goNoGoRecommendation,
+    userRole,
+    subNationalLocation,
   } =
     parsed.data;
 
@@ -191,6 +195,8 @@ export async function createProject(
     targetLoiDate: targetLoiDate ?? null,
     targetCloseDate: targetCloseDate ?? null,
     ownerClerkId: userId,
+    userRole: userRole ?? null,
+    subNationalLocation: subNationalLocation ?? null,
   });
 
   if (!dbResult.ok) return dbResult;

@@ -2,15 +2,68 @@ type ChecklistItem = {
   label: string;
   complete: boolean;
   href: string;
-  hint: string;
+  hintKey: "stakeholder" | "date" | "document" | "thesis" | "meeting";
 };
 
 type Props = {
   items: ChecklistItem[];
   dealTypeLabel: string;
+  dealType: string;
 };
 
-export function SetupChecklist({ items, dealTypeLabel }: Props) {
+function getItemHints(dealType: string): {
+  stakeholder: string;
+  date: string;
+  document: string;
+  thesis: string;
+  meeting: string;
+} {
+  switch (dealType) {
+    case "exim_project_finance":
+      return {
+        stakeholder: "Add your EPC contractor (must be US-based), off-taker, or legal counsel",
+        date: "Set a target LOI date to activate urgency tracking",
+        document: "Upload your feasibility study or project information memorandum",
+        thesis: "Write a deal thesis that frames the EXIM financing rationale",
+        meeting: "Log your first stakeholder or EXIM officer meeting",
+      };
+    case "development_finance":
+      return {
+        stakeholder: "Add the IFC investment officer, your E&S consultant, or legal counsel",
+        date: "Set a target board approval date",
+        document: "Upload your concept note, feasibility study, or ESIA",
+        thesis: "Write a deal thesis that includes the development impact and additionality rationale",
+        meeting: "Log your first IFC concept review meeting or appraisal mission",
+      };
+    case "commercial_finance":
+      return {
+        stakeholder: "Add the lead arranger, your independent engineer, or legal counsel",
+        date: "Set a target credit approval date",
+        document: "Upload your financial model or information memorandum",
+        thesis: "Write a deal thesis that frames the credit story for lenders",
+        meeting: "Log your first bank meeting or mandate discussion",
+      };
+    case "private_equity":
+      return {
+        stakeholder: "Add the management team, co-investors, or financial advisor",
+        date: "Set a target IC approval or close date",
+        document: "Upload your investor deck, IM, or financial model",
+        thesis: "Write a deal thesis that frames the investment case for your IC",
+        meeting: "Log your first IC pre-screen or sponsor meeting",
+      };
+    default:
+      return {
+        stakeholder: "Add key project parties — sponsor, advisors, or counterparties",
+        date: "Set a target milestone date for your next major gate",
+        document: "Upload your core project documents",
+        thesis: "Write a deal thesis that captures the strategic rationale",
+        meeting: "Log your first stakeholder or counterpart meeting",
+      };
+  }
+}
+
+export function SetupChecklist({ items, dealTypeLabel, dealType }: Props) {
+  const hints = getItemHints(dealType);
   const allComplete = items.every((item) => item.complete);
   if (allComplete) return null;
 
@@ -131,7 +184,7 @@ export function SetupChecklist({ items, dealTypeLabel }: Props) {
                     lineHeight: 1.5,
                   }}
                 >
-                  {item.hint}
+                  {hints[item.hintKey]}
                 </p>
               )}
             </div>

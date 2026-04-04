@@ -39,6 +39,8 @@ export type Project = {
   actualCommitmentDate?: Date | null;
   actualCloseDate?: Date | null;
   ownerClerkId: string;
+  userRole: string | null;
+  subNationalLocation: string | null;
   cachedReadinessScore: number | null;
   cachedScoreUpdatedAt: Date | null;
   createdAt: Date;

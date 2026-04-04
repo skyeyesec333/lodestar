@@ -79,12 +79,14 @@ export function CollaboratorsPanel({
   ownerClerkId,
   currentUserId,
   initialMembers,
+  resolvedNames = {},
 }: {
   projectId: string;
   slug: string;
   ownerClerkId: string;
   currentUserId: string;
   initialMembers: ProjectMemberRow[];
+  resolvedNames?: Record<string, string>;
 }) {
   const [members, setMembers] = useState<ProjectMemberRow[]>(initialMembers);
   const [showInviteForm, setShowInviteForm] = useState(false);
@@ -152,7 +154,7 @@ export function CollaboratorsPanel({
   function handleRemove(member: ProjectMemberRow) {
     if (
       !confirm(
-        `Remove User •••${member.clerkUserId.slice(-4)} from this deal? They will lose access immediately.`
+        `Remove ${resolvedNames[member.clerkUserId] ?? `User •••${member.clerkUserId.slice(-4)}`} from this deal? They will lose access immediately.`
       )
     )
       return;
@@ -440,7 +442,7 @@ export function CollaboratorsPanel({
                 whiteSpace: "nowrap",
               }}
             >
-              {`User •••${ownerClerkId.slice(-4)}`}
+              {resolvedNames[ownerClerkId] ?? `User •••${ownerClerkId.slice(-4)}`}
             </span>
             {ownerClerkId === currentUserId && (
               <span
@@ -493,7 +495,7 @@ export function CollaboratorsPanel({
                   whiteSpace: "nowrap",
                 }}
               >
-                {`User •••${member.clerkUserId.slice(-4)}`}
+                {resolvedNames[member.clerkUserId] ?? `User •••${member.clerkUserId.slice(-4)}`}
               </span>
               {member.clerkUserId === currentUserId && (
                 <span

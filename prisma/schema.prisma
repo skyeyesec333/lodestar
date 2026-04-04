@@ -57,6 +57,11 @@ model Project {
   /// Which EXIM program path this project is pursuing. Affects content thresholds and applicable requirements.
   programPath           ProgramPath              @default(standard)
   dealType              DealType                 @default(exim_project_finance)
+  /// Role of the user who created this workspace. Conditions wizard guidance and onboarding content.
+  /// Values: "sponsor" | "advisor" | "government" | "lender" | null (legacy)
+  userRole              String?
+  /// Sub-national location within the deal country (state, province, region, city).
+  subNationalLocation   String?
   actionItems           ActionItem[]
   activityEvents        ActivityEvent[]
   approvals             Approval[]

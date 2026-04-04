@@ -8,6 +8,7 @@ import { getProjectRequirements } from "@/lib/db/requirements";
 import { computeReadiness } from "@/lib/scoring/index";
 import { getProgramConfig } from "@/lib/requirements/index";
 import { countryLabel } from "@/lib/projects/country-label";
+import { resolveClerkUsers } from "@/lib/clerk/resolve-users";
 import { ReadinessGauge } from "@/components/projects/ReadinessGauge";
 import { StageStepper } from "@/components/projects/StageStepper";
 import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
@@ -103,25 +104,28 @@ function fallbackMemberName(clerkUserId: string, role: TeamMember["role"]): stri
 
 function buildTeamMembers(
   ownerClerkId: string,
-  members: ProjectMemberRow[]
+  members: ProjectMemberRow[],
+  resolvedUsers: Map<string, { fullName: string; firstName: string; imageUrl: string }>
 ): TeamMember[] {
   const deduped = new Map<string, TeamMember>();
+  const ownerResolved = resolvedUsers.get(ownerClerkId);
   deduped.set(ownerClerkId, {
     clerkUserId: ownerClerkId,
-    name: fallbackMemberName(ownerClerkId, "owner"),
+    name: ownerResolved?.fullName ?? fallbackMemberName(ownerClerkId, "owner"),
     email: null,
-    imageUrl: null,
+    imageUrl: ownerResolved?.imageUrl ?? null,
     role: "owner",
   });
 
   for (const member of members) {
     const role = member.role === "editor" ? "editor" : "viewer";
     if (member.clerkUserId === ownerClerkId) continue;
+    const resolved = resolvedUsers.get(member.clerkUserId);
     deduped.set(member.clerkUserId, {
       clerkUserId: member.clerkUserId,
-      name: fallbackMemberName(member.clerkUserId, role),
+      name: resolved?.fullName ?? fallbackMemberName(member.clerkUserId, role),
       email: null,
-      imageUrl: null,
+      imageUrl: resolved?.imageUrl ?? null,
       role,
     });
   }
@@ -304,6 +308,12 @@ export default async function ProjectPage({
   const epcBids = epcBidsResult.ok ? epcBidsResult.value : [];
   const funders = fundersResult.ok ? fundersResult.value : [];
   const members = membersResult.ok ? membersResult.value : [];
+
+  const memberClerkIds = [
+    project.ownerClerkId,
+    ...members.map((m) => m.clerkUserId).filter((id) => id !== project.ownerClerkId),
+  ];
+  const resolvedUsers = await resolveClerkUsers(memberClerkIds);
   const dealParties = dealPartiesResult.ok ? dealPartiesResult.value : [];
   const milestones = milestonesResult.ok ? milestonesResult.value : [];
   const comments = commentsResult.ok ? commentsResult.value : [];
@@ -326,7 +336,7 @@ export default async function ProjectPage({
         : "viewer";
   const canEditProject = currentProjectRole === "owner";
   const canEditProjectContent = currentProjectRole !== "viewer";
-  const teamMembers = buildTeamMembers(project.ownerClerkId, members);
+  const teamMembers = buildTeamMembers(project.ownerClerkId, members, resolvedUsers);
   const actorName = teamMembers.find((member) => member.clerkUserId === userId)?.name;
   const teamMemberNamesById = Object.fromEntries(
     teamMembers.map((member) => [member.clerkUserId, member.name])
@@ -809,6 +819,9 @@ export default async function ProjectPage({
           ownerClerkId={project.ownerClerkId}
           currentUserId={userId}
           initialMembers={members}
+          resolvedNames={Object.fromEntries(
+            Array.from(resolvedUsers.entries()).map(([id, u]) => [id, u.fullName])
+          )}
         />
 
         <ShareLinksPanel
@@ -850,36 +863,37 @@ export default async function ProjectPage({
 
         <SetupChecklist
           dealTypeLabel={dealTypeLabel}
+          dealType={project.dealType}
           items={[
             {
               label: "Add a stakeholder",
               complete: stakeholders.length > 0,
               href: "#section-stakeholders",
-              hint: "Add your EPC contractor, off-taker, or legal counsel",
+              hintKey: "stakeholder",
             },
             {
               label: "Set a target date",
               complete: project.targetLoiDate != null || project.targetCloseDate != null,
               href: "#section-overview",
-              hint: "A target date activates velocity tracking and urgency alerts",
+              hintKey: "date",
             },
             {
               label: "Upload a document",
               complete: documents.length > 0,
               href: "#section-documents",
-              hint: "Upload your feasibility study, EPC term sheet, or off-take agreement",
+              hintKey: "document",
             },
             {
               label: "Write a deal thesis",
               complete: concept?.thesis != null && concept.thesis.trim().length > 0,
               href: "#section-concept",
-              hint: "A one-paragraph thesis frames the deal for your team and lenders",
+              hintKey: "thesis",
             },
             {
               label: "Log a meeting",
               complete: meetings.length > 0,
               href: "#section-execution",
-              hint: "Log your first stakeholder or lender meeting to start building the execution record",
+              hintKey: "meeting",
             },
           ]}
         />

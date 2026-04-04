@@ -65,6 +65,31 @@ function getActions(dealType: string): Action[] {
     ];
   }
 
+  if (dealType === "commercial_finance") {
+    return [
+      {
+        text: "Add the borrower, arranger, and any co-lenders to the Parties workspace",
+        anchor: "#section-stakeholders",
+      },
+      {
+        text: "Set a target financial close date to activate urgency tracking",
+        anchor: "#section-overview",
+      },
+      {
+        text: "Upload the credit memo or information memorandum in the Evidence workspace",
+        anchor: "#section-documents",
+      },
+      {
+        text: "Define the loan structure, tenor, and pricing in the Capital workspace",
+        anchor: "#section-capital",
+      },
+      {
+        text: "Write a deal thesis summarising the credit case in the Concept workspace",
+        anchor: "#section-concept",
+      },
+    ];
+  }
+
   if (dealType.startsWith("pe") || dealType === "private_equity") {
     return [
       {

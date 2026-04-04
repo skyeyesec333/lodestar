@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, X, Copy, Check, Loader2 } from "lucide-react";
+import { FileText, X, Copy, Check, Loader2, Download } from "lucide-react";
 import type { StatusReport } from "@/lib/ai/status-report";
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 type Props = {
   projectSlug: string;
@@ -66,6 +70,56 @@ export function StatusReportButton({ projectSlug }: Props) {
     await navigator.clipboard.writeText(buildClipboardText(report));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleDownloadPdf() {
+    if (!report) return;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${report.headline}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Georgia, serif; font-size: 11pt; color: #111; padding: 48px; max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 18pt; font-weight: normal; margin-bottom: 6px; }
+    .meta { font-size: 9pt; color: #666; margin-bottom: 32px; font-family: monospace; }
+    h2 { font-size: 10pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #666; margin: 24px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    p { font-size: 11pt; line-height: 1.65; margin-bottom: 12px; }
+    ul { margin: 0 0 12px 20px; }
+    li { font-size: 11pt; line-height: 1.65; margin-bottom: 4px; }
+    .readiness { font-size: 13pt; font-weight: 600; margin-bottom: 8px; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(report.headline)}</h1>
+  <p class="meta">Deal Status Report · ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+  <h2>Deal Status</h2>
+  <p class="readiness">${escapeHtml(report.readinessSummary)}</p>
+  <h2>Progress</h2>
+  <p>${escapeHtml(report.progressSummary)}</p>
+  <h2>Key Risks</h2>
+  <ul>${report.keyRisks.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>
+  <h2>Next Steps</h2>
+  <ul>${report.nextSteps.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul>
+</body>
+</html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none";
+    document.body.appendChild(iframe);
+
+    iframe.contentDocument!.open();
+    iframe.contentDocument!.write(html);
+    iframe.contentDocument!.close();
+
+    iframe.onload = () => {
+      iframe.contentWindow!.focus();
+      iframe.contentWindow!.print();
+      setTimeout(() => document.body.removeChild(iframe), 1000);
+    };
   }
 
   return (
@@ -307,6 +361,21 @@ export function StatusReportButton({ projectSlug }: Props) {
                     >
                       {copied ? <Check size={13} /> : <Copy size={13} />}
                       {copied ? "Copied" : "Copy to clipboard"}
+                    </button>
+                    <button
+                      onClick={handleDownloadPdf}
+                      disabled={!report}
+                      style={{
+                        ...actionButtonStyle,
+                        backgroundColor: "var(--ink)",
+                        color: "var(--bg)",
+                        borderColor: "var(--ink)",
+                        opacity: report ? 1 : 0.4,
+                        cursor: report ? "pointer" : "not-allowed",
+                      }}
+                    >
+                      <Download size={13} />
+                      Download PDF
                     </button>
                     <button onClick={handleClose} style={actionButtonStyle}>
                       <X size={13} />

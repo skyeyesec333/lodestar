@@ -60,9 +60,23 @@ function stageVariant(
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function PortfolioPage() {
+const DEAL_TYPE_LABELS: Record<string, string> = {
+  exim_project_finance: "EXIM Project Finance",
+  commercial_finance: "Commercial Finance",
+  development_finance: "Development Finance",
+  private_equity: "Private Equity",
+  other: "Other",
+};
+
+export default async function PortfolioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ dealType?: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
+
+  const { dealType: dealTypeFilter } = await searchParams;
 
   const result = await getPortfolioStats(userId);
   const milestonesResult = await getUpcomingMilestones(userId);
@@ -91,9 +105,16 @@ export default async function PortfolioPage() {
     );
   }
 
-  const projects = result.value;
+  const allProjects = result.value;
+  const projects =
+    dealTypeFilter && dealTypeFilter !== "all"
+      ? allProjects.filter((p) => p.dealType === dealTypeFilter)
+      : allProjects;
 
-  if (projects.length === 0) {
+  // Derive available deal types from actual data for filter UI
+  const dealTypesInPortfolio = Array.from(new Set(allProjects.map((p) => p.dealType))).sort();
+
+  if (allProjects.length === 0) {
     return (
       <div className="space-y-6">
         <h1
@@ -134,8 +155,13 @@ export default async function PortfolioPage() {
     0n
   );
 
+  // Only include projects with at least one requirement in the avg — new blank workspaces
+  // start at 0% but shouldn't drag the portfolio average down artificially.
+  const scoredProjects = projects.filter((p) => p.totalRequirements > 0);
   const avgReadiness =
-    projects.reduce((sum, p) => sum + p.readinessScore, 0) / projects.length;
+    scoredProjects.length > 0
+      ? scoredProjects.reduce((sum, p) => sum + p.readinessScore, 0) / scoredProjects.length
+      : 0;
 
   const stageBreakdown = projects.reduce<Record<string, number>>((acc, p) => {
     acc[p.stage] = (acc[p.stage] ?? 0) + 1;
@@ -144,17 +170,75 @@ export default async function PortfolioPage() {
 
   return (
     <div className="space-y-8">
-      {/* Title */}
-      <h1
-        style={{
-          fontFamily: "'DM Serif Display', Georgia, serif",
-          fontSize: "28px",
-          fontWeight: 400,
-          color: "var(--text-primary)",
-        }}
-      >
-        Portfolio Overview
-      </h1>
+      {/* Title + filter */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+        <h1
+          style={{
+            fontFamily: "'DM Serif Display', Georgia, serif",
+            fontSize: "28px",
+            fontWeight: 400,
+            color: "var(--text-primary)",
+            margin: 0,
+          }}
+        >
+          Portfolio Overview
+        </h1>
+        {dealTypesInPortfolio.length > 1 && (
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <Link
+              href="/portfolio"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                padding: "5px 10px",
+                borderRadius: "999px",
+                border: `1px solid ${!dealTypeFilter || dealTypeFilter === "all" ? "var(--teal)" : "var(--border)"}`,
+                color: !dealTypeFilter || dealTypeFilter === "all" ? "var(--teal)" : "var(--text-secondary)",
+                backgroundColor: !dealTypeFilter || dealTypeFilter === "all" ? "var(--teal-soft)" : "transparent",
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+              }}
+            >
+              All
+            </Link>
+            {dealTypesInPortfolio.map((dt) => (
+              <Link
+                key={dt}
+                href={`/portfolio?dealType=${dt}`}
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  padding: "5px 10px",
+                  borderRadius: "999px",
+                  border: `1px solid ${dealTypeFilter === dt ? "var(--teal)" : "var(--border)"}`,
+                  color: dealTypeFilter === dt ? "var(--teal)" : "var(--text-secondary)",
+                  backgroundColor: dealTypeFilter === dt ? "var(--teal-soft)" : "transparent",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {DEAL_TYPE_LABELS[dt] ?? formatDealType(dt)}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* No results under active filter */}
+      {projects.length === 0 && (
+        <Card>
+          <CardContent className="pt-10 pb-10 text-center">
+            <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "13px", color: "var(--text-secondary)" }}>
+              No {DEAL_TYPE_LABELS[dealTypeFilter ?? ""] ?? dealTypeFilter} deals in your portfolio yet.{" "}
+              <Link href="/portfolio" className="underline">Clear filter</Link>
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

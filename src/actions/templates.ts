@@ -99,6 +99,8 @@ export async function cloneTemplate(
     targetLoiDate: null,
     targetCloseDate: null,
     ownerClerkId: userId,
+    userRole: null,
+    subNationalLocation: null,
   });
 
   if (!projectResult.ok) return projectResult;

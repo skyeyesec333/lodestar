@@ -286,12 +286,11 @@ export function EximEligibilityScreen({ onPass, onExit }: Props) {
   function handleQ1(answer: boolean) {
     setAnswers((prev) => ({ ...prev, q1: answer }));
     if (!answer) {
-      triggerFail(
-        "EXIM project finance typically requires greenfield deals. Refinancing or expansions of existing businesses generally don't qualify for EXIM's project finance program."
+      addAdvisory(
+        "EXIM project finance is designed for greenfield deals. Expansions or refinancings of existing businesses typically don't qualify. Confirm eligibility with an EXIM officer before investing significant time in this workspace."
       );
-    } else {
-      setStep(2);
     }
+    setStep(2);
   }
 
   // Q2 handlers

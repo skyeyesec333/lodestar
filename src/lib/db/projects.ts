@@ -58,6 +58,8 @@ const projectFullSelect = {
   actualCommitmentDate: true,
   actualCloseDate: true,
   ownerClerkId: true,
+  userRole: true,
+  subNationalLocation: true,
   cachedReadinessScore: true,
   cachedScoreUpdatedAt: true,
   createdAt: true,
@@ -330,6 +332,8 @@ export type CreateProjectInput = {
   targetLoiDate: Date | null;
   targetCloseDate: Date | null;
   ownerClerkId: string;
+  userRole: string | null;
+  subNationalLocation: string | null;
 };
 
 export async function createProjectRecord(

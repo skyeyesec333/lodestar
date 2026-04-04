@@ -284,7 +284,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
             {[
               {
                 label: "Gate status",
-                value: loiReady ? (isExim ? "LOI ready" : "Gate ready") : (isExim ? "LOI pending" : "Gate pending"),
+                value: loiReady ? "LOI ready" : "LOI pending",
                 tone: loiReady ? "var(--teal)" : "var(--gold)",
               },
               {
@@ -332,6 +332,42 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
           </div>
         </div>
       </div>
+
+      {scoreBps === 0 && (
+        <div
+          style={{
+            marginTop: "16px",
+            padding: "12px 14px",
+            borderRadius: "8px",
+            backgroundColor: "color-mix(in srgb, var(--accent) 6%, var(--bg))",
+            border: "1px solid color-mix(in srgb, var(--accent) 20%, var(--border))",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "var(--accent)",
+              margin: "0 0 4px",
+            }}
+          >
+            Starting point
+          </p>
+          <p
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: "12px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.55,
+              margin: 0,
+            }}
+          >
+            Your score starts at 0% — this is your baseline, not a problem with your deal. Work through the Workplan below and mark requirements as they progress.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
