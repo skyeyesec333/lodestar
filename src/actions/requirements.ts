@@ -136,10 +136,8 @@ export async function updateRequirementStatus(
     { requirementId, requirementName: reqName, newStatus: status }
   );
 
-  // Auto-add a note when one is supplied with the status change
-  if (note && note.trim()) {
-    await addRequirementNote(projectId, requirementId, userId, note.trim(), status);
-  }
+  // Always write a status snapshot for trendline history; include user note if supplied
+  await addRequirementNote(projectId, requirementId, userId, note?.trim() ?? "", status);
 
   revalidatePath(`/projects/${access.value.slug}`);
 

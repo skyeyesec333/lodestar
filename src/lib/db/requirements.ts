@@ -134,6 +134,7 @@ async function fetchNotesMap(projectId: string): Promise<Map<string, Requirement
     SELECT id, "requirementId", "clerkUserId", note, "statusSnapshot", "createdAt"
     FROM requirement_notes
     WHERE "projectId" = ${projectId}
+      AND note != ''
     ORDER BY "createdAt" DESC
     LIMIT 200
   `;
