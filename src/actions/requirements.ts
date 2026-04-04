@@ -133,7 +133,7 @@ export async function updateRequirementStatus(
   const reqName = getRequirementById(dealType, requirementId)?.name ?? requirementId;
   await recordActivity(projectId, userId, "requirement_status_changed",
     `${reqName} → ${REQUIREMENT_STATUS_LABELS[status]}`,
-    { requirementId, status }
+    { requirementId, requirementName: reqName, newStatus: status }
   );
 
   // Auto-add a note when one is supplied with the status change
@@ -439,9 +439,10 @@ export async function updateRequirementResponsibilityAction(
   });
   if (!result.ok) return result;
 
+  const respReqName = getRequirementById(access.value.dealType, requirementId)?.name ?? requirementId;
   recordActivity(projectId, userId, "requirement_responsibility_updated",
-    `Responsibility updated for requirement ${requirementId}`,
-    { requirementId }
+    `Responsibility updated for "${respReqName}"`,
+    { requirementId, requirementName: respReqName }
   ).catch(() => {});
 
   if (responsibleStakeholderId) {

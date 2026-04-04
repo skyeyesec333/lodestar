@@ -61,6 +61,18 @@ function buildMessage(eventType: string, label: string, meta: Record<string, unk
       const decision = typeof meta?.decision === "string" ? meta.decision : "reviewed";
       return `${actor} ${decision} "${target}"`;
     }
+    case "approval_status_changed": {
+      const entityType = typeof meta?.entityType === "string" ? meta.entityType : "item";
+      const toStatus = typeof meta?.toStatus === "string" ? meta.toStatus : null;
+      if (toStatus === "approved") return `${actor} approved a ${entityType}`;
+      if (toStatus === "rejected") return `${actor} rejected a ${entityType}`;
+      if (toStatus === "in_review") return `${actor} submitted a ${entityType} for review`;
+      return `${actor} updated approval status for a ${entityType}`;
+    }
+    case "requirement_responsibility_updated": {
+      const reqName = typeof meta?.requirementName === "string" ? meta.requirementName : "a requirement";
+      return `${actor} updated ownership of "${reqName}"`;
+    }
     default:
       return label || `${actor} updated the project`;
   }
@@ -68,7 +80,8 @@ function buildMessage(eventType: string, label: string, meta: Record<string, unk
 
 export async function getRecentNotifications(
   userId: string,
-  limit = 20
+  limit = 20,
+  excludeSelf = true
 ): Promise<Result<NotificationItem[]>> {
   try {
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -104,6 +117,7 @@ export async function getRecentNotifications(
     const rows = await db.activityEvent.findMany({
       where: {
         projectId: { in: projectIds },
+        ...(excludeSelf ? { clerkUserId: { not: userId } } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: limit,
