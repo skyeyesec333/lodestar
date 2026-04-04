@@ -922,6 +922,40 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
     )
   );
   const [expandedResponsibility, setExpandedResponsibility] = useState<Set<string>>(new Set());
+  const [expandedInfo, setExpandedInfo] = useState<Set<string>>(new Set());
+
+  function toggleInfo(requirementId: string) {
+    setExpandedInfo((prev) => {
+      const next = new Set(prev);
+      next.has(requirementId) ? next.delete(requirementId) : next.add(requirementId);
+      return next;
+    });
+  }
+
+  function getSubstantiallyFinalText(category: string): string {
+    switch (category) {
+      case "contracts": return "The contract is negotiated, signed by all parties, and reflects final commercial terms — not a term sheet or draft.";
+      case "financial": return "The financial model or document reflects final assumptions, has been reviewed by advisors, and is ready for lender submission.";
+      case "studies": return "The study is complete, stamped by the responsible firm, and addresses all EXIM/lender scope requirements.";
+      case "permits": return "The permit or approval has been formally issued by the relevant authority — not pending or under review.";
+      case "corporate": return "The corporate resolution, authorization, or registration is executed and certified.";
+      case "environmental_social": return "The ESAP or environmental study is complete, disclosed, and accepted by the relevant authority.";
+      default: return "The item meets EXIM's substantially final standard — executed or near-executed, not a summary or outline.";
+    }
+  }
+
+  function getTypicalOwner(category: string, responsibleOrganizationName: string | null): string {
+    if (responsibleOrganizationName) return responsibleOrganizationName;
+    switch (category) {
+      case "contracts": return "EPC Contractor / Project Sponsor";
+      case "financial": return "Financial Advisor / Sponsor";
+      case "studies": return "Independent Engineer / Sponsor";
+      case "permits": return "Project Sponsor / Local Counsel";
+      case "corporate": return "Project Sponsor / Legal Counsel";
+      case "environmental_social": return "Environmental Consultant / Sponsor";
+      default: return "Project Sponsor";
+    }
+  }
 
   function handleStatusChange(requirementId: string, status: RequirementStatusValue) {
     const previous = statuses[requirementId];
@@ -1235,6 +1269,25 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                             >
                               {row.name}
                             </span>
+                            <button
+                              onClick={() => toggleInfo(row.requirementId)}
+                              title="What is this?"
+                              style={{
+                                width: "16px",
+                                height: "16px",
+                                borderRadius: "50%",
+                                border: "1px solid var(--border)",
+                                background: "var(--bg)",
+                                color: "var(--ink-muted)",
+                                fontSize: "11px",
+                                cursor: "pointer",
+                                lineHeight: 1,
+                                padding: 0,
+                                flexShrink: 0,
+                              }}
+                            >
+                              ℹ
+                            </button>
                             {row.isLoiCritical ? (
                               <span
                                 style={{
@@ -1281,6 +1334,32 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                             >
                               {row.description}
                             </p>
+                          )}
+                          {expandedInfo.has(row.requirementId) && (
+                            <div
+                              style={{
+                                backgroundColor: "color-mix(in srgb, var(--accent) 4%, var(--bg-card))",
+                                border: "1px solid color-mix(in srgb, var(--accent) 20%, var(--border))",
+                                borderRadius: "6px",
+                                padding: "10px 12px",
+                                marginTop: "6px",
+                                fontSize: "12px",
+                                color: "var(--ink-mid)",
+                                lineHeight: 1.6,
+                              }}
+                            >
+                              <p style={{ margin: "0 0 8px", fontFamily: "'Inter', sans-serif" }}>{row.description}</p>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
+                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", flexShrink: 0 }}>Substantially final:</span>
+                                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "11px" }}>{getSubstantiallyFinalText(row.category)}</span>
+                                </div>
+                                <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
+                                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", flexShrink: 0 }}>Typical owner:</span>
+                                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "11px" }}>{getTypicalOwner(row.category, row.responsibleOrganizationName)}</span>
+                                </div>
+                              </div>
+                            </div>
                           )}
                         </div>
 
@@ -1762,6 +1841,25 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         >
                           {row.name}
                         </span>
+                        <button
+                          onClick={() => toggleInfo(row.requirementId)}
+                          title="What is this?"
+                          style={{
+                            width: "16px",
+                            height: "16px",
+                            borderRadius: "50%",
+                            border: "1px solid var(--border)",
+                            background: "var(--bg)",
+                            color: "var(--ink-muted)",
+                            fontSize: "11px",
+                            cursor: "pointer",
+                            lineHeight: 1,
+                            padding: 0,
+                            flexShrink: 0,
+                          }}
+                        >
+                          ℹ
+                        </button>
                         {row.isLoiCritical ? (
                           <span
                             style={{
@@ -1947,6 +2045,32 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         >
                           {row.description}
                         </p>
+                      )}
+                      {expandedInfo.has(row.requirementId) && (
+                        <div
+                          style={{
+                            backgroundColor: "color-mix(in srgb, var(--accent) 4%, var(--bg-card))",
+                            border: "1px solid color-mix(in srgb, var(--accent) 20%, var(--border))",
+                            borderRadius: "6px",
+                            padding: "10px 12px",
+                            marginTop: "6px",
+                            fontSize: "12px",
+                            color: "var(--ink-mid)",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          <p style={{ margin: "0 0 8px", fontFamily: "'Inter', sans-serif" }}>{row.description}</p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", flexShrink: 0 }}>Substantially final:</span>
+                              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "11px" }}>{getSubstantiallyFinalText(row.category)}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
+                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "var(--ink-muted)", flexShrink: 0 }}>Typical owner:</span>
+                              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "11px" }}>{getTypicalOwner(row.category, row.responsibleOrganizationName)}</span>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
 

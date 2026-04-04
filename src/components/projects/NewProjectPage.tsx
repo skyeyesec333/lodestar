@@ -20,7 +20,7 @@ export function NewProjectPage({
     <OnboardingWizard
       templateId={templateId}
       existingProjects={existingProjects}
-      onComplete={(slug) => router.push(`/projects/${slug}`)}
+      onComplete={(slug) => router.push(`/projects/${slug}?new=1`)}
       onBack={handleExit}
     />
   );

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 // notFound used for project lookup; requirements errors throw to surface the actual message
@@ -78,6 +79,8 @@ import { ReadinessTrendlineChart } from "@/components/projects/ReadinessTrendlin
 import { ApprovalsPanel } from "@/components/projects/ApprovalsPanel";
 import { StatusReportButton } from "@/components/projects/StatusReportButton";
 import { SectionSubNav } from "@/components/projects/SectionSubNav";
+import { FirstRunOverlay } from "@/components/projects/FirstRunOverlay";
+import { SetupChecklist } from "@/components/projects/SetupChecklist";
 
 function roleLabel(role: TeamMember["role"]): string {
   switch (role) {
@@ -614,6 +617,13 @@ export default async function ProjectPage({
 
   return (
     <BeaconProvider>
+      <Suspense fallback={null}>
+        <FirstRunOverlay
+          dealType={project.dealType}
+          projectSlug={project.slug}
+          projectName={project.name}
+        />
+      </Suspense>
     <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
     <div style={{ flex: 1, minWidth: 0 }}>
       <WorkspaceBeaconSync />
@@ -833,6 +843,42 @@ export default async function ProjectPage({
             {project.description ?? "This overview keeps the current stage, next gate, and operating pressure in one place so the team can orient quickly before moving into the deeper workspaces."}
           </p>
         </div>
+
+        <SetupChecklist
+          dealTypeLabel={dealTypeLabel}
+          items={[
+            {
+              label: "Add a stakeholder",
+              complete: stakeholders.length > 0,
+              href: "#section-stakeholders",
+              hint: "Add your EPC contractor, off-taker, or legal counsel",
+            },
+            {
+              label: "Set a target date",
+              complete: project.targetLoiDate != null || project.targetCloseDate != null,
+              href: "#section-overview",
+              hint: "A target date activates velocity tracking and urgency alerts",
+            },
+            {
+              label: "Upload a document",
+              complete: documents.length > 0,
+              href: "#section-documents",
+              hint: "Upload your feasibility study, EPC term sheet, or off-take agreement",
+            },
+            {
+              label: "Write a deal thesis",
+              complete: concept?.thesis != null && concept.thesis.trim().length > 0,
+              href: "#section-concept",
+              hint: "A one-paragraph thesis frames the deal for your team and lenders",
+            },
+            {
+              label: "Log a meeting",
+              complete: meetings.length > 0,
+              href: "#section-execution",
+              hint: "Log your first stakeholder or lender meeting to start building the execution record",
+            },
+          ]}
+        />
 
         <DecisionDesk
           projectSlug={project.slug}
