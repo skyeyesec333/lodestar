@@ -284,7 +284,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
             {[
               {
                 label: "Gate status",
-                value: loiReady ? "LOI ready" : "LOI pending",
+                value: loiReady ? (isExim ? "LOI ready" : "Gate ready") : (isExim ? "LOI pending" : "Gate pending"),
                 tone: loiReady ? "var(--teal)" : "var(--gold)",
               },
               {

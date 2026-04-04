@@ -139,5 +139,5 @@ Format your response as:
 
 Then add a brief (2-3 sentence) **Outlook** paragraph summarizing the overall trajectory and any flags.
 
-Be specific to EXIM requirements and this project's actual status. Do not hedge — give direct, expert advice.`;
+Be specific to the requirements for this deal type and this project's actual status. Do not hedge — give direct, expert advice.`;
 }

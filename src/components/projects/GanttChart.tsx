@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import type { RequirementStatusValue } from "@/types/requirements";
+import { getProgramConfig } from "@/lib/requirements";
 
 // ─── Gantt tour (fullscreen only) ─────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ type TourRect = { top: number; left: number; width: number; height: number };
 
 const GANTT_TOUR: TourStep[] = [
   { target: "[data-tour='gantt-density']",     title: "Density",          body: "Tight fits all 36 lanes in a compact view. Spacious gives you room to read every label.",                                                                                  placement: "bottom" },
-  { target: "[data-tour='gantt-phase']",       title: "Phase filter",     body: "Show only EXIM LOI-phase items to focus on what's blocking submission, or EXIM Final Commitment items to plan ahead.",                                              placement: "bottom" },
+  { target: "[data-tour='gantt-phase']",       title: "Phase filter",     body: "Filter requirements by phase to focus on what matters most at your current stage.",                                              placement: "bottom" },
   { target: "[data-tour='gantt-predictions']", title: "Predictions",      body: "Toggle the dashed future bands. They're calculated from your current status and LOI target — a best-case estimate of when each item will close.",                          placement: "bottom" },
   { target: "[data-tour='gantt-collapse']",    title: "Collapse",         body: "Press ESC or click Collapse to return to the project page. All your filter settings are preserved.",                                                                       placement: "bottom" },
 ];
@@ -245,6 +246,7 @@ export type GanttProps = {
   targetLoiDate: Date | null;
   targetCloseDate?: Date | null;
   milestones?: MilestoneMarker[];
+  dealType?: string;
 };
 
 type GanttRow =
@@ -256,7 +258,7 @@ type Tooltip = { svgX: number; rowY: number; lines: string[] };
 type Controls = {
   density:      DensityKey;
   showPredicted: boolean;
-  filterPhase:  "all" | "loi" | "final_commitment";
+  filterPhase:  "all" | string;
   hideDone:     boolean;
   collapsedCats: Set<string>;
 };
@@ -301,12 +303,14 @@ function ControlBar({
   fullscreen,
   onToggleFullscreen,
   projectName,
+  phaseFilterOptions,
 }: {
   ctrl: Controls;
   setCtrl: React.Dispatch<React.SetStateAction<Controls>>;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
   projectName?: string;
+  phaseFilterOptions: Array<[string, string]>;
 }) {
   const btnBase: React.CSSProperties = {
     fontFamily: "'DM Mono', monospace",
@@ -383,7 +387,7 @@ function ControlBar({
         <span style={{ ...btnBase, border: "none", padding: "4px 2px", color: "var(--ink-muted)", cursor: "default" }}>
           Phase
         </span>
-        {([["all", "All"], ["loi", "EXIM LOI"], ["final_commitment", "EXIM Final"]] as const).map(([v, label]) => (
+        {phaseFilterOptions.map(([v, label]) => (
           <button
             key={v}
             style={{ ...btnBase, ...(ctrl.filterPhase === v ? active : inactive) }}
@@ -486,7 +490,7 @@ function ControlBar({
 
 // ─── Legend ───────────────────────────────────────────────────────────────────
 
-function Legend({ showPredicted }: { showPredicted: boolean }) {
+function Legend({ showPredicted, primaryGateLabel }: { showPredicted: boolean; primaryGateLabel: string }) {
   const items: [RequirementStatusValue, string][] = [
     ["in_progress",        "In Progress"],
     ["draft",              "Draft"],
@@ -521,7 +525,7 @@ function Legend({ showPredicted }: { showPredicted: boolean }) {
         <svg width="16" height="7" viewBox="0 0 16 7" style={{ overflow: "visible" }}>
           <line x1="8" y1="0" x2="8" y2="7" stroke="var(--gold)" strokeWidth="1.5" strokeDasharray="3,2" />
         </svg>
-        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)" }}>EXIM LOI Target</span>
+        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)" }}>{primaryGateLabel} Target</span>
       </div>
     </div>
   );
@@ -544,6 +548,7 @@ function GanttSVG({
   hoveredId,
   onHover,
   onCatClick,
+  phaseLabels,
 }: {
   ganttRows: GanttRow[];
   ctrl: Controls;
@@ -559,6 +564,7 @@ function GanttSVG({
   hoveredId: string | null;
   onHover: (id: string | null) => void;
   onCatClick: (cat: string) => void;
+  phaseLabels: Record<string, string>;
 }) {
   const d = DENSITY[ctrl.density];
   const areaW = width - LABEL_W - RIGHT_PAD;
@@ -850,10 +856,8 @@ function GanttSVG({
                       row.name,
                       STATUS_LABELS[status],
                       row.isLoiCritical
-                        ? "EXIM LOI Critical"
-                        : row.phaseRequired === "loi"
-                          ? "EXIM LOI Phase"
-                          : "EXIM Final Commitment Phase",
+                        ? `${phaseLabels["loi"] ?? row.phaseRequired} Critical`
+                        : (phaseLabels[row.phaseRequired] ?? row.phaseRequired) + " Phase",
                     ],
                   });
                 }}
@@ -1049,7 +1053,12 @@ function GanttSVG({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseDate, milestones = [] }: GanttProps) {
+export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseDate, milestones = [], dealType }: GanttProps) {
+  const programConfig = getProgramConfig(dealType ?? "exim_project_finance");
+  const phaseFilterOptions: Array<[string, string]> = [
+    ["all", "All"],
+    ...Object.entries(programConfig.phaseLabels),
+  ];
   const defaultCollapsedCats = new Set<string>(CATEGORY_ORDER);
   const [ctrl, setCtrl] = useState<Controls>({
     density:        "normal",
@@ -1210,6 +1219,7 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
     hoveredId,
     onHover: setHoveredId,
     onCatClick: toggleCat,
+    phaseLabels: programConfig.phaseLabels,
   };
 
   // Always render inline container so ResizeObserver keeps measuring width.
@@ -1218,8 +1228,8 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
     <>
       {/* ── Inline (always mounted) ─────────────────────────────────────────── */}
       <div style={{ visibility: fullscreen ? "hidden" : "visible" }}>
-        <ControlBar ctrl={ctrl} setCtrl={setCtrl} fullscreen={false} onToggleFullscreen={() => { setTooltip(null); setFullscreen(true); }} />
-        <Legend showPredicted={ctrl.showPredicted} />
+        <ControlBar ctrl={ctrl} setCtrl={setCtrl} fullscreen={false} onToggleFullscreen={() => { setTooltip(null); setFullscreen(true); }} phaseFilterOptions={phaseFilterOptions} />
+        <Legend showPredicted={ctrl.showPredicted} primaryGateLabel={programConfig.primaryGateLabel} />
         <div ref={inlineRef} style={{ position: "relative", width: "100%", overflowX: "auto" }}>
           <GanttSVG {...svgProps} width={inlineW} />
           {!fullscreen && tooltip && <TooltipEl t={tooltip} w={inlineW} />}
@@ -1249,7 +1259,7 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
           {/* Header */}
           <div style={{ padding: "14px 28px", borderBottom: "1px solid var(--border)", flexShrink: 0, backgroundColor: "var(--bg-card)", display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ flex: 1 }}>
-              <ControlBar ctrl={ctrl} setCtrl={setCtrl} fullscreen={true} onToggleFullscreen={() => { setTooltip(null); setFullscreen(false); }} />
+              <ControlBar ctrl={ctrl} setCtrl={setCtrl} fullscreen={true} onToggleFullscreen={() => { setTooltip(null); setFullscreen(false); }} phaseFilterOptions={phaseFilterOptions} />
             </div>
             {/* Tour trigger */}
             <button
@@ -1284,7 +1294,7 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
 
           {/* Scrollable body */}
           <div style={{ flex: 1, overflow: "auto", padding: "20px 28px" }}>
-            <Legend showPredicted={ctrl.showPredicted} />
+            <Legend showPredicted={ctrl.showPredicted} primaryGateLabel={programConfig.primaryGateLabel} />
             <div ref={fsRef} style={{ position: "relative", minWidth: "640px" }}>
               <GanttSVG {...svgProps} width={fsW || CHART_REF_W} />
               {tooltip && <TooltipEl t={tooltip} w={fsW || CHART_REF_W} />}

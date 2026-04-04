@@ -6,6 +6,8 @@ import Link from "next/link";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { computeReadiness } from "@/lib/scoring/index";
+import { getProgramConfig } from "@/lib/requirements/index";
+import { countryLabel } from "@/lib/projects/country-label";
 import { ReadinessGauge } from "@/components/projects/ReadinessGauge";
 import { StageStepper } from "@/components/projects/StageStepper";
 import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
@@ -15,7 +17,7 @@ import { ActivityFeed } from "@/components/projects/ActivityFeed";
 import { StakeholderPanel } from "@/components/stakeholders/StakeholderPanel";
 import { getProjectActivity } from "@/lib/db/activity";
 import { getProjectStakeholders } from "@/lib/db/stakeholders";
-import { LoiBlockersPanel } from "@/components/requirements/LoiBlockersPanel";
+import { GateBlockersPanel } from "@/components/requirements/LoiBlockersPanel";
 import { RequirementsChecklist } from "@/components/requirements/RequirementsChecklist";
 import { DocumentPanel } from "@/components/documents/DocumentPanel";
 import { getProjectDocuments } from "@/lib/db/documents";
@@ -60,6 +62,7 @@ import type { CategoryBreakdown } from "@/lib/db/requirements";
 import type { TeamMember } from "@/types/collaboration";
 import type { ProjectMemberRow } from "@/lib/db/members";
 import { DecisionDesk } from "@/components/projects/DecisionDesk";
+import { ConceptBeaconBrief } from "@/components/projects/ConceptBeaconBrief";
 import { checkStageGate } from "@/lib/projects/stage-gate";
 import { buildProjectOperatingMetrics } from "@/lib/projects/operating-metrics";
 import { WorkplanQueue } from "@/components/projects/WorkplanQueue";
@@ -488,6 +491,7 @@ export default async function ProjectPage({
     project.dealType
   );
   const isExim = project.dealType === "exim_project_finance";
+  const programConfig = getProgramConfig(project.dealType);
   const dealTypeLabel = formatDealTypeLabel(project.dealType);
   const currentStageLabel = formatStageLabel(project.stage, project.dealType);
   const nextGateLabel = getNextGateLabel(project.stage, project.dealType);
@@ -817,7 +821,7 @@ export default async function ProjectPage({
       <section id="section-overview" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "22px" }}>
           <p className="eyebrow" style={{ marginBottom: "10px" }}>
-            {dealTypeLabel} · {project.countryCode} · {project.sector}
+            {dealTypeLabel} · {countryLabel(project.countryCode)} · {project.sector}
           </p>
           <h1
             style={{
@@ -910,7 +914,7 @@ export default async function ProjectPage({
           }}
         >
           {[
-            { label: "Country", value: project.countryCode },
+            { label: "Country", value: countryLabel(project.countryCode) },
             { label: "Sector", value: project.sector },
             {
               label: "CAPEX",
@@ -990,8 +994,9 @@ export default async function ProjectPage({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)",
             gap: "18px",
+            alignItems: "start",
           }}
         >
           <ProjectConceptPanel
@@ -1001,131 +1006,256 @@ export default async function ProjectPage({
             canEdit={canEditProjectContent}
           />
 
-          <div
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: "14px",
-              padding: "20px 22px",
-            }}
-          >
-            <p className="eyebrow" style={{ marginBottom: "10px" }}>Current framing</p>
-            <p
+          {/* Right sidebar: deal snapshot + next priorities */}
+          <div style={{ display: "grid", gap: "14px" }}>
+
+            {/* Deal snapshot */}
+            <div
               style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: "14px",
-                color: "var(--ink-mid)",
-                lineHeight: 1.75,
-                margin: 0,
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border)",
+                borderRadius: "14px",
+                padding: "20px 22px",
               }}
             >
-              {conceptSummary}
-            </p>
-            {concept?.sponsorRationale ? (
-              <p
+              <p className="eyebrow" style={{ marginBottom: "14px" }}>Deal snapshot</p>
+              <div style={{ display: "grid", gap: "12px" }}>
+                {[
+                  { label: "Capital path", value: dealTypeLabel, filled: true },
+                  { label: "Current stage", value: currentStageLabel, filled: true },
+                  {
+                    label: "Target outcome",
+                    value: concept?.targetOutcome ?? null,
+                    filled: !!concept?.targetOutcome,
+                  },
+                  {
+                    label: isExim ? "Target LOI" : "Target close",
+                    value: formatTargetDate(targetGateDate),
+                    filled: !!targetGateDate,
+                  },
+                  {
+                    label: "Readiness",
+                    value: `${Math.round(scoreBps / 100)}%`,
+                    filled: scoreBps > 0,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                      paddingBottom: "10px",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-muted)",
+                        paddingTop: "2px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: "13px",
+                        color: item.filled ? "var(--ink)" : "var(--ink-muted)",
+                        lineHeight: 1.45,
+                        textAlign: "right",
+                        fontStyle: item.filled ? "normal" : "italic",
+                      }}
+                    >
+                      {item.value ?? "Not set"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Gate review status strip */}
+              <div
                 style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: "13px",
-                  color: "var(--ink-mid)",
-                  lineHeight: 1.65,
-                  margin: "12px 0 0",
+                  marginTop: "14px",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  backgroundColor: "var(--bg)",
+                  border: `1px solid ${gateReviewTone}`,
                 }}
               >
-                <span style={{ color: "var(--ink)" }}>Sponsor rationale:</span> {concept.sponsorRationale}
-              </p>
+                <p
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "9px",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: gateReviewTone,
+                    margin: "0 0 4px",
+                  }}
+                >
+                  Gate review
+                </p>
+                <p
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "12px",
+                    color: "var(--ink)",
+                    lineHeight: 1.5,
+                    margin: 0,
+                  }}
+                >
+                  {gateReview.summary}
+                </p>
+              </div>
+            </div>
+
+            {/* Concept completion */}
+            {(() => {
+              const conceptFields = [
+                { label: "Thesis", done: !!(concept?.thesis || project.description) },
+                { label: "Sponsor rationale", done: !!concept?.sponsorRationale },
+                { label: "Target outcome", done: !!concept?.targetOutcome },
+                { label: "Known unknowns", done: !!concept?.knownUnknowns },
+                { label: "Fatal flaws", done: !!concept?.fatalFlaws },
+                { label: "Next actions", done: !!concept?.nextActions },
+                { label: "Go / no-go rec.", done: !!concept?.goNoGoRecommendation },
+              ];
+              const doneCount = conceptFields.filter((f) => f.done).length;
+              const totalCount = conceptFields.length;
+              const pct = Math.round((doneCount / totalCount) * 100);
+              return (
+                <div
+                  style={{
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "14px",
+                    padding: "20px 22px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                    <p className="eyebrow" style={{ margin: 0 }}>Concept completeness</p>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "11px",
+                        color: pct === 100 ? "var(--teal)" : "var(--ink-muted)",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {doneCount}/{totalCount}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      height: "4px",
+                      borderRadius: "2px",
+                      backgroundColor: "var(--border)",
+                      marginBottom: "14px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${pct}%`,
+                        borderRadius: "2px",
+                        backgroundColor: pct === 100 ? "var(--teal)" : "var(--accent)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gap: "8px" }}>
+                    {conceptFields.map((field) => (
+                      <div key={field.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            width: "14px",
+                            height: "14px",
+                            borderRadius: "3px",
+                            border: `1.5px solid ${field.done ? "var(--teal)" : "var(--border)"}`,
+                            backgroundColor: field.done ? "var(--teal)" : "transparent",
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {field.done ? (
+                            <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
+                              <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          ) : null}
+                        </span>
+                        <span
+                          style={{
+                            fontFamily: "'Inter', sans-serif",
+                            fontSize: "12px",
+                            color: field.done ? "var(--ink)" : "var(--ink-muted)",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {field.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Next priorities (only if there are open prompts) */}
+            {conceptPrompts.length > 0 ? (
+              <div
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "14px",
+                  padding: "20px 22px",
+                }}
+              >
+                <p className="eyebrow" style={{ marginBottom: "12px" }}>Open gaps</p>
+                <div style={{ display: "grid", gap: "8px" }}>
+                  {conceptPrompts.slice(0, 5).map((prompt) => (
+                    <div key={prompt} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          marginTop: "6px",
+                          width: "5px",
+                          height: "5px",
+                          borderRadius: "50%",
+                          backgroundColor: "var(--accent)",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <p
+                        style={{
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: "12px",
+                          color: "var(--ink-mid)",
+                          lineHeight: 1.55,
+                          margin: 0,
+                        }}
+                      >
+                        {prompt}
+                      </p>
+                    </div>
+                  ))}
+                  {conceptPrompts.length > 5 ? (
+                    <p style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", color: "var(--ink-muted)", margin: "4px 0 0", letterSpacing: "0.08em" }}>
+                      +{conceptPrompts.length - 5} more
+                    </p>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
-          </div>
-
-          <div
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: "14px",
-              padding: "20px 22px",
-            }}
-          >
-            <p className="eyebrow" style={{ marginBottom: "10px" }}>Launch assumptions</p>
-            <div style={{ display: "grid", gap: "10px" }}>
-              {[
-                { label: "Capital path", value: dealTypeLabel },
-                { label: "Current maturity", value: currentStageLabel },
-                {
-                  label: "Target outcome",
-                  value: concept?.targetOutcome ?? "Not captured yet",
-                },
-                {
-                  label: isExim ? "Target LOI" : "Target close",
-                  value: formatTargetDate(targetGateDate),
-                },
-                {
-                  label: "Gate review",
-                  value: gateReview.summary,
-                },
-              ].map((item) => (
-                <div key={item.label} style={{ display: "grid", gap: "2px" }}>
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "9px",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      color: "var(--ink-muted)",
-                    }}
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "'Inter', sans-serif",
-                      fontSize: "13px",
-                      color: "var(--ink)",
-                      lineHeight: 1.45,
-                    }}
-                  >
-                    {item.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div
-            style={{
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border)",
-              borderRadius: "14px",
-              padding: "20px 22px",
-            }}
-          >
-            <p className="eyebrow" style={{ marginBottom: "10px" }}>What to clarify next</p>
-            <div style={{ display: "grid", gap: "10px" }}>
-              {(conceptPrompts.length > 0 ? conceptPrompts : ["Refine the concept note with counterparties, capital path, and milestone assumptions."]).map((prompt) => (
-                <div key={prompt} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                  <span
-                    aria-hidden="true"
-                    style={{
-                      marginTop: "7px",
-                      width: "6px",
-                      height: "6px",
-                      borderRadius: "50%",
-                      backgroundColor: "var(--accent)",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <p
-                    style={{
-                      fontFamily: "'Inter', sans-serif",
-                      fontSize: "13px",
-                      color: "var(--ink-mid)",
-                      lineHeight: 1.6,
-                      margin: 0,
-                    }}
-                  >
-                    {prompt}
-                  </p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -1192,124 +1322,16 @@ export default async function ProjectPage({
           </div>
         </div>
 
-        <div
-          style={{
-            marginTop: "18px",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border)",
-            borderRadius: "14px",
-            padding: "18px 20px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: "16px",
-              flexWrap: "wrap",
-              marginBottom: "14px",
-            }}
-          >
-            <div style={{ minWidth: 0, maxWidth: "760px" }}>
-              <p className="eyebrow" style={{ marginBottom: "8px" }}>Concept agent brief</p>
-              <h3
-                style={{
-                  fontFamily: "'DM Serif Display', Georgia, serif",
-                  fontSize: "22px",
-                  fontWeight: 400,
-                  color: "var(--ink)",
-                  margin: "0 0 8px",
-                }}
-              >
-                What Beacon should pressure-test here
-              </h3>
-              <p
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: "14px",
-                  color: "var(--ink-mid)",
-                  lineHeight: 1.65,
-                  margin: 0,
-                }}
-              >
-                Beacon should use the structured concept record, uploaded evidence, and external context to challenge the deal thesis before the team spends more time on execution.
-              </p>
-            </div>
-
-            <div
-              style={{
-                padding: "8px 10px",
-                borderRadius: "999px",
-                border: "1px solid var(--border)",
-                color: "var(--accent)",
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "10px",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
-              Concept workspace
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "14px",
-            }}
-          >
-            {[
-              {
-                label: "Frame the opportunity",
-                detail: concept?.thesis
-                  ? "Assess whether the current thesis is differentiated, financeable, and worth advancing."
-                  : "No thesis is captured yet. Help the team define what the deal actually is and why it matters.",
-              },
-              {
-                label: "Pressure-test assumptions",
-                detail: concept?.knownUnknowns
-                  ? `Use the known unknowns to identify the assumptions most likely to break the current plan.`
-                  : "Surface the missing assumptions that could materially change the capital path or timing.",
-              },
-              {
-                label: "Map external context",
-                detail:
-                  "Connect the concept to comparable opportunities, market conditions, policy context, and sponsor positioning.",
-              },
-              {
-                label: "Recommend next moves",
-                detail: concept?.nextActions
-                  ? "Challenge whether the listed next actions are the highest-leverage way to improve the next gate."
-                  : "Suggest the next few actions that would most quickly validate or kill the concept.",
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  backgroundColor: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "12px",
-                  padding: "14px 16px",
-                }}
-              >
-                <p className="eyebrow" style={{ marginBottom: "8px" }}>{item.label}</p>
-                <p
-                  style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: "13px",
-                    color: "var(--ink-mid)",
-                    lineHeight: 1.6,
-                    margin: 0,
-                  }}
-                >
-                  {item.detail}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ConceptBeaconBrief
+          thesis={concept?.thesis ?? null}
+          knownUnknowns={concept?.knownUnknowns ?? null}
+          fatalFlaws={concept?.fatalFlaws ?? null}
+          nextActions={concept?.nextActions ?? null}
+          goNoGoRecommendation={concept?.goNoGoRecommendation ?? null}
+          gateReviewSummary={gateReview.summary}
+          conceptPromptsCount={conceptPrompts.length}
+          isExim={isExim}
+        />
       </section>
 
       <section id="section-stakeholders" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
@@ -1520,7 +1542,15 @@ export default async function ProjectPage({
           />
         </section>
 
-        {isExim && !loiReady && <LoiBlockersPanel blockerIds={loiBlockers} />}
+        {programConfig.hasBlockerColumn && !loiReady && (
+          <GateBlockersPanel
+            blockers={loiBlockers.map((id) => ({
+              id,
+              name: rows.find((r) => r.requirementId === id)?.name ?? id,
+            }))}
+            gateLabel={programConfig.primaryGateLabel}
+          />
+        )}
 
         <ReadinessTrendlineChart projectSlug={project.slug} />
 
@@ -1537,7 +1567,7 @@ export default async function ProjectPage({
         />
 
         <div id="section-gap-analysis" />
-        <GapAnalysis projectId={project.id} />
+        <GapAnalysis projectId={project.id} dealType={project.dealType} />
 
         <StaleAssignmentsPanel projectId={project.id} />
 
@@ -1916,6 +1946,7 @@ export default async function ProjectPage({
             projectCreatedAt={project.createdAt}
             targetLoiDate={project.targetLoiDate}
             targetCloseDate={project.targetCloseDate}
+            dealType={project.dealType}
             milestones={milestones.map((m) => ({
               id: m.id,
               name: m.name,

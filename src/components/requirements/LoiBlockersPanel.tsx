@@ -1,20 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { REQUIREMENTS_BY_ID } from "@/lib/exim/requirements";
 
-type LoiBlockersPanelProps = {
-  blockerIds: string[];
+type GateBlockersPanelProps = {
+  blockers: Array<{ id: string; name: string }>;
+  gateLabel: string;
 };
 
-export function LoiBlockersPanel({ blockerIds }: LoiBlockersPanelProps) {
+export function GateBlockersPanel({ blockers, gateLabel }: GateBlockersPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showReturnJump, setShowReturnJump] = useState(false);
-  const previewBlockerIds = blockerIds.slice(0, 3);
-  const remainingPreviewCount = blockerIds.length - previewBlockerIds.length;
+  const previewBlockers = blockers.slice(0, 3);
+  const remainingPreviewCount = blockers.length - previewBlockers.length;
 
-  if (blockerIds.length === 0) return null;
+  if (blockers.length === 0) return null;
 
   function scrollTo(id: string) {
     const el = document.getElementById(`req-${id}`);
@@ -72,7 +72,7 @@ export function LoiBlockersPanel({ blockerIds }: LoiBlockersPanelProps) {
                   margin: 0,
                 }}
               >
-                EXIM LOI Blockers
+                {gateLabel} Blockers
               </p>
               <span
                 style={{
@@ -87,7 +87,7 @@ export function LoiBlockersPanel({ blockerIds }: LoiBlockersPanelProps) {
                   padding: "3px 7px",
                 }}
               >
-                {blockerIds.length} remaining
+                {blockers.length} remaining
               </span>
               <button
                 type="button"
@@ -152,71 +152,68 @@ export function LoiBlockersPanel({ blockerIds }: LoiBlockersPanelProps) {
             marginBottom: isExpanded ? "12px" : "10px",
           }}
         >
-          {previewBlockerIds.map((id) => {
-            const req = REQUIREMENTS_BY_ID.get(id);
-            return (
-              <button
-                key={id}
-                onClick={() => scrollTo(id)}
+          {previewBlockers.map((blocker) => (
+            <button
+              key={blocker.id}
+              onClick={() => scrollTo(blocker.id)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "border-color 0.12s ease, transform 0.12s ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gold)";
+                (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "color-mix(in srgb, var(--gold) 22%, var(--border))";
+                (e.currentTarget as HTMLButtonElement).style.transform = "";
+              }}
+            >
+              <span
                 style={{
-                  display: "inline-flex",
+                  display: "flex",
                   alignItems: "center",
-                  gap: "8px",
-                  backgroundColor: "var(--bg-card)",
-                  border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))",
-                  padding: "8px 10px",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  transition: "border-color 0.12s ease, transform 0.12s ease",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gold)";
-                  (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.borderColor =
-                    "color-mix(in srgb, var(--gold) 22%, var(--border))";
-                  (e.currentTarget as HTMLButtonElement).style.transform = "";
+                  gap: "12px",
+                  minWidth: 0,
                 }}
               >
                 <span
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    minWidth: 0,
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "9px",
+                    letterSpacing: "0.10em",
+                    textTransform: "uppercase",
+                    color: "var(--ink)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
                   }}
                 >
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "9px",
-                      letterSpacing: "0.10em",
-                      textTransform: "uppercase",
-                      color: "var(--ink)",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {req?.name ?? id}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "8px",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      color: "var(--ink-muted)",
-                      flexShrink: 0,
-                    }}
-                  >
-                    Jump
-                  </span>
+                  {blocker.name}
                 </span>
-              </button>
-            );
-          })}
+                <span
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "8px",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "var(--ink-muted)",
+                    flexShrink: 0,
+                  }}
+                >
+                  Jump
+                </span>
+              </span>
+            </button>
+          ))}
           {remainingPreviewCount > 0 && !isExpanded && (
             <button
               type="button"
@@ -252,120 +249,117 @@ export function LoiBlockersPanel({ blockerIds }: LoiBlockersPanelProps) {
                 marginTop: "2px",
               }}
             >
-              {blockerIds.map((id) => {
-                const req = REQUIREMENTS_BY_ID.get(id);
-                return (
-                  <button
-                    key={id}
-                    onClick={() => scrollTo(id)}
+              {blockers.map((blocker) => (
+                <button
+                  key={blocker.id}
+                  onClick={() => scrollTo(blocker.id)}
+                  style={{
+                    display: "grid",
+                    gap: "10px",
+                    textAlign: "left",
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))",
+                    padding: "12px 14px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    transition: "border-color 0.12s ease, transform 0.12s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gold)";
+                    (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor =
+                      "color-mix(in srgb, var(--gold) 22%, var(--border))";
+                    (e.currentTarget as HTMLButtonElement).style.transform = "";
+                  }}
+                >
+                  <div
                     style={{
-                      display: "grid",
-                      gap: "10px",
-                      textAlign: "left",
-                      backgroundColor: "var(--bg-card)",
-                      border: "1px solid color-mix(in srgb, var(--gold) 22%, var(--border))",
-                      padding: "12px 14px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      transition: "border-color 0.12s ease, transform 0.12s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--gold)";
-                      (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.borderColor =
-                        "color-mix(in srgb, var(--gold) 22%, var(--border))";
-                      (e.currentTarget as HTMLButtonElement).style.transform = "";
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "12px",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "12px",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "6px",
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: "9px",
-                          letterSpacing: "0.12em",
-                          textTransform: "uppercase",
-                          color: "var(--accent)",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: "6px",
-                            height: "6px",
-                            borderRadius: "50%",
-                            backgroundColor: "var(--accent)",
-                            flexShrink: 0,
-                          }}
-                        />
-                        LOI-critical
-                      </span>
-                      <span
-                        style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: "9px",
-                          letterSpacing: "0.10em",
-                          textTransform: "uppercase",
-                          color: "var(--ink-muted)",
-                        }}
-                      >
-                        Open
-                      </span>
-                    </div>
-
                     <span
                       style={{
-                        fontFamily: "'Inter', sans-serif",
-                        fontSize: "15px",
-                        fontWeight: 600,
-                        color: "var(--ink)",
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {req?.name ?? id}
-                    </span>
-
-                    <div
-                      style={{
-                        display: "flex",
+                        display: "inline-flex",
                         alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "12px",
+                        gap: "6px",
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "var(--accent)",
                       }}
                     >
                       <span
                         style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: "10px",
-                          letterSpacing: "0.08em",
-                          color: "var(--ink-muted)",
+                          width: "6px",
+                          height: "6px",
+                          borderRadius: "50%",
+                          backgroundColor: "var(--accent)",
+                          flexShrink: 0,
                         }}
-                      >
-                        Jump to checklist
-                      </span>
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                        style={{ flexShrink: 0, opacity: 0.55 }}
-                      >
-                        <path d="M2 8L8 2M8 2H4M8 2v4" stroke="var(--ink)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  </button>
-                );
-              })}
+                      />
+                      {gateLabel}-critical
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        letterSpacing: "0.10em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-muted)",
+                      }}
+                    >
+                      Open
+                    </span>
+                  </div>
+
+                  <span
+                    style={{
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: "15px",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      lineHeight: 1.35,
+                    }}
+                  >
+                    {blocker.name}
+                  </span>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "10px",
+                        letterSpacing: "0.08em",
+                        color: "var(--ink-muted)",
+                      }}
+                    >
+                      Jump to checklist
+                    </span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 10 10"
+                      fill="none"
+                      style={{ flexShrink: 0, opacity: 0.55 }}
+                    >
+                      <path d="M2 8L8 2M8 2H4M8 2v4" stroke="var(--ink)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                </button>
+              ))}
             </div>
 
             <p

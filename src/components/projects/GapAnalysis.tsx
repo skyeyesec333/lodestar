@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 
-type Props = { projectId: string };
+const DEAL_TYPE_ANALYSIS_LABELS: Record<string, string> = {
+  exim_project_finance: "EXIM Deal Gap Analysis",
+  development_finance: "DFI / IFC Gap Analysis",
+  commercial_finance: "Commercial Bank Gap Analysis",
+  private_equity: "PE / Sponsor Finance Gap Analysis",
+};
+
+type Props = { projectId: string; dealType?: string };
 
 type State = "idle" | "loading" | "done" | "error";
 
@@ -72,7 +79,8 @@ function renderMarkdown(text: string) {
   });
 }
 
-export function GapAnalysis({ projectId }: Props) {
+export function GapAnalysis({ projectId, dealType }: Props) {
+  const analysisLabel = DEAL_TYPE_ANALYSIS_LABELS[dealType ?? ""] ?? "Deal Gap Analysis";
   const [state, setState] = useState<State>("idle");
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +153,7 @@ export function GapAnalysis({ projectId }: Props) {
                 margin: "0 0 4px",
               }}
             >
-              AI · EXIM Deal Gap Analysis
+              AI · {analysisLabel}
             </p>
             <p
               style={{

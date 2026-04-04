@@ -13,6 +13,7 @@ import {
   type EligibilityResult,
 } from "@/components/projects/EximEligibilityScreen";
 import { getWorkspaceTemplate, type WorkspaceTemplate } from "@/lib/templates/directory";
+import { COUNTRY_OPTIONS, countryLabel } from "@/lib/projects/country-label";
 
 const SECTOR_OPTIONS = [
   { value: "power", label: "Power / Energy" },
@@ -63,39 +64,6 @@ const STAGE_OPTIONS = [
 
 type StageValue = (typeof STAGE_OPTIONS)[number]["value"];
 
-const COUNTRY_OPTIONS = [
-  { code: "AO", name: "Angola" },
-  { code: "AR", name: "Argentina" },
-  { code: "BD", name: "Bangladesh" },
-  { code: "BR", name: "Brazil" },
-  { code: "CI", name: "Côte d'Ivoire" },
-  { code: "CO", name: "Colombia" },
-  { code: "EG", name: "Egypt" },
-  { code: "ET", name: "Ethiopia" },
-  { code: "GH", name: "Ghana" },
-  { code: "ID", name: "Indonesia" },
-  { code: "IN", name: "India" },
-  { code: "IQ", name: "Iraq" },
-  { code: "JO", name: "Jordan" },
-  { code: "KE", name: "Kenya" },
-  { code: "MA", name: "Morocco" },
-  { code: "MX", name: "Mexico" },
-  { code: "MZ", name: "Mozambique" },
-  { code: "NG", name: "Nigeria" },
-  { code: "PE", name: "Peru" },
-  { code: "PH", name: "Philippines" },
-  { code: "PK", name: "Pakistan" },
-  { code: "RW", name: "Rwanda" },
-  { code: "SA", name: "Saudi Arabia" },
-  { code: "SN", name: "Senegal" },
-  { code: "TZ", name: "Tanzania" },
-  { code: "UA", name: "Ukraine" },
-  { code: "UG", name: "Uganda" },
-  { code: "VN", name: "Vietnam" },
-  { code: "ZA", name: "South Africa" },
-  { code: "ZM", name: "Zambia" },
-  { code: "ZW", name: "Zimbabwe" },
-] as const;
 
 interface WizardState {
   name: string;
@@ -617,9 +585,6 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
     return STAGE_OPTIONS.find((option) => option.value === value)?.label ?? value;
   }
 
-  function countryLabel(code: string) {
-    return COUNTRY_OPTIONS.find((country) => country.code === code)?.name ?? code;
-  }
 
   const twoColGrid: React.CSSProperties = {
     display: "grid",
@@ -798,8 +763,8 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                       >
                         <option value="" disabled>Select country</option>
                         {COUNTRY_OPTIONS.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.name} ({country.code})
+                          <option key={country.value} value={country.value}>
+                            {country.label} ({country.value})
                           </option>
                         ))}
                       </select>
