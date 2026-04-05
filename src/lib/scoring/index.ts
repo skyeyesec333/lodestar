@@ -14,7 +14,6 @@
  */
 
 import {
-  EXIM_REQUIREMENTS,
   LOI_CRITICAL_IDS,
 } from "../exim/requirements";
 import { getRequirementsForDealType } from "../requirements/index";
@@ -131,27 +130,8 @@ export function computeReadiness(
   statuses: RequirementInput[],
   dealType?: string
 ): ReadinessResult {
-  if (dealType && dealType !== "exim_project_finance") {
-    const requirements = getRequirementsForDealType(dealType);
-    return scoreRequirements(requirements, statuses);
-  }
-
-  // EXIM path — uses legacy EximRequirementDef adapted to RequirementDef shape
-  const eximAsGeneric: RequirementDef[] = EXIM_REQUIREMENTS.map((r) => ({
-    id: r.id,
-    category: r.category,
-    name: r.name,
-    description: r.description,
-    phaseRequired: r.phaseRequired,
-    isPrimaryGate: r.isLoiCritical,
-    weight: r.weight,
-    sortOrder: r.sortOrder,
-    phaseLabel: r.phaseRequired === "loi" ? "LOI" : "Final Commitment",
-    defaultOwner: "Sponsor",
-    applicableSectors: r.applicableSectors,
-  }));
-
-  return scoreRequirements(eximAsGeneric, statuses);
+  const requirements = getRequirementsForDealType(dealType ?? "exim_project_finance");
+  return scoreRequirements(requirements, statuses);
 }
 
 // Re-export for code that imports these directly from scoring/index

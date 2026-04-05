@@ -1,5 +1,4 @@
 import { db } from "./index";
-import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
 import { getRequirementsForDealType } from "@/lib/requirements/index";
 import type { RequirementDef } from "@/lib/requirements/types";
 import type { RequirementStatusValue } from "@/types/requirements";
@@ -166,21 +165,7 @@ export async function getProjectRequirements(
   try {
     // Resolve the taxonomy for this deal type (falls back to EXIM if omitted)
     const requirements: readonly RequirementDef[] =
-      dealType && dealType !== "exim_project_finance"
-        ? getRequirementsForDealType(dealType)
-        : EXIM_REQUIREMENTS.map((r) => ({
-            id: r.id,
-            category: r.category,
-            name: r.name,
-            description: r.description,
-            phaseRequired: r.phaseRequired,
-            isPrimaryGate: r.isLoiCritical,
-            weight: r.weight,
-            sortOrder: r.sortOrder,
-            phaseLabel: r.phaseRequired === "loi" ? "LOI" : "Final Commitment",
-            defaultOwner: "Sponsor",
-            applicableSectors: r.applicableSectors,
-          }));
+      getRequirementsForDealType(dealType ?? "exim_project_finance");
 
     const existing = await db.projectRequirement.findMany({
       where: { projectId },
