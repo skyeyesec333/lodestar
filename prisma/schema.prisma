@@ -685,6 +685,8 @@ enum DealType {
   development_finance
   /// Private equity sponsor finance, no lender involvement yet.
   private_equity
+  /// Blended / concessional finance: layered donor grants, first-loss tranches, and commercial capital.
+  blended_finance
   /// Other or not yet determined.
   other
 }

@@ -67,6 +67,7 @@ const DEAL_TYPE_VALUES = [
   "commercial_finance",
   "development_finance",
   "private_equity",
+  "blended_finance",
   "other",
 ] as const;
 

@@ -271,6 +271,39 @@ const financial: readonly EximRequirementDef[] = [
     weight: 75,
     sortOrder: 10,
   },
+  {
+    id: "exim_exposure_fee_term_sheet",
+    category: "financial",
+    name: "EXIM Exposure Fee Term Sheet",
+    description:
+      "EXIM exposure fee term sheet received and modeled in financial projections. The exposure fee (risk premium) is a significant cost item; it must be incorporated into the financial model and confirmed with EXIM's underwriting team before final commitment.",
+    phaseRequired: "final_commitment",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 11,
+  },
+  {
+    id: "us_content_certification_formal",
+    category: "financial",
+    name: "Formal US Content Certification",
+    description:
+      "Formal US content certification (distinct from the EPC contractor's US content analysis report) submitted directly to EXIM confirming that eligible US goods and services exceed the statutory threshold (>51%). This is the sponsor's affirmative certification to EXIM — a separate, binding submission from the EPC's content breakdown report.",
+    phaseRequired: "loi",
+    isLoiCritical: true,
+    weight: 150,
+    sortOrder: 12,
+  },
+  {
+    id: "market_flex_terms",
+    category: "financial",
+    name: "Market Flex Terms Agreement",
+    description:
+      "Market flex terms agreed with any co-lending commercial banks in the syndication alongside the EXIM-guaranteed tranche. Flex provisions allow banks to adjust pricing and structure during syndication; these terms must be understood and modeled before final commitment.",
+    phaseRequired: "final_commitment",
+    isLoiCritical: false,
+    weight: 50,
+    sortOrder: 13,
+  },
 ] as const;
 
 // ─── Studies ─────────────────────────────────────────────────
@@ -353,6 +386,17 @@ const studies: readonly EximRequirementDef[] = [
     weight: 100,
     sortOrder: 7,
     applicableSectors: ["power"],
+  },
+  {
+    id: "tied_aid_analysis",
+    category: "studies",
+    name: "Tied Aid / Grant Analysis",
+    description:
+      "Tied aid and grant analysis completed where a sovereign counterparty or host government is involved. EXIM must assess whether the project involves tied aid elements that could trigger OECD Arrangement obligations or affect EXIM's pricing and terms. Required for sovereign or quasi-sovereign counterparty transactions.",
+    phaseRequired: "loi",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 8,
   },
 ] as const;
 
@@ -496,6 +540,17 @@ const corporate: readonly EximRequirementDef[] = [
     weight: 50,
     sortOrder: 6,
   },
+  {
+    id: "application_fee_loi_fee",
+    category: "corporate",
+    name: "LOI Application Fee Confirmation",
+    description:
+      "Confirm that the EXIM LOI application fee has been submitted or formally waived. EXIM charges a processing fee at the time of LOI application; failure to submit the fee delays the application intake process.",
+    phaseRequired: "loi",
+    isLoiCritical: false,
+    weight: 50,
+    sortOrder: 7,
+  },
 ] as const;
 
 // ─── Environmental & Social ─────────────────────────────────
@@ -550,7 +605,7 @@ const environmental_social: readonly EximRequirementDef[] = [
 // ─── Combined taxonomy ──────────────────────────────────────
 
 /**
- * The complete EXIM requirements taxonomy. 43 items across 6 categories.
+ * The complete EXIM requirements taxonomy. 48 items across 6 categories.
  * This array is the source of truth — the seed script and scoring logic
  * both read from here.
  *

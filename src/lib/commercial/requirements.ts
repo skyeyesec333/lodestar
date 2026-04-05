@@ -389,6 +389,32 @@ const financial: readonly RequirementDef[] = [
     phaseLabel: "Credit Approval",
     defaultOwner: "Tax advisor",
   },
+  {
+    id: "cb_dscr_compliance_cert",
+    category: "financial",
+    name: "Quarterly DSCR Compliance Certificate",
+    description:
+      "Quarterly DSCR compliance certificate delivered to the agent bank confirming that the project's debt service coverage ratio meets the covenant threshold. Non-delivery is a technical event of default; consistent breach triggers enforcement provisions. Becomes a binding covenant in the facility agreement.",
+    phaseRequired: "covenant",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 16,
+    phaseLabel: "Covenant",
+    defaultOwner: "Sponsor / CFO",
+  },
+  {
+    id: "cb_financial_statements_delivery",
+    category: "financial",
+    name: "Financial Statements Delivery Covenant",
+    description:
+      "Delivery of audited annual and management quarterly financial statements to the agent bank per the covenant schedule in the facility agreement. Typically: audited accounts within 180 days of year end; management accounts within 45 days of quarter end. Non-delivery is a technical default.",
+    phaseRequired: "covenant",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 17,
+    phaseLabel: "Covenant",
+    defaultOwner: "Sponsor / CFO",
+  },
 ];
 
 // ─── Technical Studies ────────────────────────────────────────────────────────
@@ -667,6 +693,19 @@ const insurance: readonly RequirementDef[] = [
     phaseLabel: "Covenant",
     defaultOwner: "Insurance broker / Sponsor",
   },
+  {
+    id: "cb_insurance_renewal_confirmation",
+    category: "insurance",
+    name: "Annual Insurance Renewal Confirmation",
+    description:
+      "Annual insurance renewal confirmation (broker certificate) provided to the agent bank as required by the covenant schedule. Covers all required insurance classes. Non-delivery is a technical event of default; lapse of required coverage is a material event of default.",
+    phaseRequired: "covenant",
+    isPrimaryGate: false,
+    weight: 50,
+    sortOrder: 7,
+    phaseLabel: "Covenant",
+    defaultOwner: "Insurance broker / Sponsor",
+  },
 ];
 
 // ─── Permits & Approvals ──────────────────────────────────────────────────────
@@ -793,6 +832,32 @@ const corporate: readonly RequirementDef[] = [
     sortOrder: 7,
     phaseLabel: "CP to Close",
     defaultOwner: "Lenders' counsel",
+  },
+  {
+    id: "cb_change_of_control_consent",
+    category: "corporate",
+    name: "Change of Control Consent Confirmation",
+    description:
+      "Change of control consent clause confirmed with the lender group. The facility agreement will include change of control as an event of default or mandatory prepayment trigger; the consent mechanism must be documented and understood by all sponsors before close.",
+    phaseRequired: "cp_to_close",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 8,
+    phaseLabel: "CP to Close",
+    defaultOwner: "Sponsor / Legal counsel",
+  },
+  {
+    id: "cb_mac_notification",
+    category: "corporate",
+    name: "Material Adverse Change (MAC) Notification Obligation",
+    description:
+      "Material adverse change notification obligation documented and tracked as a post-close covenant. The facility agreement requires the borrower to notify the agent bank promptly of any MAC event. Sponsors must have an internal process to monitor and discharge this obligation throughout the loan term.",
+    phaseRequired: "covenant",
+    isPrimaryGate: false,
+    weight: 50,
+    sortOrder: 9,
+    phaseLabel: "Covenant",
+    defaultOwner: "Sponsor / CFO",
   },
 ];
 

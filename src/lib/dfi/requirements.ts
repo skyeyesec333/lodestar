@@ -328,6 +328,19 @@ const environmental_social: readonly RequirementDef[] = [
     phaseLabel: "Financial Close",
     defaultOwner: "Sponsor",
   },
+  {
+    id: "dfi_carbon_footprint_baseline",
+    category: "environmental_social",
+    name: "Carbon Footprint & GHG Baseline Measurement",
+    description:
+      "Carbon footprint and GHG baseline measurement for the project, distinct from the GHG quantification study. DFIs increasingly require sponsors to establish a pre-project baseline (scope 1, 2, and material scope 3 emissions) against which GHG displacement will be tracked over the investment horizon.",
+    phaseRequired: "board_approval",
+    isPrimaryGate: false,
+    weight: 100,
+    sortOrder: 15,
+    phaseLabel: "Board Approval",
+    defaultOwner: "Third-party consultant",
+  },
 ];
 
 // ─── Financial ────────────────────────────────────────────────────────────────
@@ -488,6 +501,19 @@ const financial: readonly RequirementDef[] = [
     sortOrder: 12,
     phaseLabel: "Financial Close",
     defaultOwner: "Lenders' counsel / Sponsor",
+  },
+  {
+    id: "dfi_hipso_indicators",
+    category: "financial",
+    name: "HIPSO / Development Impact Indicators",
+    description:
+      "Harmonized Indicators for Private Sector Operations (HIPSO) or equivalent development impact indicators agreed with the DFI. These metrics — covering jobs, energy access, tax revenues, GHG displacement — are tracked through the life of the investment and reported in the DFI's annual impact report.",
+    phaseRequired: "board_approval",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 13,
+    phaseLabel: "Board Approval",
+    defaultOwner: "DFI + Sponsor",
   },
 ];
 
@@ -725,6 +751,19 @@ const corporate: readonly RequirementDef[] = [
     sortOrder: 5,
     phaseLabel: "Financial Close",
     defaultOwner: "Legal counsel",
+  },
+  {
+    id: "dfi_country_strategy_alignment",
+    category: "corporate",
+    name: "DFI Country Strategy Alignment Memo",
+    description:
+      "Memo demonstrating alignment with the DFI's country strategy and sector priorities. DFIs require the project to fit within their active country program — a project in a country or sector outside the DFI's current strategy will face significant approval risk regardless of its financial merits.",
+    phaseRequired: "board_approval",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 6,
+    phaseLabel: "Board Approval",
+    defaultOwner: "Sponsor / DFI",
   },
 ];
 

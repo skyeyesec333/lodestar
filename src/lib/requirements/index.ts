@@ -16,6 +16,7 @@ import { DFI_REQUIREMENTS } from "@/lib/dfi/requirements";
 import { IFC_REQUIREMENTS } from "@/lib/ifc/requirements";
 import { COMMERCIAL_REQUIREMENTS } from "@/lib/commercial/requirements";
 import { PE_REQUIREMENTS } from "@/lib/pe/requirements";
+import { BLENDED_REQUIREMENTS } from "@/lib/blended/requirements";
 import type { RequirementDef } from "./types";
 
 // ─── DealType values (mirrors Prisma enum) ────────────────────────────────────
@@ -25,6 +26,7 @@ export type DealTypeValue =
   | "development_finance"
   | "commercial_finance"
   | "private_equity"
+  | "blended_finance"
   | "other";
 
 // ─── Program config ───────────────────────────────────────────────────────────
@@ -77,6 +79,16 @@ const PROGRAM_CONFIGS: Record<DealTypeValue, ProgramConfig> = {
       screening: "Screening",
       ic_approval: "IC Approval",
       post_ic: "Post-IC",
+    },
+    hasBlockerColumn: true,
+  },
+  blended_finance: {
+    label: "Blended / Concessional Finance",
+    primaryGateLabel: "Concessional Approval",
+    phaseLabels: {
+      application: "Application",
+      concessional_approval: "Concessional Approval",
+      financial_close: "Financial Close",
     },
     hasBlockerColumn: true,
   },
@@ -205,6 +217,9 @@ export function getRequirementsForDealType(dealType: string): RequirementDef[] {
 
     case "private_equity":
       return [...PE_REQUIREMENTS];
+
+    case "blended_finance":
+      return [...BLENDED_REQUIREMENTS];
 
     case "other":
     default:

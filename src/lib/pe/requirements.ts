@@ -65,6 +65,19 @@ const screening: readonly RequirementDef[] = [
     defaultOwner: "Compliance / Legal",
   },
   {
+    id: "pe_lp_mandate_compliance",
+    category: "corporate",
+    name: "LP Mandate Compliance Memo",
+    description:
+      "Formal LP mandate compliance memo confirming the deal fits the fund mandate across geography, sector, ticket size, hold period, ESG exclusions, concentration limits, and LP side letter restrictions. Distinct from the informal mandate check (pe_mandate_check) — this is a documented, compliance-sign-off memo prepared before committing full diligence resources.",
+    phaseRequired: "screening",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 4,
+    phaseLabel: "Screening",
+    defaultOwner: "Compliance / Deal team",
+  },
+  {
     id: "pe_preliminary_returns",
     category: "financial",
     name: "Preliminary Return Analysis",
@@ -335,6 +348,19 @@ const financial: readonly RequirementDef[] = [
     phaseLabel: "IC Approval",
     defaultOwner: "Deal team / Treasury",
   },
+  {
+    id: "pe_comparable_transactions",
+    category: "financial",
+    name: "Comparable Transaction Analysis",
+    description:
+      "Comparable transaction analysis prepared for the IC memo: valuation multiples (EV/EBITDA, EV/MW), return profiles (equity IRR, equity multiple), deal terms, and transaction precedents. Benchmarks the deal against market and supports the IC valuation case. Distinct from the initial screening-stage precedent review.",
+    phaseRequired: "ic_approval",
+    isPrimaryGate: false,
+    weight: 100,
+    sortOrder: 13,
+    phaseLabel: "IC Approval",
+    defaultOwner: "Deal team",
+  },
 ];
 
 // ─── Due Diligence Reports ────────────────────────────────────────────────────
@@ -490,6 +516,32 @@ const governance: readonly RequirementDef[] = [
     defaultOwner: "Compliance",
   },
   {
+    id: "pe_management_references",
+    category: "corporate",
+    name: "Management Team Reference Checks",
+    description:
+      "Formal reference checks on the management team: prior employer verification, peer references from co-investors, counterparty references from prior transactions, and legal/regulatory background. IC will not approve a management team without completed reference checks — in PE, management is a primary risk factor.",
+    phaseRequired: "ic_approval",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 8,
+    phaseLabel: "IC Approval",
+    defaultOwner: "Deal team / Compliance",
+  },
+  {
+    id: "pe_exit_strategy_memo",
+    category: "corporate",
+    name: "Exit Strategy Memo (Multi-Path Analysis)",
+    description:
+      "Exit strategy memo modeling multiple exit paths: trade sale, IPO, secondary to infrastructure fund, refinancing recapitalization, and hold-to-maturity. Includes buyer universe, exit timeline, EV/EBITDA or DSCR assumptions at exit for each scenario, and expected IRR range per path. IC approves the exit strategy — without a credible exit, the IRR is theoretical.",
+    phaseRequired: "ic_approval",
+    isPrimaryGate: true,
+    weight: 125,
+    sortOrder: 9,
+    phaseLabel: "IC Approval",
+    defaultOwner: "Deal team",
+  },
+  {
     id: "pe_board_gp_resolutions",
     category: "corporate",
     name: "Board / GP Resolutions Authorizing Investment",
@@ -599,6 +651,19 @@ const environmental_social: readonly RequirementDef[] = [
     defaultOwner: "Deal team / ESG team",
   },
   {
+    id: "pe_esg_baseline",
+    category: "environmental_social",
+    name: "ESG Baseline Assessment",
+    description:
+      "ESG baseline assessment completed per fund policy: identifies current E&S risks and gaps, establishes a pre-investment baseline for tracking improvement, and informs the 100-day ESG action plan. Required by LP reporting frameworks (GRESB, ILPA) and increasingly a hard IC gate for infrastructure funds with ESG commitments.",
+    phaseRequired: "ic_approval",
+    isPrimaryGate: false,
+    weight: 75,
+    sortOrder: 6,
+    phaseLabel: "IC Approval",
+    defaultOwner: "ESG team / Third-party consultant",
+  },
+  {
     id: "pe_responsible_contractor",
     category: "environmental_social",
     name: "Responsible Contractor Policy",
@@ -607,7 +672,7 @@ const environmental_social: readonly RequirementDef[] = [
     phaseRequired: "post_ic",
     isPrimaryGate: false,
     weight: 50,
-    sortOrder: 6,
+    sortOrder: 7,
     phaseLabel: "Post-IC",
     defaultOwner: "ESG team / Sponsor",
   },

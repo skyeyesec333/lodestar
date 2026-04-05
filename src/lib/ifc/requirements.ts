@@ -234,6 +234,19 @@ const environmental_social: readonly IfcRequirementDef[] = [
     phaseLabel: "Board Approval",
     defaultOwner: "Third-party consultant",
   },
+  {
+    id: "ifc_carbon_baseline",
+    category: "environmental_social",
+    name: "Carbon Footprint & GHG Baseline Measurement",
+    description:
+      "Carbon footprint and GHG baseline measurement establishing pre-project emissions levels (scope 1, 2, and material scope 3) against which GHG displacement will be tracked. Distinct from the GHG quantification study — the baseline feeds into IFC's Paris alignment screening and annual DOTS reporting.",
+    phaseRequired: "board_approval",
+    isLoiCritical: false,
+    weight: 100,
+    sortOrder: 16,
+    phaseLabel: "Board Approval",
+    defaultOwner: "Third-party consultant",
+  },
 ];
 
 // ─── Contracts & Commercial Agreements ───────────────────────────────────────
@@ -520,6 +533,19 @@ const financial: readonly IfcRequirementDef[] = [
     phaseLabel: "Financial Close",
     defaultOwner: "Lenders' counsel / Sponsor",
   },
+  {
+    id: "ifc_hipso_indicators",
+    category: "financial",
+    name: "HIPSO / DOTS Development Impact Indicators",
+    description:
+      "Harmonized Indicators for Private Sector Operations (HIPSO) or IFC Development Outcome Tracking System (DOTS) metrics agreed with IFC. Covers employment, energy access, tax revenues, and GHG displacement. These indicators are tracked through the life of the investment and disclosed in IFC's annual report.",
+    phaseRequired: "board_approval",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 13,
+    phaseLabel: "Board Approval",
+    defaultOwner: "IFC + Sponsor",
+  },
 ];
 
 // ─── Technical Studies ────────────────────────────────────────────────────────
@@ -782,6 +808,19 @@ const corporate: readonly IfcRequirementDef[] = [
     sortOrder: 6,
     phaseLabel: "Financial Close",
     defaultOwner: "Legal counsel",
+  },
+  {
+    id: "ifc_country_strategy_alignment",
+    category: "corporate",
+    name: "IFC Country Strategy Alignment Memo",
+    description:
+      "Memo demonstrating alignment with IFC's Country Partnership Framework (CPF) and sector priorities for the host country. Projects outside IFC's active country program face significant board approval risk. The CPF is a publicly available document — sponsor teams should confirm alignment early.",
+    phaseRequired: "board_approval",
+    isLoiCritical: false,
+    weight: 75,
+    sortOrder: 7,
+    phaseLabel: "Board Approval",
+    defaultOwner: "Sponsor / IFC",
   },
 ];
 

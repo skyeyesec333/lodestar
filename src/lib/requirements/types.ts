@@ -39,8 +39,16 @@ export const PE_PHASES = [
 ] as const;
 export type PePhase = (typeof PE_PHASES)[number];
 
+/** Blended / concessional finance phases */
+export const BLENDED_PHASES = [
+  "application",
+  "concessional_approval",
+  "financial_close",
+] as const;
+export type BlendedPhase = (typeof BLENDED_PHASES)[number];
+
 /** Union of all phase values across all deal types */
-export type AnyPhase = EximPhase | DfiPhase | CommercialPhase | PePhase;
+export type AnyPhase = EximPhase | DfiPhase | CommercialPhase | PePhase | BlendedPhase;
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 
