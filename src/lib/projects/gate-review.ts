@@ -2,7 +2,7 @@ import type { ProjectPhase } from "@prisma/client";
 import type { Project } from "@/types";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import type { ProjectConceptRow } from "@/lib/db/project-concepts";
-import { getProgramConfig } from "@/lib/requirements/index";
+import { getProgramConfig, getStageLabel } from "@/lib/requirements/index";
 
 type GateCriterionStatus = "ready" | "blocked";
 
@@ -36,37 +36,12 @@ const PHASE_ORDER: ProjectPhase[] = [
   "financial_close",
 ];
 
-const EXIM_STAGE_LABELS: Record<ProjectPhase, string> = {
-  concept: "Concept",
-  pre_loi: "Pre-LOI",
-  loi_submitted: "LOI Submitted",
-  loi_approved: "LOI Approved",
-  pre_commitment: "Pre-Commitment",
-  final_commitment: "Final Commitment",
-  financial_close: "Financial Close",
-};
-
-const GENERIC_STAGE_LABELS: Record<ProjectPhase, string> = {
-  concept: "Concept",
-  pre_loi: "Early Development",
-  loi_submitted: "Mandate / Approval",
-  loi_approved: "Due Diligence",
-  pre_commitment: "Pre-Commitment",
-  final_commitment: "Committed",
-  financial_close: "Financial Close",
-};
-
 const OPEN_STATUSES = new Set<ProjectRequirementRow["status"]>([
   "not_started",
   "in_progress",
   "draft",
 ]);
 
-function formatStageLabel(stage: ProjectPhase, dealType: string) {
-  const labels =
-    dealType === "exim_project_finance" ? EXIM_STAGE_LABELS : GENERIC_STAGE_LABELS;
-  return labels[stage] ?? stage.replace(/_/g, " ");
-}
 
 export function buildGateReview({
   project,
@@ -214,10 +189,10 @@ export function buildGateReview({
   return {
     gatePhase,
     nextStage,
-    nextStageLabel: nextStage ? formatStageLabel(nextStage, project.dealType) : null,
+    nextStageLabel: nextStage ? getStageLabel(nextStage, project.dealType) : null,
     status,
     summary: canAdvance
-      ? `Ready to review for ${nextStage ? formatStageLabel(nextStage, project.dealType) : "the next gate"}`
+      ? `Ready to review for ${nextStage ? getStageLabel(nextStage, project.dealType) : "the next gate"}`
       : `${missingCriteria.length} gate condition${
           missingCriteria.length === 1 ? "" : "s"
         } still need attention`,

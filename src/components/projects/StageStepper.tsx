@@ -1,29 +1,23 @@
 import type { DealType } from "@prisma/client";
+import { getStageLabel } from "@/lib/requirements/index";
 
-const EXIM_STAGES = [
-  { id: "concept",          label: "Concept"            },
-  { id: "pre_loi",          label: "Pre-LOI"            },
-  { id: "loi_submitted",    label: "LOI Submitted"      },
-  { id: "loi_approved",     label: "LOI Approved"       },
-  { id: "pre_commitment",   label: "Pre-Commitment"     },
-  { id: "final_commitment", label: "Final Commitment"   },
-  { id: "financial_close",  label: "Financial Close"    },
+const PHASE_ORDER = [
+  "concept",
+  "pre_loi",
+  "loi_submitted",
+  "loi_approved",
+  "pre_commitment",
+  "final_commitment",
+  "financial_close",
 ] as const;
 
-const GENERIC_STAGES = [
-  { id: "concept",          label: "Concept"            },
-  { id: "pre_loi",          label: "Early Development"  },
-  { id: "loi_submitted",    label: "Mandate / Approval" },
-  { id: "loi_approved",     label: "Due Diligence"      },
-  { id: "pre_commitment",   label: "Pre-Commitment"     },
-  { id: "final_commitment", label: "Committed"          },
-  { id: "financial_close",  label: "Financial Close"    },
-] as const;
-
-type StageId = (typeof EXIM_STAGES)[number]["id"];
+type StageId = (typeof PHASE_ORDER)[number];
 
 export function StageStepper({ current, dealType }: { current: StageId; dealType?: DealType }) {
-  const stages = dealType === "exim_project_finance" || !dealType ? EXIM_STAGES : GENERIC_STAGES;
+  const stages = PHASE_ORDER.map((id) => ({
+    id,
+    label: getStageLabel(id, dealType ?? "exim_project_finance"),
+  }));
   const currentIndex = stages.findIndex((s) => s.id === current);
 
   return (

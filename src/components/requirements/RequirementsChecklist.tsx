@@ -12,6 +12,7 @@ import type { TeamMember } from "@/types/collaboration";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
 import { WatchButton } from "@/components/collaboration/WatchButton";
+import { getProgramConfig } from "@/lib/requirements/index";
 
 type StakeholderOption = { id: string; name: string };
 type OrganizationOption = { id: string; name: string };
@@ -44,20 +45,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   environmental_social: "Environmental & Social",
 };
 
-const EXIM_PHASE_LABELS: Record<string, string> = {
-  loi: "EXIM LOI",
-  final_commitment: "EXIM Final Commitment",
-};
-
-const IFC_PHASE_LABELS: Record<string, string> = {
-  board_approval: "Board Approval",
-  financial_close: "Financial Close",
-};
-
-const GENERIC_PHASE_LABELS: Record<string, string> = {
-  loi: "Initial Approval",
-  final_commitment: "Financial Close",
-};
 
 const IFC_CATEGORY_LABELS: Record<string, string> = {
   environmental_social: "Environmental & Social",
@@ -1317,7 +1304,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                                   borderRadius: "2px",
                                 }}
                               >
-                                {IFC_PHASE_LABELS[row.phaseRequired] ?? row.phaseRequired}
+                                {getProgramConfig(dealType ?? "exim_project_finance").phaseLabels[row.phaseRequired] ?? row.phaseRequired}
                               </span>
                             )}
                           </div>
@@ -1889,7 +1876,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                               borderRadius: "2px",
                             }}
                           >
-                            {(isExim ? EXIM_PHASE_LABELS : GENERIC_PHASE_LABELS)[row.phaseRequired]}
+                            {getProgramConfig(dealType ?? "exim_project_finance").phaseLabels[row.phaseRequired] ?? row.phaseRequired}
                           </span>
                         )}
 

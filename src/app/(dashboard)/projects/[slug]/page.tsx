@@ -6,7 +6,7 @@ import Link from "next/link";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { computeReadiness } from "@/lib/scoring/index";
-import { getProgramConfig } from "@/lib/requirements/index";
+import { getProgramConfig, getStageLabel } from "@/lib/requirements/index";
 import { countryLabel } from "@/lib/projects/country-label";
 import { resolveClerkUsers } from "@/lib/clerk/resolve-users";
 import { ReadinessGauge } from "@/components/projects/ReadinessGauge";
@@ -133,26 +133,6 @@ function buildTeamMembers(
   return Array.from(deduped.values());
 }
 
-const EXIM_STAGE_LABELS: Record<string, string> = {
-  concept: "Concept",
-  pre_loi: "Pre-LOI",
-  loi_submitted: "LOI Submitted",
-  loi_approved: "LOI Approved",
-  pre_commitment: "Pre-Commitment",
-  final_commitment: "Final Commitment",
-  financial_close: "Financial Close",
-};
-
-const GENERIC_STAGE_LABELS: Record<string, string> = {
-  concept: "Concept",
-  pre_loi: "Early Development",
-  loi_submitted: "Mandate / Approval",
-  loi_approved: "Due Diligence",
-  pre_commitment: "Pre-Commitment",
-  final_commitment: "Committed",
-  financial_close: "Financial Close",
-};
-
 const DEAL_TYPE_LABELS: Record<string, string> = {
   exim_project_finance: "US EXIM Project Finance",
   commercial_finance: "Commercial Finance",
@@ -165,13 +145,8 @@ function formatDealTypeLabel(dealType: string) {
   return DEAL_TYPE_LABELS[dealType] ?? dealType.replace(/_/g, " ");
 }
 
-function formatStageLabel(stage: string, dealType: string) {
-  const labels = dealType === "exim_project_finance" ? EXIM_STAGE_LABELS : GENERIC_STAGE_LABELS;
-  return labels[stage] ?? stage.replace(/_/g, " ");
-}
 
 function getNextGateLabel(stage: string, dealType: string) {
-  const labels = dealType === "exim_project_finance" ? EXIM_STAGE_LABELS : GENERIC_STAGE_LABELS;
   const order = [
     "concept",
     "pre_loi",
@@ -185,7 +160,7 @@ function getNextGateLabel(stage: string, dealType: string) {
   if (currentIndex < 0 || currentIndex >= order.length - 1) {
     return "Financial Close";
   }
-  return labels[order[currentIndex + 1]] ?? order[currentIndex + 1].replace(/_/g, " ");
+  return getStageLabel(order[currentIndex + 1], dealType);
 }
 
 function formatTargetDate(date: Date | null | undefined) {
@@ -503,7 +478,7 @@ export default async function ProjectPage({
   const isExim = project.dealType === "exim_project_finance";
   const programConfig = getProgramConfig(project.dealType);
   const dealTypeLabel = formatDealTypeLabel(project.dealType);
-  const currentStageLabel = formatStageLabel(project.stage, project.dealType);
+  const currentStageLabel = getStageLabel(project.stage, project.dealType);
   const nextGateLabel = getNextGateLabel(project.stage, project.dealType);
   const targetGateDate = isExim
     ? (project.targetLoiDate ?? project.targetCloseDate)

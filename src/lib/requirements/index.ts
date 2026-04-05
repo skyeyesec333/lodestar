@@ -96,6 +96,34 @@ export function getProgramConfig(dealType: string): ProgramConfig {
   return PROGRAM_CONFIGS[dealType as DealTypeValue] ?? PROGRAM_CONFIGS.other;
 }
 
+// ─── Stage label resolver ─────────────────────────────────────────────────────
+
+const EXIM_STAGE_LABELS: Record<string, string> = {
+  concept: "Concept",
+  pre_loi: "Pre-LOI",
+  loi_submitted: "LOI Submitted",
+  loi_approved: "LOI Approved",
+  pre_commitment: "Pre-Commitment",
+  final_commitment: "Final Commitment",
+  financial_close: "Financial Close",
+};
+
+const GENERIC_STAGE_LABELS: Record<string, string> = {
+  concept: "Concept",
+  pre_loi: "Early Development",
+  loi_submitted: "Mandate / Approval",
+  loi_approved: "Due Diligence",
+  pre_commitment: "Pre-Commitment",
+  final_commitment: "Committed",
+  financial_close: "Financial Close",
+};
+
+/** Returns the display label for a ProjectPhase given the deal type. */
+export function getStageLabel(stage: string, dealType: string): string {
+  const labels = dealType === "exim_project_finance" ? EXIM_STAGE_LABELS : GENERIC_STAGE_LABELS;
+  return labels[stage] ?? stage.replace(/_/g, " ");
+}
+
 // ─── Taxonomy resolver ────────────────────────────────────────────────────────
 
 /**
