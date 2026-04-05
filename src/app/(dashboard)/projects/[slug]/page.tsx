@@ -841,8 +841,10 @@ export default async function ProjectPage({
               hintKey: "stakeholder",
             },
             {
-              label: "Set a target date",
-              complete: project.targetLoiDate != null || project.targetCloseDate != null,
+              label: isExim ? "Set a target LOI date" : "Set a target gate date",
+              complete: isExim
+                ? project.targetLoiDate != null
+                : project.targetCloseDate != null || project.targetLoiDate != null,
               href: "#section-overview",
               hintKey: "date",
             },
@@ -859,7 +861,7 @@ export default async function ProjectPage({
               hintKey: "thesis",
             },
             {
-              label: "Log a meeting",
+              label: isExim ? "Log a meeting or EXIM call" : "Log a meeting",
               complete: meetings.length > 0,
               href: "#section-execution",
               hintKey: "meeting",
