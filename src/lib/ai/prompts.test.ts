@@ -78,16 +78,6 @@ describe("buildGapAnalysisPrompt — deal-type guidance injection", () => {
     expect(lower.includes("esms") || lower.includes("additionality")).toBe(true);
   });
 
-  it("includes concessional language for blended_finance", () => {
-    const prompt = buildGapAnalysisPrompt(
-      makeProject(),
-      BASE_ROWS,
-      4500,
-      "blended_finance"
-    );
-    expect(prompt.toLowerCase()).toContain("concessional");
-  });
-
   it("includes DSCR language for commercial_finance", () => {
     const prompt = buildGapAnalysisPrompt(
       makeProject(),
@@ -123,13 +113,18 @@ describe("buildGapAnalysisPrompt — general structure", () => {
     expect(prompt).toContain("EPC Term Sheet");
   });
 
-  it("uses 'LOI submission' as gate label for exim deals", () => {
+  it("uses 'LOI Submission' as gate label for exim deals", () => {
     const prompt = buildGapAnalysisPrompt(makeProject(), BASE_ROWS, 3000, "exim_project_finance");
-    expect(prompt).toContain("LOI submission");
+    expect(prompt).toContain("LOI Submission");
   });
 
-  it("uses 'next gate' as gate label for non-exim deals", () => {
-    const prompt = buildGapAnalysisPrompt(makeProject(), BASE_ROWS, 3000, "dfi");
-    expect(prompt).toContain("next gate");
+  it("uses 'Board Approval' as gate label for development_finance deals", () => {
+    const prompt = buildGapAnalysisPrompt(makeProject(), BASE_ROWS, 3000, "development_finance");
+    expect(prompt).toContain("Board Approval");
+  });
+
+  it("uses 'Credit Approval' as gate label for commercial_finance deals", () => {
+    const prompt = buildGapAnalysisPrompt(makeProject(), BASE_ROWS, 3000, "commercial_finance");
+    expect(prompt).toContain("Credit Approval");
   });
 });

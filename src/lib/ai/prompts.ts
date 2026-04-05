@@ -1,6 +1,7 @@
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
 import type { SerializableProject } from "@/components/projects/ProjectEditForm";
+import { getProgramConfig } from "@/lib/requirements/index";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -29,20 +30,20 @@ function buildOverdueBlock(rows: ProjectRequirementRow[]): string {
     .join("\n");
 }
 
-function buildMilestoneSlippageBlock(targetLoiDate: string | null): string {
-  if (!targetLoiDate) return "LOI target date not set";
+function buildMilestoneSlippageBlock(targetLoiDate: string | null, gateLabel = "Gate"): string {
+  if (!targetLoiDate) return `${gateLabel} target date not set`;
 
   const today = new Date();
   const target = new Date(targetLoiDate);
-  const daysToLoi = daysBetween(today, target);
+  const daysToGate = daysBetween(today, target);
 
-  if (daysToLoi < 0) {
-    return `WARNING: LOI target date passed ${Math.abs(daysToLoi)} days ago`;
+  if (daysToGate < 0) {
+    return `WARNING: ${gateLabel} target date passed ${Math.abs(daysToGate)} days ago`;
   }
-  if (daysToLoi <= 30) {
-    return `ALERT: LOI target date is ${daysToLoi} days away`;
+  if (daysToGate <= 30) {
+    return `ALERT: ${gateLabel} target date is ${daysToGate} days away`;
   }
-  return "LOI target is on track";
+  return `${gateLabel} target is on track`;
 }
 
 function getDealTypeGuidance(dealType: string): string {
@@ -53,8 +54,6 @@ function getDealTypeGuidance(dealType: string): string {
       return "Focus on ESMS (Environmental and Social Management System), environmental categorization, additionality demonstration, and SEP (Stakeholder Engagement Plan). DFIs require IFC Performance Standards compliance.";
     case "commercial_finance":
       return "Focus on DSCR covenant compliance, financial close conditions precedent, MAC clause definitions, and lender due diligence package completeness. Commercial banks require a fully executed term sheet before credit approval.";
-    case "blended_finance":
-      return "Focus on concessional window approval, additionality memo, first-loss tranche term sheet, and the blended finance structure rationale. Donor grant agreements must be in place before commercial lenders commit.";
     case "private_equity":
       return "Focus on management team references, LP mandate compliance memo, exit strategy documentation, and ESG baseline. PE sponsors need a clear path to exit and LP approval before deploying capital.";
     default:
@@ -70,11 +69,13 @@ export function buildGapAnalysisPrompt(
 ): string {
   const pct = (scoreBps / 100).toFixed(1);
   const effectiveDealType = dealType ?? project.dealType ?? "exim_project_finance";
+  const programConfig = getProgramConfig(effectiveDealType);
+  const gateLabel = programConfig.primaryGateLabel;
 
-  const loiItems = rows.filter((r) => r.isLoiCritical);
-  const notStarted = loiItems.filter((r) => r.status === "not_started");
-  const inProgress = loiItems.filter((r) => ["in_progress", "draft"].includes(r.status));
-  const done = loiItems.filter((r) => ["substantially_final", "executed", "waived"].includes(r.status));
+  const primaryGateItems = rows.filter((r) => r.isLoiCritical);
+  const notStarted = primaryGateItems.filter((r) => r.status === "not_started");
+  const inProgress = primaryGateItems.filter((r) => ["in_progress", "draft"].includes(r.status));
+  const done = primaryGateItems.filter((r) => ["substantially_final", "executed", "waived"].includes(r.status));
 
   const allByCategory = rows.reduce<Record<string, typeof rows>>((acc, r) => {
     (acc[r.category] ??= []).push(r);
@@ -84,14 +85,14 @@ export function buildGapAnalysisPrompt(
   const categoryLines = Object.entries(allByCategory)
     .map(([cat, items]) => {
       const statusSummary = items
-        .map((r) => `  - ${r.name}: ${REQUIREMENT_STATUS_LABELS[r.status]}${r.isLoiCritical ? " [LOI]" : ""}`)
+        .map((r) => `  - ${r.name}: ${REQUIREMENT_STATUS_LABELS[r.status]}${r.isLoiCritical ? ` [${gateLabel}]` : ""}`)
         .join("\n");
       return `${cat.toUpperCase()}:\n${statusSummary}`;
     })
     .join("\n\n");
 
-  const isExim = effectiveDealType === "exim_project_finance";
-  const gateLabel = isExim ? "LOI submission" : "next gate";
+  const targetDateLabel = effectiveDealType === "exim_project_finance" ? "Target LOI Date" : "Target Gate Date";
+  const daysToGateLabel = effectiveDealType === "exim_project_finance" ? "Days to LOI" : "Days to Gate";
 
   return `You are an expert in project finance. A project sponsor needs concise, actionable guidance on their readiness progress.
 
@@ -106,18 +107,18 @@ PROJECT CONTEXT
 - Sector: ${project.sector || "not specified"}
 - Host Country: ${project.countryCode || "not specified"}
 - Current Stage: ${project.stage.replace(/_/g, " ")}
-- Target LOI Date: ${project.targetLoiDate ? formatDate(project.targetLoiDate) : "not set"}
-- Days to LOI: ${project.targetLoiDate ? (() => { const d = daysBetween(new Date(), new Date(project.targetLoiDate)); return d >= 0 ? `${d} days remaining` : `${Math.abs(d)} days overdue`; })() : "N/A"}
+- ${targetDateLabel}: ${project.targetLoiDate ? formatDate(project.targetLoiDate) : "not set"}
+- ${daysToGateLabel}: ${project.targetLoiDate ? (() => { const d = daysBetween(new Date(), new Date(project.targetLoiDate)); return d >= 0 ? `${d} days remaining` : `${Math.abs(d)} days overdue`; })() : "N/A"}
 
 OVERDUE REQUIREMENTS (target date passed, not yet executed)
 ${buildOverdueBlock(rows)}
 
 MILESTONE SLIPPAGE
-${buildMilestoneSlippageBlock(project.targetLoiDate)}
+${buildMilestoneSlippageBlock(project.targetLoiDate, gateLabel)}
 
 READINESS SCORE: ${pct}% (${scoreBps} bps)
 
-LOI-CRITICAL ITEMS (${loiItems.length} total):
+PRIMARY GATE ITEMS — ${gateLabel} (${primaryGateItems.length} total):
 - Not started: ${notStarted.map((r) => r.name).join(", ") || "none"}
 - In progress/draft: ${inProgress.map((r) => r.name).join(", ") || "none"}
 - Substantially final or better: ${done.map((r) => r.name).join(", ") || "none"}
