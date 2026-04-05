@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { getProjectAccessById } from "@/lib/db/project-access";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { computeReadiness } from "@/lib/scoring/index";
 import { anthropic } from "@/lib/ai/client";
@@ -31,8 +32,14 @@ export async function POST(req: Request) {
 
   const { projectId } = parsed.data;
 
-  const projectRow = await db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
+  // Verify the caller has at least viewer access (owners, editors, and viewers may run gap analysis)
+  const projectAccess = await getProjectAccessById(projectId, userId);
+  if (!projectAccess) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const projectRow = await db.project.findUnique({
+    where: { id: projectId },
     select: {
       id: true,
       name: true,

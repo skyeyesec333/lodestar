@@ -3,10 +3,12 @@ import type {
   EximCoverType,
   ProjectPhase,
   DealType,
+  EnvironmentalCategory,
+  ProgramPath,
 } from "@prisma/client";
 
 // Re-export Prisma enums — the rest of the app imports enums from here, not @prisma/client
-export type { ProjectSector, EximCoverType, ProjectPhase, DealType };
+export type { ProjectSector, EximCoverType, ProjectPhase, DealType, EnvironmentalCategory, ProgramPath };
 
 // ── Result / error types ──────────────────────────────────────────────────────
 
@@ -39,6 +41,8 @@ export type Project = {
   actualCommitmentDate?: Date | null;
   actualCloseDate?: Date | null;
   ownerClerkId: string;
+  environmentalCategory: EnvironmentalCategory | null;
+  programPath: ProgramPath;
   userRole: string | null;
   subNationalLocation: string | null;
   cachedReadinessScore: number | null;

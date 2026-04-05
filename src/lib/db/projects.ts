@@ -7,6 +7,7 @@ import type {
   ProjectPhase,
 } from "@prisma/client";
 import { db } from "./index";
+import { getProjectAccessById } from "./project-access";
 import type {
   Project,
   ProjectListItem,
@@ -58,6 +59,8 @@ const projectFullSelect = {
   actualCommitmentDate: true,
   actualCloseDate: true,
   ownerClerkId: true,
+  environmentalCategory: true,
+  programPath: true,
   userRole: true,
   subNationalLocation: true,
   cachedReadinessScore: true,
@@ -249,9 +252,18 @@ export async function updateProjectRecord(
     actualCloseDate?: Date | null;
   }
 ): Promise<Result<Project>> {
+  // Verify the caller has at least editor access (owners and editors may update)
+  const access = await getProjectAccessById(id, clerkUserId);
+  if (!access) {
+    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found or access denied." } };
+  }
+  if (access.role === "viewer") {
+    return { ok: false, error: { code: "UNAUTHORIZED", message: "You do not have permission to update this project." } };
+  }
+
   try {
     const row = await db.project.update({
-      where: { id, ownerClerkId: clerkUserId },
+      where: { id },
       data,
       select: projectFullSelect,
     });
