@@ -1,6 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-const client = new Anthropic();
+import { anthropic as client } from "./client";
 
 export type ExtractedActionItem = {
   title: string;
