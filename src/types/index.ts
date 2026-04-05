@@ -30,7 +30,7 @@ export type Project = {
   description: string | null;
   countryCode: string;
   sector: ProjectSector;
-  capexUsdCents: bigint | null;
+  capexUsdCents: number | null;
   dealType: DealType;
   eximCoverType: EximCoverType | null;
   stage: ProjectPhase;
@@ -66,7 +66,7 @@ export type ProjectSummary = Pick<
 >;
 
 export type ProjectListItem = ProjectSummary & {
-  capexUsdCents: bigint | null;
+  capexUsdCents: number | null;
   lastActivityAt: Date | null;
 };
 

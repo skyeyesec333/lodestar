@@ -69,6 +69,21 @@ const projectFullSelect = {
   updatedAt: true,
 } as const;
 
+// ── Row mapper ────────────────────────────────────────────────────────────────
+
+type ProjectFullRow = {
+  [K in keyof typeof projectFullSelect]: K extends "capexUsdCents"
+    ? bigint | null
+    : unknown;
+} & Record<string, unknown>;
+
+function toProject(row: ProjectFullRow): Project {
+  return {
+    ...(row as unknown as Project),
+    capexUsdCents: row.capexUsdCents != null ? Number(row.capexUsdCents) : null,
+  };
+}
+
 // ── Query helpers ─────────────────────────────────────────────────────────────
 
 export async function getProjectsByUser(
@@ -131,7 +146,7 @@ export async function getProjectsByUser(
           stage: row.stage,
           targetLoiDate: row.targetLoiDate,
           cachedReadinessScore: row.cachedReadinessScore,
-          capexUsdCents: row.capexUsdCents,
+          capexUsdCents: row.capexUsdCents != null ? Number(row.capexUsdCents) : null,
           createdAt: row.createdAt,
           lastActivityAt: row.activityEvents[0]?.createdAt ?? null,
         }))
@@ -201,7 +216,7 @@ export async function getProjectBySlug(
       select: projectFullSelect,
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-    return { ok: true, value: row };
+    return { ok: true, value: toProject(row as ProjectFullRow) };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
@@ -224,7 +239,7 @@ export async function getProjectById(
       select: projectFullSelect,
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-    return { ok: true, value: row };
+    return { ok: true, value: toProject(row as ProjectFullRow) };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
@@ -267,7 +282,7 @@ export async function updateProjectRecord(
       data,
       select: projectFullSelect,
     });
-    return { ok: true, value: row };
+    return { ok: true, value: toProject(row as ProjectFullRow) };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
@@ -336,7 +351,7 @@ export type PublicProjectSummary = {
   sector: string;
   stage: string;
   dealType: string;
-  capexUsdCents: bigint | null;
+  capexUsdCents: number | null;
   cachedReadinessScore: number | null;
   description: string | null;
   subNationalLocation: string | null;
@@ -362,7 +377,10 @@ export async function getProjectByIdPublic(
       },
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-    return { ok: true, value: row };
+    return {
+      ok: true,
+      value: { ...row, capexUsdCents: row.capexUsdCents != null ? Number(row.capexUsdCents) : null },
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
@@ -398,7 +416,7 @@ export async function createProjectRecord(
       data: input,
       select: projectFullSelect,
     });
-    return { ok: true, value: row };
+    return { ok: true, value: toProject(row as ProjectFullRow) };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown database error";

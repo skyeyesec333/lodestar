@@ -25,9 +25,9 @@ function formatDate(date: Date): string {
   });
 }
 
-function formatCapex(cents: bigint | null): string {
+function formatCapex(cents: number | null): string {
   if (!cents) return "—";
-  const millions = Number(cents) / 100_000_000;
+  const millions = cents / 100_000_000;
   if (millions >= 1000) return `$${(millions / 1000).toFixed(1)}B`;
   return `$${millions.toFixed(1)}M`;
 }

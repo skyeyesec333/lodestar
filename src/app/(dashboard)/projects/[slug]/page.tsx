@@ -396,7 +396,7 @@ export default async function ProjectPage({
     countryCode: project.countryCode,
     sector: project.sector,
     dealType: project.dealType,
-    capexUsdCents: project.capexUsdCents != null ? Number(project.capexUsdCents) : null,
+    capexUsdCents: project.capexUsdCents,
     eximCoverType: project.eximCoverType,
     stage: project.stage,
     targetLoiDate: project.targetLoiDate ? project.targetLoiDate.toISOString() : null,
@@ -934,7 +934,7 @@ export default async function ProjectPage({
               label: "CAPEX",
               value:
                 project.capexUsdCents != null
-                  ? `$${(Number(project.capexUsdCents) / 100_000_000).toFixed(0)}M`
+                  ? `$${(project.capexUsdCents / 100_000_000).toFixed(0)}M`
                   : "—",
             },
             {
@@ -1499,7 +1499,7 @@ export default async function ProjectPage({
           slug={project.slug}
           initialFunders={funders}
           requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
-          capexUsdCents={project.capexUsdCents != null ? Number(project.capexUsdCents) : null}
+          capexUsdCents={project.capexUsdCents}
         />
 
         <CovenantMonitoringPanel

@@ -2,6 +2,7 @@ import type { ProjectPhase } from "@prisma/client";
 import type { Project } from "@/types";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import type { ProjectConceptRow } from "@/lib/db/project-concepts";
+import { getProgramConfig } from "@/lib/requirements/index";
 
 type GateCriterionStatus = "ready" | "blocked";
 
@@ -84,6 +85,7 @@ export function buildGateReview({
   thresholdBps?: number;
 }): GateReview {
   const isExim = project.dealType === "exim_project_finance";
+  const programConfig = getProgramConfig(project.dealType);
   const currentIndex = PHASE_ORDER.indexOf(project.stage);
   const nextStage =
     currentIndex >= 0 && currentIndex < PHASE_ORDER.length - 1
@@ -139,7 +141,7 @@ export function buildGateReview({
       label: "Gate-band requirements",
       detail:
         openGateRows.length === 0
-          ? `All ${gatePhase === "loi" ? "LOI-band" : "commitment-band"} requirements are advanced past draft`
+          ? `All ${programConfig.primaryGateLabel}-band requirements are advanced past draft`
           : `${openGateRows.length} requirement${
               openGateRows.length === 1 ? "" : "s"
             } still sit in not started, in progress, or draft`,

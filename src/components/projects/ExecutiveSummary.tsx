@@ -25,9 +25,9 @@ interface ExecutiveSummaryProps {
   upcomingMilestones: DealMilestoneRow[];
 }
 
-function formatCapex(capexUsdCents: bigint | null): string {
+function formatCapex(capexUsdCents: number | null): string {
   if (capexUsdCents == null) return "—";
-  const usd = Number(capexUsdCents) / 100;
+  const usd = capexUsdCents / 100;
   if (usd >= 1_000_000_000) {
     return `$${(usd / 1_000_000_000).toFixed(1)}B`;
   }

@@ -9,9 +9,9 @@ type PortfolioTriageCardProps = {
   lane: PortfolioTriageLane;
 };
 
-function formatCapex(cents: bigint | null): string {
+function formatCapex(cents: number | null): string {
   if (cents == null) return "—";
-  const dollars = Number(cents) / 100;
+  const dollars = cents / 100;
   const millions = dollars / 1_000_000;
   return `$${millions.toFixed(1)}M`;
 }

@@ -125,7 +125,7 @@ export type PortfolioProjectRow = {
   cachedReadinessScore: number | null;
   readinessScore: number;
   readinessBps: number | null;
-  capexUsdCents: bigint | null;
+  capexUsdCents: number | null;
   totalRequirements: number;
   completedRequirements: number;
   createdAt: Date;
@@ -179,7 +179,7 @@ export async function getPortfolioStats(
         targetLoiDate: project.targetLoiDate,
         targetCloseDate: project.targetCloseDate,
         cachedReadinessScore: project.cachedReadinessScore,
-        capexUsdCents: project.capexUsdCents,
+        capexUsdCents: project.capexUsdCents != null ? Number(project.capexUsdCents) : null,
         createdAt: project.createdAt,
         lastActivityAt: project.activityEvents[0]?.createdAt ?? null,
       }))
@@ -254,7 +254,7 @@ export async function getPortfolioStats(
         cachedReadinessScore: project.cachedReadinessScore,
         readinessScore: readiness.readinessScore,
         readinessBps: readiness.readinessBps,
-        capexUsdCents: project.capexUsdCents,
+        capexUsdCents: project.capexUsdCents != null ? Number(project.capexUsdCents) : null,
         totalRequirements: applicableRequirements.length,
         completedRequirements: metrics.doneCount,
         createdAt: project.createdAt,

@@ -24,9 +24,9 @@ import { Badge } from "@/components/ui/badge";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatCapex(cents: bigint | null): string {
+function formatCapex(cents: number | null): string {
   if (cents === null) return "—";
-  const millions = Number(cents) / 100_000_000;
+  const millions = cents / 100_000_000;
   return `$${millions.toFixed(1)}M`;
 }
 
@@ -151,8 +151,8 @@ export default async function PortfolioPage({
   // ── Summary stats ───────────────────────────────────────────────────────────
 
   const totalCapexCents = projects.reduce(
-    (sum, p) => sum + (p.capexUsdCents ?? 0n),
-    0n
+    (sum, p) => sum + (p.capexUsdCents ?? 0),
+    0
   );
 
   // Only include projects with at least one requirement in the avg — new blank workspaces
