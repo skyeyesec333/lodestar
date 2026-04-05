@@ -3,7 +3,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
 import {
   addStakeholderToProject,
   removeStakeholderRole,
@@ -11,6 +10,7 @@ import {
   updateLastContacted,
 } from "@/lib/db/stakeholders";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import type { Result } from "@/types";
 import type { StakeholderRoleType } from "@prisma/client";
 
@@ -59,12 +59,6 @@ const updateSchema = z.object({
   roleDescription: z.string().max(1000).nullable().optional(),
 });
 
-async function verifyOwnership(projectId: string, userId: string) {
-  return db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true },
-  });
-}
 
 export async function addStakeholder(input: unknown): Promise<Result<void>> {
   const { userId } = await auth();
@@ -83,9 +77,8 @@ export async function addStakeholder(input: unknown): Promise<Result<void>> {
   const { projectId, slug, name, email, phone, title, organizationName, roleType, isPrimary } =
     parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await addStakeholderToProject(projectId, {
     name,
@@ -125,9 +118,8 @@ export async function removeStakeholder(input: unknown): Promise<Result<void>> {
 
   const { projectId, slug, roleId, stakeholderName, replacementRoleId, replacementStakeholderName } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await removeStakeholderRole(roleId, projectId, replacementRoleId ?? null, userId);
   if (!result.ok) return result;
@@ -160,9 +152,8 @@ export async function updateStakeholder(input: unknown): Promise<Result<void>> {
   const { projectId, slug, roleId, name, email, phone, title, organizationName, roleDescription } =
     parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await updateStakeholderInProject(projectId, roleId, {
     name,
@@ -206,9 +197,8 @@ export async function markStakeholderContacted(input: unknown): Promise<Result<v
 
   const { projectId, slug, stakeholderId, stakeholderName } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await updateLastContacted(stakeholderId);
   if (!result.ok) return result;

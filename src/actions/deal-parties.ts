@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { addDealParty, removeDealParty } from "@/lib/db/deal-parties";
 import { DEAL_PARTY_TYPES } from "@/lib/exim/deal-parties";
+import { assertProjectAccess } from "@/lib/db/project-access";
+import { db } from "@/lib/db";
 import type { Result } from "@/types";
 import type { DealPartyRow } from "@/lib/db/deal-parties";
 
@@ -36,6 +38,10 @@ export async function addDealPartyAction(
   }
 
   const { projectId, slug, organizationName, partyType, notes } = parsed.data;
+
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await addDealParty(projectId, organizationName, partyType, notes ?? null);
 
   if (result.ok) {
@@ -60,6 +66,12 @@ export async function removeDealPartyAction(
   }
 
   const { dealPartyId, slug } = parsed.data;
+
+  const party = await db.dealParty.findUnique({ where: { id: dealPartyId }, select: { projectId: true } });
+  if (!party) return { ok: false, error: { code: "NOT_FOUND", message: "Deal party not found." } };
+  const access = await assertProjectAccess(party.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await removeDealParty(dealPartyId);
 
   if (result.ok) {

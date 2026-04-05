@@ -9,6 +9,8 @@ import {
   removeDebtTranche,
 } from "@/lib/db/debt-tranches";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
+import { db } from "@/lib/db";
 import type { Result } from "@/types";
 
 const TRANCHE_TYPES = [
@@ -62,6 +64,9 @@ export async function addDebtTrancheAction(
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } };
   }
 
+  const access = await assertProjectAccess(parsed.data.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await addDebtTranche({
     projectId: parsed.data.projectId,
     funderId: parsed.data.funderId,
@@ -95,6 +100,12 @@ export async function updateDebtTrancheAction(
   }
 
   const { trancheId, slug, ...data } = parsed.data;
+
+  const tranche = await db.debtTranche.findUnique({ where: { id: trancheId }, select: { projectId: true } });
+  if (!tranche) return { ok: false, error: { code: "NOT_FOUND", message: "Debt tranche not found." } };
+  const access = await assertProjectAccess(tranche.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateDebtTranche(trancheId, data);
 
   if (result.ok) revalidatePath(`/projects/${slug}`);
@@ -111,6 +122,11 @@ export async function removeDebtTrancheAction(
   if (!parsed.success) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } };
   }
+
+  const tranche = await db.debtTranche.findUnique({ where: { id: parsed.data.trancheId }, select: { projectId: true } });
+  if (!tranche) return { ok: false, error: { code: "NOT_FOUND", message: "Debt tranche not found." } };
+  const access = await assertProjectAccess(tranche.projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await removeDebtTranche(parsed.data.trancheId);
   if (result.ok) revalidatePath(`/projects/${parsed.data.slug}`);

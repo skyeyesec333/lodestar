@@ -4,8 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import type { DocumentRequestStatus } from "@prisma/client";
-import { db } from "@/lib/db";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import {
   createDocumentRequestRecord,
   type DocumentRequestRow,
@@ -34,12 +34,6 @@ const updateSchema = z.object({
   status: z.enum(["requested", "received", "waived", "cancelled"]),
 });
 
-async function verifyOwnership(projectId: string, userId: string) {
-  return db.project.findFirst({
-    where: { id: projectId, ownerClerkId: userId },
-    select: { id: true },
-  });
-}
 
 export async function createDocumentRequest(input: unknown): Promise<Result<DocumentRequestRow>> {
   const { userId } = await auth();
@@ -67,9 +61,8 @@ export async function createDocumentRequest(input: unknown): Promise<Result<Docu
     dueDate,
   } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await createDocumentRequestRecord({
     projectId,
@@ -118,9 +111,8 @@ export async function updateStakeholderDocumentRequestStatus(
 
   const { projectId, slug, requestId, stakeholderName, title, status } = parsed.data;
 
-  if (!(await verifyOwnership(projectId, userId))) {
-    return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-  }
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await updateDocumentRequestStatus(
     requestId,

@@ -10,6 +10,8 @@ import {
   removeCovenant,
 } from "@/lib/db/covenants";
 import { recordActivity } from "@/lib/db/activity";
+import { assertProjectAccess } from "@/lib/db/project-access";
+import { db } from "@/lib/db";
 import type { Result } from "@/types";
 
 const COVENANT_TYPES = [
@@ -73,6 +75,9 @@ export async function addCovenantAction(
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } };
   }
 
+  const access = await assertProjectAccess(parsed.data.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await addCovenant({
     projectId: parsed.data.projectId,
     funderId: parsed.data.funderId,
@@ -105,6 +110,12 @@ export async function updateCovenantAction(
   }
 
   const { covenantId, slug, ...data } = parsed.data;
+
+  const covenant = await db.covenant.findUnique({ where: { id: covenantId }, select: { projectId: true } });
+  if (!covenant) return { ok: false, error: { code: "NOT_FOUND", message: "Covenant not found." } };
+  const access = await assertProjectAccess(covenant.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateCovenant(covenantId, data, userId);
 
   if (result.ok) revalidatePath(`/projects/${slug}`);
@@ -121,6 +132,11 @@ export async function markCovenantSatisfiedAction(
   if (!parsed.success) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } };
   }
+
+  const covenant = await db.covenant.findUnique({ where: { id: parsed.data.covenantId }, select: { projectId: true } });
+  if (!covenant) return { ok: false, error: { code: "NOT_FOUND", message: "Covenant not found." } };
+  const access = await assertProjectAccess(covenant.projectId, userId, "editor");
+  if (!access.ok) return { ok: false, error: access.error };
 
   const result = await markCovenantSatisfied(parsed.data.covenantId, userId);
 
@@ -144,6 +160,11 @@ export async function removeCovenantAction(
   if (!parsed.success) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.message } };
   }
+
+  const covenant = await db.covenant.findUnique({ where: { id: parsed.data.covenantId }, select: { projectId: true } });
+  if (!covenant) return { ok: false, error: { code: "NOT_FOUND", message: "Covenant not found." } };
+  const access = await assertProjectAccess(covenant.projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await removeCovenant(parsed.data.covenantId);
   if (result.ok) revalidatePath(`/projects/${parsed.data.slug}`);

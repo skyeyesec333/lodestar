@@ -9,6 +9,8 @@ import {
   updateEpcBidDetails,
   deleteEpcBid,
 } from "@/lib/db/epc-bids";
+import { assertProjectAccess } from "@/lib/db/project-access";
+import { db } from "@/lib/db";
 import type { Result } from "@/types";
 
 const addBidSchema = z.object({
@@ -53,6 +55,10 @@ export async function addEpcBid(raw: unknown): Promise<Result<void>> {
   }
 
   const { slug, ...data } = parsed.data;
+
+  const access = await assertProjectAccess(data.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await createEpcBid(data);
   if (!result.ok) return result;
 
@@ -70,6 +76,12 @@ export async function setEpcBidStatus(raw: unknown): Promise<Result<void>> {
   }
 
   const { bidId, slug, status, disqualificationReason } = parsed.data;
+
+  const bid = await db.epcBid.findUnique({ where: { id: bidId }, select: { projectId: true } });
+  if (!bid) return { ok: false, error: { code: "NOT_FOUND", message: "EPC bid not found." } };
+  const access = await assertProjectAccess(bid.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateEpcBidStatus(bidId, status, disqualificationReason);
   if (!result.ok) return result;
 
@@ -87,6 +99,12 @@ export async function editEpcBidDetails(raw: unknown): Promise<Result<void>> {
   }
 
   const { bidId, slug, submittedAt, ...data } = parsed.data;
+
+  const bid = await db.epcBid.findUnique({ where: { id: bidId }, select: { projectId: true } });
+  if (!bid) return { ok: false, error: { code: "NOT_FOUND", message: "EPC bid not found." } };
+  const access = await assertProjectAccess(bid.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateEpcBidDetails(bidId, {
     ...data,
     submittedAt: submittedAt ? new Date(submittedAt) : null,
@@ -105,6 +123,11 @@ export async function removeEpcBid(raw: unknown): Promise<Result<void>> {
   if (!parsed.success) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } };
   }
+
+  const bid = await db.epcBid.findUnique({ where: { id: parsed.data.bidId }, select: { projectId: true } });
+  if (!bid) return { ok: false, error: { code: "NOT_FOUND", message: "EPC bid not found." } };
+  const access = await assertProjectAccess(bid.projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await deleteEpcBid(parsed.data.bidId);
   if (!result.ok) return result;

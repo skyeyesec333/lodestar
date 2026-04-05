@@ -11,6 +11,8 @@ import {
   updateFunderConditionStatus,
   deleteFunderCondition,
 } from "@/lib/db/funders";
+import { assertProjectAccess } from "@/lib/db/project-access";
+import { db } from "@/lib/db";
 import type { Result } from "@/types";
 
 const FUNDER_TYPES = ["exim", "dfi", "commercial_bank", "equity", "mezzanine", "other"] as const;
@@ -82,6 +84,10 @@ export async function addFunderRelationship(raw: unknown): Promise<Result<void>>
   }
 
   const { slug, lastContactDate, nextFollowupDate, ...data } = parsed.data;
+
+  const access = await assertProjectAccess(data.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await createFunderRelationship({
     ...data,
     lastContactDate: lastContactDate ? new Date(lastContactDate) : null,
@@ -103,6 +109,12 @@ export async function setFunderStage(raw: unknown): Promise<Result<void>> {
   }
 
   const { relationshipId, slug, engagementStage, notes, lastContactDate, nextFollowupDate } = parsed.data;
+
+  const rel = await db.funderRelationship.findUnique({ where: { id: relationshipId }, select: { projectId: true } });
+  if (!rel) return { ok: false, error: { code: "NOT_FOUND", message: "Funder relationship not found." } };
+  const access = await assertProjectAccess(rel.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateFunderRelationship(relationshipId, {
     engagementStage,
     ...(notes !== undefined ? { notes } : {}),
@@ -125,6 +137,12 @@ export async function editFunderDetails(raw: unknown): Promise<Result<void>> {
   }
 
   const { relationshipId, slug, lastContactDate, nextFollowupDate, ...data } = parsed.data;
+
+  const rel = await db.funderRelationship.findUnique({ where: { id: relationshipId }, select: { projectId: true } });
+  if (!rel) return { ok: false, error: { code: "NOT_FOUND", message: "Funder relationship not found." } };
+  const access = await assertProjectAccess(rel.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateFunderRelationship(relationshipId, {
     ...data,
     lastContactDate: lastContactDate !== undefined ? (lastContactDate ? new Date(lastContactDate) : null) : undefined,
@@ -145,6 +163,11 @@ export async function removeFunderRelationship(raw: unknown): Promise<Result<voi
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } };
   }
 
+  const rel = await db.funderRelationship.findUnique({ where: { id: parsed.data.relationshipId }, select: { projectId: true } });
+  if (!rel) return { ok: false, error: { code: "NOT_FOUND", message: "Funder relationship not found." } };
+  const access = await assertProjectAccess(rel.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await deleteFunderRelationship(parsed.data.relationshipId);
   if (!result.ok) return result;
 
@@ -162,6 +185,12 @@ export async function addCondition(raw: unknown): Promise<Result<void>> {
   }
 
   const { slug, dueDate, ...data } = parsed.data;
+
+  const rel = await db.funderRelationship.findUnique({ where: { id: data.funderRelationshipId }, select: { projectId: true } });
+  if (!rel) return { ok: false, error: { code: "NOT_FOUND", message: "Funder relationship not found." } };
+  const access = await assertProjectAccess(rel.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await addFunderCondition({
     ...data,
     dueDate: dueDate ? new Date(dueDate) : null,
@@ -182,6 +211,12 @@ export async function setConditionStatus(raw: unknown): Promise<Result<void>> {
   }
 
   const { conditionId, slug, status, satisfiedAt } = parsed.data;
+
+  const cond = await db.funderCondition.findUnique({ where: { id: conditionId }, select: { funderRelationship: { select: { projectId: true } } } });
+  if (!cond) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+  const access = await assertProjectAccess(cond.funderRelationship.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateFunderConditionStatus(
     conditionId,
     status,
@@ -201,6 +236,11 @@ export async function removeCondition(raw: unknown): Promise<Result<void>> {
   if (!parsed.success) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } };
   }
+
+  const cond = await db.funderCondition.findUnique({ where: { id: parsed.data.conditionId }, select: { funderRelationship: { select: { projectId: true } } } });
+  if (!cond) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+  const access = await assertProjectAccess(cond.funderRelationship.projectId, userId, "editor");
+  if (!access.ok) return access;
 
   const result = await deleteFunderCondition(parsed.data.conditionId);
   if (!result.ok) return result;

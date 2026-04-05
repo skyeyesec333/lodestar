@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { assertProjectAccess } from "@/lib/db/project-access";
 import {
   createMilestone,
   updateMilestone,
@@ -73,6 +74,9 @@ export async function createMilestoneAction(
 
   const { projectId, slug, name, description, linkedPhase, targetDate } = parsed.data;
 
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const existing = await db.dealMilestone.findFirst({
     where: { projectId, name },
     select: { id: true },
@@ -104,6 +108,12 @@ export async function updateMilestoneAction(
   }
 
   const { milestoneId, slug, name, description, linkedPhase, targetDate } = parsed.data;
+
+  const milestone = await db.dealMilestone.findUnique({ where: { id: milestoneId }, select: { projectId: true } });
+  if (!milestone) return { ok: false, error: { code: "NOT_FOUND", message: "Milestone not found." } };
+  const access = await assertProjectAccess(milestone.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await updateMilestone(milestoneId, {
     name,
     description,
@@ -127,6 +137,12 @@ export async function toggleMilestoneComplete(
   }
 
   const { milestoneId, slug, completed } = parsed.data;
+
+  const milestone = await db.dealMilestone.findUnique({ where: { id: milestoneId }, select: { projectId: true } });
+  if (!milestone) return { ok: false, error: { code: "NOT_FOUND", message: "Milestone not found." } };
+  const access = await assertProjectAccess(milestone.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = completed
     ? await completeMilestone(milestoneId, userId)
     : await uncompleteMilestone(milestoneId);
@@ -147,6 +163,12 @@ export async function deleteMilestoneAction(
   }
 
   const { milestoneId, slug } = parsed.data;
+
+  const milestone = await db.dealMilestone.findUnique({ where: { id: milestoneId }, select: { projectId: true } });
+  if (!milestone) return { ok: false, error: { code: "NOT_FOUND", message: "Milestone not found." } };
+  const access = await assertProjectAccess(milestone.projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const result = await deleteMilestone(milestoneId);
   if (result.ok) revalidatePath(`/projects/${slug}`);
   return result;
@@ -164,6 +186,10 @@ export async function applyMilestoneTemplate(
   }
 
   const { projectId, slug, templateSlug, anchorDate } = parsed.data;
+
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
+
   const anchor = parseDateOrNull(anchorDate);
   if (!anchor) {
     return { ok: false, error: { code: "VALIDATION_ERROR", message: "Invalid anchor date" } };
