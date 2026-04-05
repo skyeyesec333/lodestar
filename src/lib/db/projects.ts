@@ -315,6 +315,48 @@ export async function getOverdueLoiProjects(
   }
 }
 
+// ── Public (unauthenticated) helpers ──────────────────────────────────────────
+
+export type PublicProjectSummary = {
+  id: string;
+  name: string;
+  countryCode: string;
+  sector: string;
+  stage: string;
+  dealType: string;
+  capexUsdCents: bigint | null;
+  cachedReadinessScore: number | null;
+  description: string | null;
+  subNationalLocation: string | null;
+};
+
+export async function getProjectByIdPublic(
+  id: string
+): Promise<Result<PublicProjectSummary>> {
+  try {
+    const row = await db.project.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        countryCode: true,
+        sector: true,
+        stage: true,
+        dealType: true,
+        capexUsdCents: true,
+        cachedReadinessScore: true,
+        description: true,
+        subNationalLocation: true,
+      },
+    });
+    if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
+    return { ok: true, value: row };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
 // ── Write helpers ─────────────────────────────────────────────────────────────
 
 export type CreateProjectInput = {

@@ -1,5 +1,7 @@
 import { resolveShareToken } from "@/lib/db/share-links";
 import { getProjectDocuments } from "@/lib/db/documents";
+import { getProjectByIdPublic } from "@/lib/db/projects";
+import { countryLabel } from "@/lib/projects/country-label";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -21,6 +23,31 @@ function formatDate(date: Date): string {
     month: "short",
     day: "numeric",
   });
+}
+
+function formatCapex(cents: bigint | null): string {
+  if (!cents) return "—";
+  const millions = Number(cents) / 100_000_000;
+  if (millions >= 1000) return `$${(millions / 1000).toFixed(1)}B`;
+  return `$${millions.toFixed(1)}M`;
+}
+
+function formatStage(stage: string): string {
+  return stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatSector(sector: string): string {
+  return sector.charAt(0).toUpperCase() + sector.slice(1);
+}
+
+function formatDealType(dt: string): string {
+  const map: Record<string, string> = {
+    exim_project_finance: "EXIM Project Finance",
+    commercial_finance: "Commercial Finance",
+    development_finance: "Development Finance",
+    private_equity: "Private Equity",
+  };
+  return map[dt] ?? dt.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ── Invalid / expired state ───────────────────────────────────────────────────
@@ -90,6 +117,45 @@ function InvalidLinkPage() {
   );
 }
 
+// ── KPI tile ──────────────────────────────────────────────────────────────────
+
+function KpiTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: "10px",
+        padding: "14px 18px",
+        backgroundColor: "#ffffff",
+      }}
+    >
+      <p
+        style={{
+          fontFamily: "'DM Mono', monospace",
+          fontSize: "9px",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "#9ca3af",
+          margin: "0 0 6px",
+        }}
+      >
+        {label}
+      </p>
+      <p
+        style={{
+          fontFamily: "'DM Serif Display', Georgia, serif",
+          fontSize: "18px",
+          fontWeight: 400,
+          color: "#111827",
+          margin: 0,
+        }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function SharedDataRoomPage({
@@ -101,24 +167,36 @@ export default async function SharedDataRoomPage({
 
   const tokenResult = await resolveShareToken(token);
 
-  // Show invalid page for any error or invalid token
   if (!tokenResult.ok || !tokenResult.value.isValid) {
     return <InvalidLinkPage />;
   }
 
   const { projectId, projectName } = tokenResult.value;
 
-  const documentsResult = await getProjectDocuments(projectId);
-  const documents = documentsResult.ok ? documentsResult.value.items : [];
+  const [documentsResult, projectResult] = await Promise.all([
+    getProjectDocuments(projectId),
+    getProjectByIdPublic(projectId),
+  ]);
 
-  // Only show current (non-superseded) documents
+  const documents = documentsResult.ok ? documentsResult.value.items : [];
   const currentDocuments = documents.filter((d) => d.state === "current");
+  const project = projectResult.ok ? projectResult.value : null;
+
+  const readinessPct = project?.cachedReadinessScore != null
+    ? `${Math.round(project.cachedReadinessScore / 100)}%`
+    : "—";
+
+  const location = project
+    ? [project.subNationalLocation, countryLabel(project.countryCode)]
+        .filter(Boolean)
+        .join(", ")
+    : "—";
 
   return (
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "var(--bg, #f9f8f6)",
+        backgroundColor: "#f9f8f6",
         fontFamily: "'Inter', sans-serif",
         padding: "0 0 80px",
       }}
@@ -177,7 +255,8 @@ export default async function SharedDataRoomPage({
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: "840px", margin: "0 auto", padding: "40px 24px" }}>
+      <div style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
+
         {/* Notice banner */}
         <div
           style={{
@@ -197,8 +276,77 @@ export default async function SharedDataRoomPage({
           directly.
         </div>
 
+        {/* Project overview */}
+        {project && (
+          <div style={{ marginBottom: "40px" }}>
+            <p
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "10px",
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "#9ca3af",
+                margin: "0 0 14px",
+              }}
+            >
+              Project Overview
+            </p>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: "10px",
+                marginBottom: project.description ? "20px" : "0",
+              }}
+            >
+              <KpiTile label="Location" value={location} />
+              <KpiTile label="Sector" value={formatSector(project.sector)} />
+              <KpiTile label="Deal Type" value={formatDealType(project.dealType)} />
+              <KpiTile label="Stage" value={formatStage(project.stage)} />
+              <KpiTile label="CAPEX" value={formatCapex(project.capexUsdCents)} />
+              <KpiTile label="Readiness" value={readinessPct} />
+            </div>
+
+            {project.description && (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "18px 20px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  backgroundColor: "#ffffff",
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "9px",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "#9ca3af",
+                    margin: "0 0 8px",
+                  }}
+                >
+                  Concept
+                </p>
+                <p
+                  style={{
+                    fontSize: "14px",
+                    color: "#374151",
+                    lineHeight: 1.7,
+                    margin: 0,
+                  }}
+                >
+                  {project.description}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Document list */}
-        <div style={{ marginBottom: "12px" }}>
+        <div>
           <p
             style={{
               fontFamily: "'DM Mono', monospace",
@@ -293,7 +441,7 @@ export default async function SharedDataRoomPage({
           )}
         </div>
 
-        {/* Footer note */}
+        {/* Footer */}
         <p
           style={{
             fontSize: "12px",
