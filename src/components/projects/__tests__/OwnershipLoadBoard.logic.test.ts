@@ -21,7 +21,7 @@ function makeRequirement(
     name: "Test Requirement",
     category: "contracts",
     phaseRequired: "loi",
-    isLoiCritical: false,
+    isPrimaryGate: false,
     status: "not_started",
     isApplicable: true,
     responsibleOrganizationId: null,
@@ -166,7 +166,7 @@ describe("classifyRequirement", () => {
 
   it("returns 'LOI critical' label for assigned LOI-critical requirements", () => {
     const req = makeRequirement({
-      isLoiCritical: true,
+      isPrimaryGate: true,
       responsibleOrganizationId: "org-1",
     });
     const signal = classifyRequirement(req, REFERENCE);
@@ -175,7 +175,7 @@ describe("classifyRequirement", () => {
 
   it("assigns critical level for high-score requirements (overdue LOI critical unassigned)", () => {
     const req = makeRequirement({
-      isLoiCritical: true,
+      isPrimaryGate: true,
       targetDate: futureDate(-5),
       status: "in_progress",
     });
@@ -184,7 +184,7 @@ describe("classifyRequirement", () => {
   });
 
   it("score is 0 and level quiet when not applicable", () => {
-    const req = makeRequirement({ isApplicable: false, isLoiCritical: true });
+    const req = makeRequirement({ isApplicable: false, isPrimaryGate: true });
     const signal = classifyRequirement(req, REFERENCE);
     expect(signal.level).toBe("quiet");
   });

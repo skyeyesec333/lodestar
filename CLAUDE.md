@@ -2,12 +2,13 @@
 
 ## What this app does
 Lodestar is an infrastructure project lifecycle management platform
-for sponsors pursuing US EXIM Bank project finance. It tracks every
-stakeholder, meeting, document, and milestone from initial concept
-through Letter of Interest submission and Financial Close.
+for sponsors pursuing project finance across multiple programs:
+US EXIM Bank, DFI/IFC, commercial bank project finance, and private equity.
+It tracks every stakeholder, meeting, document, and milestone from
+initial concept through key approval milestones and Financial Close.
 
 The core metaphor: a live readiness score that tells the project
-owner exactly how close they are to a submittable EXIM data room,
+owner exactly how close they are to a submittable data room / gate package,
 at all times.
 
 ## Domain vocabulary
@@ -18,8 +19,9 @@ at all times.
 - **Final Commitment** — EXIM's binding financing approval, follows LOI
 - **CP / Condition Precedent** — a gating requirement that must be satisfied before the next phase
 - **Data room** — structured document repository assembled for lender/EXIM review
-- **Readiness score** — percentage of EXIM-required artifacts that are in substantially final or executed form
-- **Substantially final form** — EXIM's standard: contracts must be near-executed, not summaries or outlines
+- **Readiness score** — weighted percentage of required artifacts that are in substantially final or executed form; taxonomy is deal-type-specific
+- **Substantially final form** — lender/program standard: contracts must be near-executed, not summaries or outlines; terminology originates with EXIM
+- **Primary gate** — the program-agnostic term for LOI (EXIM), Board Approval (DFI), Credit Approval (commercial), or IC Approval (PE)
 - **IDC** — Interest During Construction, a key financing cost EXIM models
 - **CLS** — Country Limitation Schedule, EXIM's country-by-country eligibility rules
 - **Political-only cover** — narrower EXIM guarantee covering only political risk, not commercial
@@ -106,14 +108,17 @@ docs/
 - `src/lib/db/external-evidence.ts`
 
 ## Current build phase
-**Phase 1 — Alpha product.**
-The repo is past pure foundation work. It now includes an authenticated dashboard,
-project detail workflows, meetings, documents, requirements tracking, timeline UI,
-and an embedded assistant.
+**Phase 1 — Alpha product, multi-program aware.**
+The repo has a complete authenticated dashboard, project detail workflows,
+meetings, documents, requirements tracking, timeline UI, and an embedded assistant.
+Multi-program taxonomy is live: EXIM, DFI/IFC, commercial bank, and PE each have
+their own requirement set, phase labels, and gate config via `getProgramConfig()`.
 
-Current planning stance:
-- Runtime product scope is still EXIM-first.
-- Strategy may broaden beyond EXIM, but that is a product-planning decision, not
-  an implemented domain abstraction yet.
-- Prefer strengthening the current readiness spine before introducing a multi-program
-  taxonomy layer.
+Architecture rules for multi-program work:
+- `getRequirementsForDealType(dealType)` — single router for all taxonomies
+- `getProgramConfig(dealType)` — gate label, phase labels, hasBlockerColumn
+- `getStageLabel(stage, dealType)` — ProjectPhase display name per program
+- `getCategoryLabel(category)` — shared requirement category display name
+- `computeReadiness(statuses, dealType)` — program-agnostic scoring
+- `ProjectRequirementRow.isPrimaryGate` — renamed from `isLoiCritical`
+- `capexUsdCents` is `number | null` on `Project`/`ProjectListItem` — converted at DB boundary

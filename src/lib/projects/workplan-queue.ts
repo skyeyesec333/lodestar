@@ -9,7 +9,7 @@ export type WorkplanQueueItem = {
   category: string;
   phaseRequired: string;
   status: ProjectRequirementRow["status"];
-  isLoiCritical: boolean;
+  isPrimaryGate: boolean;
   targetDate: Date | null;
   responsibleOrganizationName: string | null;
   responsibleStakeholderName: string | null;
@@ -70,7 +70,7 @@ export function buildWorkplanQueue(
         category: row.category,
         phaseRequired: row.phaseRequired,
         status: row.status,
-        isLoiCritical: row.isLoiCritical,
+        isPrimaryGate: row.isPrimaryGate,
         targetDate: row.targetDate,
         responsibleOrganizationName: row.responsibleOrganizationName,
         responsibleStakeholderName: row.responsibleStakeholderName,
@@ -89,7 +89,7 @@ export function buildWorkplanQueue(
       continue;
     }
 
-    if (item.isLoiCritical) criticalNow.push(item);
+    if (item.isPrimaryGate) criticalNow.push(item);
     if (item.blockedByEvidence) missingEvidence.push(item);
     if (item.blockedByOwner) unowned.push(item);
     if (item.overdue) overdue.push(item);

@@ -72,7 +72,7 @@ export function buildGapAnalysisPrompt(
   const programConfig = getProgramConfig(effectiveDealType);
   const gateLabel = programConfig.primaryGateLabel;
 
-  const primaryGateItems = rows.filter((r) => r.isLoiCritical);
+  const primaryGateItems = rows.filter((r) => r.isPrimaryGate);
   const notStarted = primaryGateItems.filter((r) => r.status === "not_started");
   const inProgress = primaryGateItems.filter((r) => ["in_progress", "draft"].includes(r.status));
   const done = primaryGateItems.filter((r) => ["substantially_final", "executed", "waived"].includes(r.status));
@@ -85,7 +85,7 @@ export function buildGapAnalysisPrompt(
   const categoryLines = Object.entries(allByCategory)
     .map(([cat, items]) => {
       const statusSummary = items
-        .map((r) => `  - ${r.name}: ${REQUIREMENT_STATUS_LABELS[r.status]}${r.isLoiCritical ? ` [${gateLabel}]` : ""}`)
+        .map((r) => `  - ${r.name}: ${REQUIREMENT_STATUS_LABELS[r.status]}${r.isPrimaryGate ? ` [${gateLabel}]` : ""}`)
         .join("\n");
       return `${cat.toUpperCase()}:\n${statusSummary}`;
     })

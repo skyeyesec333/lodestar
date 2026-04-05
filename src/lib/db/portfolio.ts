@@ -71,7 +71,7 @@ function buildRequirementRowsForProject(
       description: definition.description,
       category: definition.category,
       phaseRequired: definition.phaseRequired,
-      isLoiCritical: definition.isPrimaryGate,
+      isPrimaryGate: definition.isPrimaryGate,
       weight: definition.weight,
       sortOrder: definition.sortOrder,
       status: (status?.status ?? "not_started") as RequirementStatusValue,

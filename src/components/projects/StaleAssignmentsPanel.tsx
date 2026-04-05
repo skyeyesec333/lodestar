@@ -1,4 +1,5 @@
 import { getStaleAssignments } from "@/lib/db/requirements";
+import { getCategoryLabel } from "@/lib/requirements/index";
 
 const STATUS_LABELS: Record<string, string> = {
   not_started: "Not started",
@@ -7,14 +8,6 @@ const STATUS_LABELS: Record<string, string> = {
   substantially_final: "Substantially final",
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Env & Social",
-};
 
 interface StaleAssignmentsPanelProps {
   projectId: string;
@@ -94,7 +87,7 @@ export async function StaleAssignmentsPanel({ projectId }: StaleAssignmentsPanel
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {items.map((item) => {
           const owner = item.assignedTo ?? item.responsibleParty ?? "—";
-          const categoryLabel = CATEGORY_LABELS[item.category] ?? item.category;
+          const categoryLabel = getCategoryLabel(item.category);
           const statusLabel = STATUS_LABELS[item.status] ?? item.status;
 
           return (

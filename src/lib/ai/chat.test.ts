@@ -68,7 +68,7 @@ describe("buildChatPrompt", () => {
     expect(prompt).toContain("Readiness score: 34.0%");
     expect(prompt).toContain("USER: Explain this page.");
     expect(prompt).toContain("APP CONTEXT");
-    expect(prompt).toContain("OFFICIAL EXIM CONTEXT");
+    expect(prompt).toContain("OFFICIAL PROGRAM CONTEXT");
     expect(prompt).toContain("Country Limitation Schedule");
   });
 

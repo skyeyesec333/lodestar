@@ -1,5 +1,5 @@
 import { db } from "./index";
-import { getRequirementsForDealType } from "@/lib/requirements/index";
+import { getRequirementsForDealType, getCategoryLabel } from "@/lib/requirements/index";
 import type { RequirementDef } from "@/lib/requirements/types";
 import type { RequirementStatusValue } from "@/types/requirements";
 import type { AppError, Result } from "@/types";
@@ -33,7 +33,7 @@ export type ProjectRequirementRow = {
   description: string;
   category: string;
   phaseRequired: string;
-  isLoiCritical: boolean;
+  isPrimaryGate: boolean;
   weight: number;
   sortOrder: number;
   status: RequirementStatusValue;
@@ -96,7 +96,7 @@ function buildRows(
       description: req.description,
       category: req.category,
       phaseRequired: req.phaseRequired,
-      isLoiCritical: req.isPrimaryGate,
+      isPrimaryGate: req.isPrimaryGate,
       weight: req.weight,
       sortOrder: req.sortOrder,
       status: (live?.status ?? "not_started") as RequirementStatusValue,
@@ -375,14 +375,6 @@ export type CategoryBreakdown = {
   blockingRequirements: BlockingRequirement[];
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Env & Social",
-};
 
 // ── Stale assignments ─────────────────────────────────────────────────────────
 
@@ -501,7 +493,7 @@ export async function getRequirementCategoryBreakdown(
 
     const breakdown: CategoryBreakdown[] = Object.entries(groups).map(([cat, counts]) => ({
       category: cat,
-      label: CATEGORY_LABELS[cat] ?? cat,
+      label: getCategoryLabel(cat),
       total: counts.total,
       completed: counts.completed,
       inProgress: counts.inProgress,

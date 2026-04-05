@@ -11,7 +11,7 @@ export type OwnershipLoadBoardRequirement = Pick<
   | "name"
   | "category"
   | "phaseRequired"
-  | "isLoiCritical"
+  | "isPrimaryGate"
   | "status"
   | "isApplicable"
   | "responsibleOrganizationId"
@@ -98,7 +98,7 @@ export function classifyRequirement(
   const isSoon = dueDays !== null && dueDays >= 0 && dueDays <= 14;
 
   let score = 0;
-  if (requirement.isLoiCritical) score += 24;
+  if (requirement.isPrimaryGate) score += 24;
   if (!hasOwner) score += 18;
   if (isLate) score += 36;
   else if (isSoon) score += 18;
@@ -130,7 +130,7 @@ export function classifyRequirement(
   } else if (!hasOwner) {
     label = "Unassigned";
     detail = "Unassigned owner";
-  } else if (requirement.isLoiCritical) {
+  } else if (requirement.isPrimaryGate) {
     label = "LOI critical";
     detail = "Next-gate blocker";
   } else if (isBlocked) {

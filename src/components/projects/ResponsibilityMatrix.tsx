@@ -1,4 +1,5 @@
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
+import { getCategoryLabel } from "@/lib/requirements/index";
 import type { RequirementStatusValue } from "@/types/requirements";
 import {
   detailMonoLabelStyle,
@@ -30,19 +31,11 @@ function formatTargetDate(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Env & Social",
-};
 
 export function ResponsibilityMatrix({ requirements }: Props) {
   // Filter: LOI-critical and applicable
   const applicable = requirements.filter(
-    (r) => r.isLoiCritical && r.isApplicable !== false
+    (r) => r.isPrimaryGate && r.isApplicable !== false
   );
 
   // Group by responsibleOrganizationName; null → "Unassigned"
@@ -233,7 +226,7 @@ export function ResponsibilityMatrix({ requirements }: Props) {
                           textOverflow: "ellipsis",
                         }}
                       >
-                        {CATEGORY_LABELS[req.category] ?? req.category}
+                        {getCategoryLabel(req.category)}
                       </span>
 
                       {/* Responsible person */}

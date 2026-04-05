@@ -1,6 +1,7 @@
 "use client";
 
 import type { GateCheckResult, GateBlocker } from "@/lib/projects/stage-gate";
+import { getCategoryLabel } from "@/lib/requirements/index";
 
 export type { GateCheckResult };
 
@@ -12,14 +13,6 @@ type Props = {
   onCancel: () => void;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Env & Social",
-};
 
 function CategoryBadge({ category }: { category: string }) {
   return (
@@ -38,7 +31,7 @@ function CategoryBadge({ category }: { category: string }) {
         flexShrink: 0,
       }}
     >
-      {CATEGORY_LABELS[category] ?? category}
+      {getCategoryLabel(category)}
     </span>
   );
 }

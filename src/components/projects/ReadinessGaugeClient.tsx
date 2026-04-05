@@ -8,6 +8,7 @@ import {
   detailSurfaceCardStyle,
 } from "./projectDetailStyles";
 import { recalculateReadiness } from "@/actions/projects";
+import { getCategoryLabel } from "@/lib/requirements/index";
 
 type Props = {
   scoreBps: number;
@@ -19,14 +20,6 @@ type Props = {
   cachedScoreUpdatedAt: Date | null;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Env & Social",
-};
 
 const CATEGORY_ORDER = [
   "contracts",
@@ -90,7 +83,7 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
   const orderedCategoryScores = CATEGORY_ORDER
     .map((key) => ({
       key,
-      label: CATEGORY_LABELS[key],
+      label: getCategoryLabel(key),
       scoreBps: categoryScores[key],
     }))
     .filter((entry) => typeof entry.scoreBps === "number");

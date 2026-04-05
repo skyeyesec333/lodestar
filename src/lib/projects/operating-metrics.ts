@@ -133,7 +133,7 @@ export function buildProjectOperatingMetrics(input: {
     if (docCount === 0) uncoveredRequirementCount += 1;
     else coveredRequirementCount += 1;
 
-    if (row.isLoiCritical && !done) {
+    if (row.isPrimaryGate && !done) {
       criticalOpenCount += 1;
       if (!row.responsibleOrganizationId && !row.responsibleStakeholderId) {
         unassignedCriticalCount += 1;

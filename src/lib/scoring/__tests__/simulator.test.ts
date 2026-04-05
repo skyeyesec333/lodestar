@@ -29,7 +29,7 @@ function makeRow(
     description: def?.description ?? "",
     category: def?.category ?? "contracts",
     phaseRequired: def?.phaseRequired ?? "loi",
-    isLoiCritical: def?.isLoiCritical ?? false,
+    isPrimaryGate: def?.isLoiCritical ?? false,
     weight: def?.weight ?? 100,
     sortOrder: def?.sortOrder ?? 1,
     status,

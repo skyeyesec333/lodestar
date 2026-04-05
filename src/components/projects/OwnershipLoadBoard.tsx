@@ -15,7 +15,7 @@ export type OwnershipLoadBoardRequirement = Pick<
   | "name"
   | "category"
   | "phaseRequired"
-  | "isLoiCritical"
+  | "isPrimaryGate"
   | "status"
   | "isApplicable"
   | "responsibleOrganizationId"
@@ -129,7 +129,7 @@ function classifyRequirement(requirement: OwnershipLoadBoardRequirement): Requir
   const isSoon = dueDays !== null && dueDays >= 0 && dueDays <= 14;
 
   let score = 0;
-  if (requirement.isLoiCritical) score += 24;
+  if (requirement.isPrimaryGate) score += 24;
   if (!requirement.isApplicable) score += 0;
   if (!hasOwner) score += 18;
   if (isLate) score += 36;
@@ -163,7 +163,7 @@ function classifyRequirement(requirement: OwnershipLoadBoardRequirement): Requir
   } else if (!hasOwner) {
     label = "Unassigned";
     detail = "Unassigned owner";
-  } else if (requirement.isLoiCritical) {
+  } else if (requirement.isPrimaryGate) {
     label = "LOI critical";
     detail = "Next-gate blocker";
   } else if (isBlocked) {
@@ -501,7 +501,7 @@ export function OwnershipLoadBoard({
                             textOverflow: "ellipsis",
                           }}
                         >
-                          {[item.requirement.category, item.requirement.phaseRequired, item.requirement.isLoiCritical ? "LOI critical" : null]
+                          {[item.requirement.category, item.requirement.phaseRequired, item.requirement.isPrimaryGate ? "LOI critical" : null]
                             .filter(Boolean)
                             .join(" · ")}
                         </div>

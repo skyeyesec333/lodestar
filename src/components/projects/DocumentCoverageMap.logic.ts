@@ -4,6 +4,7 @@
 import type { DocumentRow } from "@/lib/db/documents";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_CATEGORIES } from "@/lib/exim/requirements";
+import { getCategoryLabel } from "@/lib/requirements/index";
 
 export type CoverageBucket = {
   category: string;
@@ -23,14 +24,6 @@ export type CoverageResult = {
   docsByRequirementId: Map<string, DocumentRow[]>;
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Environmental / Social",
-};
 
 export function computeCoverage(
   requirementRows: ProjectRequirementRow[],
@@ -62,7 +55,7 @@ export function computeCoverage(
     }, 0);
     return {
       category,
-      label: CATEGORY_LABELS[category] ?? category.replace(/_/g, " "),
+      label: getCategoryLabel(category),
       requirements,
       coveredCount,
       applicableCount,
@@ -80,7 +73,7 @@ export function computeCoverage(
       ? Math.round((coveredRequirements.length / applicableRequirements.length) * 100)
       : 0;
 
-  const loiCriticalRows = applicableRequirements.filter((row) => row.isLoiCritical);
+  const loiCriticalRows = applicableRequirements.filter((row) => row.isPrimaryGate);
   const loiCriticalCovered = loiCriticalRows.filter((row) => {
     const docs = docsByRequirementId.get(row.projectRequirementId) ?? [];
     return docs.length > 0;

@@ -21,7 +21,7 @@ function makeRow(overrides: Partial<ProjectRequirementRow> = {}): ProjectRequire
     description: "A test requirement",
     category: "contracts",
     phaseRequired: "loi",
-    isLoiCritical: false,
+    isPrimaryGate: false,
     weight: 5,
     sortOrder: 1,
     status: "not_started",
@@ -90,8 +90,8 @@ describe("getPriority", () => {
   });
 
   it("gives LOI-critical requirements higher base score", () => {
-    const loiRow = makeRow({ isLoiCritical: true });
-    const normalRow = makeRow({ isLoiCritical: false });
+    const loiRow = makeRow({ isPrimaryGate: true });
+    const normalRow = makeRow({ isPrimaryGate: false });
     expect(getPriority(loiRow, null)).toBeGreaterThan(getPriority(normalRow, null));
   });
 
@@ -141,7 +141,7 @@ describe("getStatusTone", () => {
   });
 
   it("returns warning for LOI critical", () => {
-    expect(getStatusTone(makeRow({ isLoiCritical: true }), 60)).toBe("warning");
+    expect(getStatusTone(makeRow({ isPrimaryGate: true }), 60)).toBe("warning");
   });
 
   it("returns warning when due within 30 days", () => {
@@ -210,12 +210,12 @@ describe("buildItems", () => {
     // overdue LOI-critical: 80 + 100 = 180; future LOI-critical at 10d: 80 + 60 = 140
     const future = makeRow({
       projectRequirementId: "future",
-      isLoiCritical: true,
+      isPrimaryGate: true,
       targetDate: targetDate(10),
     });
     const overdue = makeRow({
       projectRequirementId: "overdue",
-      isLoiCritical: true,
+      isPrimaryGate: true,
       targetDate: targetDate(-1),
     });
     const items = buildItems([future, overdue], REFERENCE_DATE);

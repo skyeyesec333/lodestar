@@ -38,7 +38,7 @@ export function getPriority(row: ProjectRequirementRow, daysUntilDue: number | n
   const isClosed = row.status === "executed" || row.status === "waived" || !row.isApplicable;
   if (isClosed) return 0;
 
-  let score = row.isLoiCritical ? 80 : 40;
+  let score = row.isPrimaryGate ? 80 : 40;
   if (daysUntilDue !== null) {
     if (daysUntilDue < 0) score += 100;
     else if (daysUntilDue <= 14) score += 60;
@@ -60,7 +60,7 @@ export function getStatusTone(
 ): StatusTone {
   if (row.status === "executed" || row.status === "waived" || !row.isApplicable) return "done";
   if (daysUntilDue !== null && daysUntilDue < 0) return "critical";
-  if (row.isLoiCritical || (daysUntilDue !== null && daysUntilDue <= 30)) return "warning";
+  if (row.isPrimaryGate || (daysUntilDue !== null && daysUntilDue <= 30)) return "warning";
   return "neutral";
 }
 

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { computeReadiness } from "@/lib/scoring/index";
-import { getProgramConfig, getStageLabel } from "@/lib/requirements/index";
+import { getProgramConfig, getStageLabel, getCategoryLabel } from "@/lib/requirements/index";
 import { countryLabel } from "@/lib/projects/country-label";
 import { resolveClerkUsers } from "@/lib/clerk/resolve-users";
 import { ReadinessGauge } from "@/components/projects/ReadinessGauge";
@@ -378,14 +378,6 @@ export default async function ProjectPage({
   };
 
   // Compute category breakdown from already-fetched requirement rows (no extra DB call)
-  const CATEGORY_LABELS_LOCAL: Record<string, string> = {
-    contracts: "Contracts",
-    financial: "Financial",
-    studies: "Studies",
-    permits: "Permits",
-    corporate: "Corporate",
-    environmental_social: "Env & Social",
-  };
   const categoryBreakdown: CategoryBreakdown[] = (() => {
     const groups: Record<
       string,
@@ -420,7 +412,7 @@ export default async function ProjectPage({
     }
     return Object.entries(groups).map(([cat, counts]) => ({
       category: cat,
-      label: CATEGORY_LABELS_LOCAL[cat] ?? cat,
+      label: getCategoryLabel(cat),
       total: counts.total,
       completed: counts.completed,
       inProgress: counts.inProgress,
@@ -444,7 +436,7 @@ export default async function ProjectPage({
       );
     })
     .sort((a, b) => {
-      if (a.isLoiCritical !== b.isLoiCritical) return a.isLoiCritical ? -1 : 1;
+      if (a.isPrimaryGate !== b.isPrimaryGate) return a.isPrimaryGate ? -1 : 1;
       return a.sortOrder - b.sortOrder;
     });
   const orphanedEvidenceCount =
@@ -460,7 +452,7 @@ export default async function ProjectPage({
   }).length;
   const linkedCoveragePct =
     applicableRequirementCount > 0 ? Math.round((linkedRequirementCount / applicableRequirementCount) * 100) : 0;
-  const criticalEvidenceRows = rows.filter((row) => row.isApplicable !== false && row.isLoiCritical);
+  const criticalEvidenceRows = rows.filter((row) => row.isApplicable !== false && row.isPrimaryGate);
   const linkedCriticalEvidenceCount = criticalEvidenceRows.filter((row) =>
     documents.some((document) => document.projectRequirementId === row.projectRequirementId) ||
     externalEvidence.some((evidence) => evidence.projectRequirementId === row.projectRequirementId)
@@ -583,7 +575,7 @@ export default async function ProjectPage({
         level,
         label: row.name,
         detail,
-        category: CATEGORY_LABELS_LOCAL[row.category] ?? row.category,
+        category: getCategoryLabel(row.category),
       });
     }
     // Sort: critical first, then warning, then info — cap at 8
@@ -1551,7 +1543,7 @@ export default async function ProjectPage({
             category: r.category,
             status: r.status,
             isApplicable: r.isApplicable,
-            isLoiCritical: r.isLoiCritical,
+            isPrimaryGate: r.isPrimaryGate,
           }))}
         />
 
@@ -1756,7 +1748,7 @@ export default async function ProjectPage({
             requirementId: row.requirementId,
             name: row.name,
             category: row.category,
-            isLoiCritical: row.isLoiCritical,
+            isPrimaryGate: row.isPrimaryGate,
           }))}
         />
 

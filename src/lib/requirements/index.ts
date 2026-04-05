@@ -124,6 +124,22 @@ export function getStageLabel(stage: string, dealType: string): string {
   return labels[stage] ?? stage.replace(/_/g, " ");
 }
 
+// ─── Category label resolver ──────────────────────────────────────────────────
+
+const CATEGORY_LABELS: Record<string, string> = {
+  contracts: "Contracts",
+  financial: "Financial",
+  studies: "Studies",
+  permits: "Permits",
+  corporate: "Corporate",
+  environmental_social: "Environmental & Social",
+};
+
+/** Returns the display label for a requirement category key. */
+export function getCategoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] ?? category.replace(/_/g, " ");
+}
+
 // ─── Taxonomy resolver ────────────────────────────────────────────────────────
 
 /**

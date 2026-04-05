@@ -28,7 +28,7 @@ function makeReq(overrides: Partial<ProjectRequirementRow> = {}): ProjectRequire
     description: "A test requirement",
     category: "commercial",
     phaseRequired: "loi_submitted",
-    isLoiCritical: false,
+    isPrimaryGate: false,
     weight: 1,
     sortOrder: 0,
     status: "not_started",
@@ -47,9 +47,9 @@ function makeReq(overrides: Partial<ProjectRequirementRow> = {}): ProjectRequire
 }
 
 const BASE_ROWS: ProjectRequirementRow[] = [
-  makeReq({ requirementId: "req-1", name: "EPC Term Sheet", category: "commercial", isLoiCritical: true, status: "not_started" }),
-  makeReq({ requirementId: "req-2", name: "Financial Model", category: "financial", isLoiCritical: true, status: "in_progress" }),
-  makeReq({ requirementId: "req-3", name: "ESIA", category: "environmental", isLoiCritical: false, status: "not_started" }),
+  makeReq({ requirementId: "req-1", name: "EPC Term Sheet", category: "commercial", isPrimaryGate: true, status: "not_started" }),
+  makeReq({ requirementId: "req-2", name: "Financial Model", category: "financial", isPrimaryGate: true, status: "in_progress" }),
+  makeReq({ requirementId: "req-3", name: "ESIA", category: "environmental", isPrimaryGate: false, status: "not_started" }),
 ];
 
 // The dealType parameter to buildGapAnalysisPrompt is a plain string (business-level value).

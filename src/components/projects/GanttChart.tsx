@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import type { RequirementStatusValue } from "@/types/requirements";
-import { getProgramConfig } from "@/lib/requirements";
+import { getProgramConfig, getCategoryLabel } from "@/lib/requirements";
 
 // ─── Gantt tour (fullscreen only) ─────────────────────────────────────────────
 
@@ -174,14 +174,6 @@ const CATEGORY_ORDER = [
   "environmental_social",
 ] as const;
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Env & Social",
-};
 
 // Theme-safe: accent colors that work across all themes.
 // We deliberately avoid "var(--accent-soft)" for bar fills because on slate
@@ -279,7 +271,7 @@ function predictCompletion(
     const deadline  = loiDate ?? new Date(today.getTime() + 120 * 864e5);
     const runwayMs  = Math.max(deadline.getTime() - today.getTime(), 7 * 864e5);
     const durMs     = Math.min(remaining * runwayMs * 0.75, runwayMs);
-    const offsetMs  = row.isLoiCritical ? 0 : runwayMs * 0.12 * (1 - progress);
+    const offsetMs  = row.isPrimaryGate ? 0 : runwayMs * 0.12 * (1 - progress);
     const start     = new Date(today.getTime() + offsetMs);
     const end       = new Date(start.getTime() + durMs);
     return { start, end: end > deadline ? deadline : end };
@@ -719,7 +711,7 @@ function GanttSVG({
                 fill="var(--ink)"
                 style={{ textTransform: "uppercase" }}
               >
-                {CATEGORY_LABELS[ganttRow.cat]}
+                {getCategoryLabel(ganttRow.cat)}
               </text>
               <line
                 x1={LABEL_W}
@@ -812,7 +804,7 @@ function GanttSVG({
             </text>
 
             {/* LOI-critical dot */}
-            {row.isLoiCritical && (
+            {row.isPrimaryGate && (
               <circle
                 cx={LABEL_W - 4}
                 cy={y + d.rowH / 2}
@@ -855,7 +847,7 @@ function GanttSVG({
                     lines: [
                       row.name,
                       STATUS_LABELS[status],
-                      row.isLoiCritical
+                      row.isPrimaryGate
                         ? `${phaseLabels["loi"] ?? row.phaseRequired} Critical`
                         : (phaseLabels[row.phaseRequired] ?? row.phaseRequired) + " Phase",
                     ],

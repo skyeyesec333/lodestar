@@ -3,6 +3,7 @@ import type { DocumentRow } from "@/lib/db/documents";
 import type { ExternalEvidenceRow } from "@/lib/db/external-evidence";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_CATEGORIES } from "@/lib/exim/requirements";
+import { getCategoryLabel } from "@/lib/requirements/index";
 import {
   detailMicroMonoStyle,
   detailMonoLabelStyle,
@@ -35,14 +36,6 @@ type RequirementEvidenceItem = {
   kind: "document" | "external";
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Environmental / Social",
-};
 
 const CATEGORY_ACCENTS: Record<string, string> = {
   contracts: "var(--accent)",
@@ -164,7 +157,7 @@ export function DocumentCoverageMap({
 
     return {
       category,
-      label: CATEGORY_LABELS[category] ?? category.replace(/_/g, " "),
+      label: getCategoryLabel(category),
       requirements,
       coveredCount,
       applicableCount,
@@ -182,7 +175,7 @@ export function DocumentCoverageMap({
     applicableRequirements.length > 0
       ? Math.round((requiredWithDocs / applicableRequirements.length) * 100)
       : 0;
-  const loaCriticalRows = applicableRequirements.filter((row) => row.isLoiCritical);
+  const loaCriticalRows = applicableRequirements.filter((row) => row.isPrimaryGate);
   const loaCriticalCovered = loaCriticalRows.filter((row) => {
     const evidenceForRequirement = evidenceByRequirementId.get(row.projectRequirementId) ?? [];
     return evidenceForRequirement.length > 0;
@@ -332,7 +325,7 @@ export function DocumentCoverageMap({
             .sort((a, b) => {
               const aDocCount = (evidenceByRequirementId.get(a.projectRequirementId) ?? []).length;
               const bDocCount = (evidenceByRequirementId.get(b.projectRequirementId) ?? []).length;
-              if (a.isLoiCritical !== b.isLoiCritical) return a.isLoiCritical ? -1 : 1;
+              if (a.isPrimaryGate !== b.isPrimaryGate) return a.isPrimaryGate ? -1 : 1;
               if (aDocCount !== bDocCount) return aDocCount - bDocCount;
               return a.sortOrder - b.sortOrder;
             })
@@ -453,7 +446,7 @@ export function DocumentCoverageMap({
                             }}
                           >
                             {formatStatus(row.status)}
-                            {row.isLoiCritical ? " · LOI-critical" : ""}
+                            {row.isPrimaryGate ? " · LOI-critical" : ""}
                           </p>
                         </div>
 

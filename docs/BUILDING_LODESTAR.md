@@ -94,6 +94,71 @@ The fix was a SQL migration. But getting the migration there was its own journey
 
 The final session cleaned up the feature branch. Everything from months of work on `wip/hybrid-sync` was merged to `main` in a single `--no-ff` merge commit and the branch deleted.
 
+### Phase 9 — Beacon live data
+
+Beacon was wired to live project data without new DB queries. Signals (critical/warning/info) were derived directly from already-fetched requirement rows and LOI blocker lists. Document coverage was computed from `categoryBreakdown` and `evidenceMissingRows`. New types `BeaconSignal`, `BeaconSignalLevel`, and `BeaconDocumentCoverage` were added to `src/types/index.ts`. `BeaconPanel` now accepts `signals?` and `documentCoverage?` props with empty-state fallbacks, removing all mock data.
+
+**The lesson:** Derive signals from data the page already fetches rather than adding new DB queries for the Beacon panel. The page data model is rich enough that Beacon context can be generated for free.
+
+### Phase 10 — Operational polish
+
+Several operational gaps were addressed in parallel:
+
+- **Notification bell enrichment:** `recordActivity` call sites were enriched to pass `requirementName`, `newStatus`, and other metadata. The `buildMessage` function in `getProjectNotifications` maps these into human-readable feed entries. An `excludeSelf` param (default `true`) was added so users don't see their own activity.
+- **Email notifications:** `sendRequirementAssignedEmail` was added to `src/lib/notifications/email.ts`. All email templates use a `esc()` HTML entity-escaping helper on every user-controlled interpolated value to prevent XSS.
+- **Fire-and-forget pattern:** Email sends are always `promise.then(...).catch(() => {})` — never awaited — so email failures never block the mutation response.
+- **Theme picker fix:** The root cause was `overflow: hidden` on the `.ls-nav-links` container clipping absolutely-positioned dropdowns. Fixed by splitting into an outer flex wrapper (no overflow) and an inner nav-links div, with `ThemeSwitcher`, `NotificationBell`, and `UserButton` moved outside the overflow-hidden container.
+
+**The XSS lesson:** Any time user-controlled values are interpolated into HTML email bodies, they must be escaped. Using an `esc()` helper at every interpolation site is safer than trying to sanitize at the storage layer.
+
+### Phase 11 — Navigation and responsive fixes
+
+- **SectionSubNav:** A `"use client"` pill-row component using IntersectionObserver and scroll events to track which sub-section is active. Used in Workplan (Readiness, Gap Analysis), Evidence (Requirements), and Execution (Meetings, Activity, PM Signals, Timeline) sections.
+- **ResponsibilityMatrix:** Wrapped grid in `overflow: auto` container with `minWidth: 620px` to prevent cramping on narrow viewports.
+- **SearchBar:** Width changed from fixed `208px` to `min(208px, 100%)` for responsive behavior.
+- **Team nav section:** Added `{ id: "section-collaborators", label: "Team" }` to `PROJECT_SECTIONS` between Summary and Overview.
+
+### Phase 12 — Trendline history
+
+The trendline was showing "No history" because snapshots were only written when users explicitly added notes. Fixed by always calling `addRequirementNote` with an empty string on every status change. A `AND note != ''` filter was added to the `fetchNotesMap` SQL query to prevent silent snapshots from appearing in the UI notes thread. The trendline reconstructs history from `RequirementNote.statusSnapshot` fields.
+
+**The silent snapshot pattern:** Write a note record on every status change (empty body, with `statusSnapshot`). Filter `note != ''` in the notes UI query. The trendline uses all records; the notes thread only shows real notes.
+
+### Phase 13 — Onboarding arc
+
+Three components were built to improve the new-deal onboarding experience:
+
+- **FirstRunOverlay** (`src/components/projects/FirstRunOverlay.tsx`): A `"use client"` component that detects `?new=1` in the URL (set by `NewProjectPage` on redirect) and checks `localStorage` for a per-project dismissal key. Shows a 5-action modal with deal-type-specific content. Dismisses by calling `router.replace` to strip `?new=1`. Must be wrapped in `<Suspense fallback={null}>` because it uses `useSearchParams()`.
+- **SetupChecklist** (`src/components/projects/SetupChecklist.tsx`): A server component placed at the top of the overview section. Derives completion from already-passed page props (stakeholders, milestones, documents, concept, meetings). Returns `null` when all 5 items are complete. Shows a progress bar when incomplete.
+- **Requirement info panels:** An ℹ button was added to every requirement row in `RequirementsChecklist.tsx`. Clicking it reveals an inline info panel with `getSubstantiallyFinalText(category)` guidance and `getTypicalOwner(category, orgName)` for ownership context.
+
+**The Suspense lesson:** In Next.js 15 App Router, any client component that calls `useSearchParams()` must be wrapped in `<Suspense>` at the server component boundary. Without it, the build throws a runtime error. This is not optional — the framework enforces it.
+
+### Phase 14 — Concept section redesign
+
+The Concept section had four equal-sized cards in a `repeat(auto-fit, minmax(220px, 1fr))` grid that looked underdeveloped — two of them appeared blank at wide viewports. Replaced with a deliberate two-column layout: `ProjectConceptPanel` on the left (wider), and a three-panel right sidebar stacking "Deal snapshot" (key deal assumptions with a gate review status strip), "Concept completeness" (checklist with progress bar), and "Open gaps" (only shown when there are unfilled concept fields).
+
+**The layout lesson:** A 4-equal-card grid without clear hierarchy looks like a placeholder. When one item is clearly primary (the editor), give it more space and group the supporting context in a sidebar.
+
+---
+
+## Agent orchestration pattern
+
+Several phases used parallel agent worktrees to build independent features simultaneously:
+
+```
+Agent 1 (worktree A): build feature X
+Agent 2 (worktree B): build feature Y
+Agent 3 (worktree C): build feature Z
+QA Agent: independently verify all three after merge
+```
+
+The worktree isolation means each agent has its own file system copy and can't conflict with the others. After all worktree agents complete, changes are cherry-picked or merged back. A QA agent then runs independently to verify behavior without being influenced by the implementation agents.
+
+**When to use this pattern:** Three or more features that share no file dependencies. Don't use it for features that touch the same component or action file.
+
+**The QA agent role:** The QA agent should be given the feature spec (what it should do) and told to read the resulting code and check for correctness, edge cases, and regressions — not just that it compiled. XSS in email templates and missing `<Suspense>` wrappers were caught by QA agents, not implementation agents.
+
 ---
 
 ## Patterns to remember

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { DocumentRow } from "@/lib/db/documents";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
+import { getCategoryLabel } from "@/lib/requirements/index";
 import { BulkStatusBar } from "@/components/requirements/BulkStatusBar";
 import { RequirementEvidenceUpload } from "@/components/requirements/RequirementEvidenceUpload";
 import { RequirementNotesQuickInput } from "@/components/requirements/RequirementNotesQuickInput";
@@ -39,9 +40,6 @@ const STATUS_OPTIONS: RequirementStatusValue[] = [
   "waived",
 ];
 
-function categoryLabel(category: string): string {
-  return category.replace(/_/g, " ");
-}
 
 function phaseLabel(phase: string): string {
   return phase.replace(/_/g, " ");
@@ -133,7 +131,7 @@ function QueueRow({
 
       <div style={{ minWidth: 0 }}>
         <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "6px" }}>
-          {item.isLoiCritical ? (
+          {item.isPrimaryGate ? (
             <span
               style={{
                 fontFamily: "'DM Mono', monospace",
@@ -159,7 +157,7 @@ function QueueRow({
               color: "var(--ink-muted)",
             }}
           >
-            {categoryLabel(item.category)} · {phaseLabel(item.phaseRequired)}
+            {getCategoryLabel(item.category)} · {phaseLabel(item.phaseRequired)}
           </span>
         </div>
         <div

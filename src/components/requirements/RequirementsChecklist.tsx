@@ -12,7 +12,7 @@ import type { TeamMember } from "@/types/collaboration";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
 import { WatchButton } from "@/components/collaboration/WatchButton";
-import { getProgramConfig } from "@/lib/requirements/index";
+import { getProgramConfig, getCategoryLabel } from "@/lib/requirements/index";
 
 type StakeholderOption = { id: string; name: string };
 type OrganizationOption = { id: string; name: string };
@@ -36,24 +36,6 @@ const CATEGORY_ORDER = [
   "environmental_social",
 ] as const;
 
-const CATEGORY_LABELS: Record<string, string> = {
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-  environmental_social: "Environmental & Social",
-};
-
-
-const IFC_CATEGORY_LABELS: Record<string, string> = {
-  environmental_social: "Environmental & Social",
-  contracts: "Contracts",
-  financial: "Financial",
-  studies: "Studies",
-  permits: "Permits",
-  corporate: "Corporate",
-};
 
 const IFC_CATEGORY_ORDER = [
   "environmental_social",
@@ -1068,13 +1050,13 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
 
   const grouped = CATEGORY_ORDER.map((cat) => ({
     category: cat,
-    label: CATEGORY_LABELS[cat],
+    label: getCategoryLabel(cat),
     items: rows.filter((r) => r.category === cat),
   }));
 
   const ifcGrouped = IFC_CATEGORY_ORDER.map((cat) => ({
     category: cat,
-    label: IFC_CATEGORY_LABELS[cat] ?? cat,
+    label: getCategoryLabel(cat),
     items: rows.filter((r) => r.category === cat),
   }));
 
@@ -1227,7 +1209,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         backgroundColor: "var(--bg-card)",
                         border: "1px solid var(--border)",
                         borderTop: "none",
-                        borderLeft: row.isLoiCritical ? "3px solid var(--accent)" : "1px solid var(--border)",
+                        borderLeft: row.isPrimaryGate ? "3px solid var(--accent)" : "1px solid var(--border)",
                         opacity: isUpdating ? 0.6 : 1,
                         transition: "opacity 0.15s, box-shadow 0.2s",
                       }}
@@ -1275,7 +1257,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                             >
                               ℹ
                             </button>
-                            {row.isLoiCritical ? (
+                            {row.isPrimaryGate ? (
                               <span
                                 style={{
                                   fontFamily: "'DM Mono', monospace",
@@ -1384,7 +1366,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                       {/* Collaboration row */}
                       {showCollab && row.isApplicable && (
                         <>
-                          {row.isLoiCritical && (
+                          {row.isPrimaryGate && (
                             <ApprovalBadge
                               projectId={projectId}
                               slug={slug}
@@ -1799,7 +1781,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                     backgroundColor: "var(--bg-card)",
                     border: "1px solid var(--border)",
                     borderTop: "none",
-                    borderLeft: row.isLoiCritical ? "3px solid var(--accent)" : "1px solid var(--border)",
+                    borderLeft: row.isPrimaryGate ? "3px solid var(--accent)" : "1px solid var(--border)",
                     opacity: isUpdating ? 0.6 : 1,
                     transition: "opacity 0.15s, box-shadow 0.2s",
                   }}
@@ -1847,7 +1829,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         >
                           ℹ
                         </button>
-                        {row.isLoiCritical ? (
+                        {row.isPrimaryGate ? (
                           <span
                             style={{
                               fontFamily: "'DM Mono', monospace",
@@ -1995,7 +1977,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         {/* Collaboration: approval badge + watch (LOI-critical or applicable items) */}
                         {showCollab && row.isApplicable && (
                           <>
-                            {row.isLoiCritical && (
+                            {row.isPrimaryGate && (
                               <ApprovalBadge
                                 projectId={projectId}
                                 slug={slug}

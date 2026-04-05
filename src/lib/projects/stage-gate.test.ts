@@ -10,7 +10,7 @@ function makeReq(overrides: Partial<ProjectRequirementRow> = {}): ProjectRequire
     description: "A requirement",
     category: "commercial",
     phaseRequired: "loi_submitted",
-    isLoiCritical: false,
+    isPrimaryGate: false,
     weight: 1,
     sortOrder: 0,
     status: "not_started",
@@ -31,8 +31,8 @@ function makeReq(overrides: Partial<ProjectRequirementRow> = {}): ProjectRequire
 describe("checkStageGate — loi_submitted", () => {
   it("returns canAdvance: true and no blockers when there are no LOI-critical items", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: false, status: "not_started" }),
-      makeReq({ requirementId: "req-2", isLoiCritical: false, status: "in_progress" }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: false, status: "not_started" }),
+      makeReq({ requirementId: "req-2", isPrimaryGate: false, status: "in_progress" }),
     ];
 
     const result = checkStageGate("loi_submitted", requirements);
@@ -43,8 +43,8 @@ describe("checkStageGate — loi_submitted", () => {
 
   it("returns canAdvance: true when all LOI-critical items are substantially_final", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: true, status: "substantially_final" }),
-      makeReq({ requirementId: "req-2", isLoiCritical: true, status: "executed" }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: true, status: "substantially_final" }),
+      makeReq({ requirementId: "req-2", isPrimaryGate: true, status: "executed" }),
     ];
 
     const result = checkStageGate("loi_submitted", requirements);
@@ -55,9 +55,9 @@ describe("checkStageGate — loi_submitted", () => {
 
   it("returns canAdvance: false and lists blockers when LOI-critical items are not done", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", name: "EPC Term Sheet", isLoiCritical: true, status: "not_started" }),
-      makeReq({ requirementId: "req-2", name: "Off-take Agreement", isLoiCritical: true, status: "in_progress" }),
-      makeReq({ requirementId: "req-3", name: "Financial Model", isLoiCritical: true, status: "substantially_final" }),
+      makeReq({ requirementId: "req-1", name: "EPC Term Sheet", isPrimaryGate: true, status: "not_started" }),
+      makeReq({ requirementId: "req-2", name: "Off-take Agreement", isPrimaryGate: true, status: "in_progress" }),
+      makeReq({ requirementId: "req-3", name: "Financial Model", isPrimaryGate: true, status: "substantially_final" }),
     ];
 
     const result = checkStageGate("loi_submitted", requirements);
@@ -71,7 +71,7 @@ describe("checkStageGate — loi_submitted", () => {
 
   it("excludes isApplicable: false items from hard blockers", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: true, status: "not_started", isApplicable: false }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: true, status: "not_started", isApplicable: false }),
     ];
 
     const result = checkStageGate("loi_submitted", requirements);
@@ -83,7 +83,7 @@ describe("checkStageGate — loi_submitted", () => {
   it("treats status=not_applicable as a blocker when the item is LOI-critical and isApplicable: true", () => {
     // 'not_applicable' status is NOT in DONE_STATUSES — structural exclusion requires isApplicable: false
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: true, status: "not_applicable", isApplicable: true }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: true, status: "not_applicable", isApplicable: true }),
     ];
 
     const result = checkStageGate("loi_submitted", requirements);
@@ -94,9 +94,9 @@ describe("checkStageGate — loi_submitted", () => {
 
   it("includes non-critical not_started items as soft blockers", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: true, status: "substantially_final" }),
-      makeReq({ requirementId: "req-2", name: "ESIA", isLoiCritical: false, status: "not_started" }),
-      makeReq({ requirementId: "req-3", name: "Feasibility Study", isLoiCritical: false, status: "in_progress" }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: true, status: "substantially_final" }),
+      makeReq({ requirementId: "req-2", name: "ESIA", isPrimaryGate: false, status: "not_started" }),
+      makeReq({ requirementId: "req-3", name: "Feasibility Study", isPrimaryGate: false, status: "in_progress" }),
     ];
 
     const result = checkStageGate("loi_submitted", requirements);
@@ -110,8 +110,8 @@ describe("checkStageGate — loi_submitted", () => {
 describe("checkStageGate — final_commitment", () => {
   it("returns canAdvance: true when all applicable items are done", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: true, status: "substantially_final" }),
-      makeReq({ requirementId: "req-2", isLoiCritical: false, status: "executed" }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: true, status: "substantially_final" }),
+      makeReq({ requirementId: "req-2", isPrimaryGate: false, status: "executed" }),
     ];
 
     const result = checkStageGate("final_commitment", requirements);
@@ -122,9 +122,9 @@ describe("checkStageGate — final_commitment", () => {
 
   it("includes both LOI-critical and non-critical items as hard blockers when not done", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", name: "EPC Contract", isLoiCritical: true, status: "not_started" }),
-      makeReq({ requirementId: "req-2", name: "Board Resolution", isLoiCritical: false, status: "in_progress" }),
-      makeReq({ requirementId: "req-3", name: "Financial Model", isLoiCritical: true, status: "substantially_final" }),
+      makeReq({ requirementId: "req-1", name: "EPC Contract", isPrimaryGate: true, status: "not_started" }),
+      makeReq({ requirementId: "req-2", name: "Board Resolution", isPrimaryGate: false, status: "in_progress" }),
+      makeReq({ requirementId: "req-3", name: "Financial Model", isPrimaryGate: true, status: "substantially_final" }),
     ];
 
     const result = checkStageGate("final_commitment", requirements);
@@ -138,8 +138,8 @@ describe("checkStageGate — final_commitment", () => {
 
   it("returns no hard blockers for items with isApplicable: false", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: false, status: "not_started", isApplicable: false }),
-      makeReq({ requirementId: "req-2", isLoiCritical: true, status: "executed" }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: false, status: "not_started", isApplicable: false }),
+      makeReq({ requirementId: "req-2", isPrimaryGate: true, status: "executed" }),
     ];
 
     const result = checkStageGate("final_commitment", requirements);
@@ -152,8 +152,8 @@ describe("checkStageGate — final_commitment", () => {
 describe("checkStageGate — pre_loi (early stage)", () => {
   it("has no hard blockers regardless of item status", () => {
     const requirements = [
-      makeReq({ requirementId: "req-1", isLoiCritical: true, status: "not_started" }),
-      makeReq({ requirementId: "req-2", isLoiCritical: false, status: "not_started" }),
+      makeReq({ requirementId: "req-1", isPrimaryGate: true, status: "not_started" }),
+      makeReq({ requirementId: "req-2", isPrimaryGate: false, status: "not_started" }),
     ];
 
     const result = checkStageGate("pre_loi", requirements);
@@ -208,7 +208,7 @@ describe("checkStageGate — GateBlocker shape", () => {
         name: "EPC Term Sheet",
         category: "commercial",
         status: "not_started",
-        isLoiCritical: true,
+        isPrimaryGate: true,
       }),
     ];
 
@@ -219,7 +219,7 @@ describe("checkStageGate — GateBlocker shape", () => {
       name: "EPC Term Sheet",
       category: "commercial",
       status: "not_started",
-      isLoiCritical: true,
+      isPrimaryGate: true,
     });
   });
 });

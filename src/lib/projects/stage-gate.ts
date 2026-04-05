@@ -5,13 +5,13 @@ export type GateBlocker = {
   name: string;
   category: string;
   status: string;
-  isLoiCritical: boolean;
+  isPrimaryGate: boolean;
 };
 
 export type GateCheckResult = {
   /** true if no hard blockers */
   canAdvance: boolean;
-  /** isLoiCritical items not in substantially_final/executed (and applicable) */
+  /** isPrimaryGate items not in substantially_final/executed (and applicable) */
   hardBlockers: GateBlocker[];
   /** non-critical items not yet started */
   softBlockers: GateBlocker[];
@@ -39,10 +39,10 @@ export function checkStageGate(
 
   if (isLoiStage) {
     hardBlockers = applicable
-      .filter((r) => r.isLoiCritical && !DONE_STATUSES.has(r.status))
+      .filter((r) => r.isPrimaryGate && !DONE_STATUSES.has(r.status))
       .map(toBlocker);
     softBlockers = applicable
-      .filter((r) => !r.isLoiCritical && r.status === "not_started")
+      .filter((r) => !r.isPrimaryGate && r.status === "not_started")
       .map(toBlocker);
   } else if (isFinalStage) {
     hardBlockers = applicable
@@ -70,6 +70,6 @@ function toBlocker(r: ProjectRequirementRow): GateBlocker {
     name: r.name,
     category: r.category,
     status: r.status,
-    isLoiCritical: r.isLoiCritical,
+    isPrimaryGate: r.isPrimaryGate,
   };
 }

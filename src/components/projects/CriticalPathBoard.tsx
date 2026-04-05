@@ -75,7 +75,7 @@ function getPriority(row: ProjectRequirementRow, daysUntilDue: number | null): n
   const isClosed = row.status === "executed" || row.status === "waived" || !row.isApplicable;
   if (isClosed) return 0;
 
-  let score = row.isLoiCritical ? 80 : 40;
+  let score = row.isPrimaryGate ? 80 : 40;
   if (daysUntilDue !== null) {
     if (daysUntilDue < 0) score += 100;
     else if (daysUntilDue <= 14) score += 60;
@@ -94,7 +94,7 @@ function getPriority(row: ProjectRequirementRow, daysUntilDue: number | null): n
 function getStatusTone(row: ProjectRequirementRow, daysUntilDue: number | null): BoardItem["statusTone"] {
   if (row.status === "executed" || row.status === "waived" || !row.isApplicable) return "done";
   if (daysUntilDue !== null && daysUntilDue < 0) return "critical";
-  if (row.isLoiCritical || (daysUntilDue !== null && daysUntilDue <= 30)) return "warning";
+  if (row.isPrimaryGate || (daysUntilDue !== null && daysUntilDue <= 30)) return "warning";
   return "neutral";
 }
 
@@ -280,7 +280,7 @@ function RequirementRowCard({ item }: { item: BoardItem }) {
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-        {item.row.isLoiCritical ? (
+        {item.row.isPrimaryGate ? (
           <span
             style={{
               ...monoLabelStyle,
@@ -351,7 +351,7 @@ export function CriticalPathBoard({
   const items = buildItems(rows, referenceDate);
   const activeItems = items.filter((item) => item.priority > 0);
   const overdueCount = activeItems.filter((item) => item.daysUntilDue !== null && item.daysUntilDue < 0).length;
-  const criticalCount = activeItems.filter((item) => item.row.isLoiCritical).length;
+  const criticalCount = activeItems.filter((item) => item.row.isPrimaryGate).length;
   const unassignedCount = activeItems.filter(
     (item) => !item.row.responsibleOrganizationName && !item.row.responsibleStakeholderName
   ).length;

@@ -13,7 +13,7 @@ type RequirementRow = {
   category: string;
   status: RequirementStatusValue;
   isApplicable: boolean;
-  isLoiCritical: boolean;
+  isPrimaryGate: boolean;
 };
 
 type SimulationResultData = {
@@ -392,7 +392,7 @@ export function ScenarioSimulator({ projectSlug, requirements }: Props) {
                           >
                             {req.name}
                           </span>
-                          {req.isLoiCritical && (
+                          {req.isPrimaryGate && (
                             <span
                               style={{
                                 marginLeft: "6px",

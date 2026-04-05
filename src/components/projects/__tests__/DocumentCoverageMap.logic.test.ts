@@ -16,7 +16,7 @@ function makeRequirement(
     description: "",
     category: "contracts",
     phaseRequired: "loi",
-    isLoiCritical: false,
+    isPrimaryGate: false,
     weight: 5,
     sortOrder: 1,
     status: "not_started",
@@ -123,13 +123,13 @@ describe("computeCoverage", () => {
       projectRequirementId: "r1",
       requirementId: "r1",
       isApplicable: true,
-      isLoiCritical: true,
+      isPrimaryGate: true,
     });
     const nonLoi = makeRequirement({
       projectRequirementId: "r2",
       requirementId: "r2",
       isApplicable: true,
-      isLoiCritical: false,
+      isPrimaryGate: false,
     });
     const doc = makeDocument({ projectRequirementId: "r1" });
     const result = computeCoverage([loiReq, nonLoi], [doc]);
@@ -141,7 +141,7 @@ describe("computeCoverage", () => {
     const req = makeRequirement({
       projectRequirementId: "r1",
       isApplicable: false,
-      isLoiCritical: true,
+      isPrimaryGate: true,
     });
     const result = computeCoverage([req], []);
     expect(result.loiCriticalTotal).toBe(0);

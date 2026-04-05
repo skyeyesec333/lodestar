@@ -4,7 +4,7 @@ type EvidenceGapItem = {
   requirementId: string;
   name: string;
   category: string;
-  isLoiCritical: boolean;
+  isPrimaryGate: boolean;
 };
 
 type EvidenceActionBoardProps = {
@@ -86,7 +86,7 @@ export function EvidenceActionBoard({
                   padding: "12px 14px",
                   borderRadius: "10px",
                   border: "1px solid var(--border)",
-                  backgroundColor: item.isLoiCritical
+                  backgroundColor: item.isPrimaryGate
                     ? "color-mix(in srgb, var(--accent) 5%, var(--bg-card))"
                     : "color-mix(in srgb, var(--gold) 5%, var(--bg-card))",
                 }}
@@ -97,11 +97,11 @@ export function EvidenceActionBoard({
                     fontSize: "9px",
                     letterSpacing: "0.1em",
                     textTransform: "uppercase",
-                    color: item.isLoiCritical ? "var(--accent)" : "var(--gold)",
+                    color: item.isPrimaryGate ? "var(--accent)" : "var(--gold)",
                   }}
                 >
                   {formatCategory(item.category)}
-                  {item.isLoiCritical ? " · gate critical" : ""}
+                  {item.isPrimaryGate ? " · gate critical" : ""}
                 </span>
                 <span
                   style={{
