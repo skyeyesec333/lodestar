@@ -288,7 +288,9 @@ export default async function ProjectPage({
     project.ownerClerkId,
     ...members.map((m) => m.clerkUserId).filter((id) => id !== project.ownerClerkId),
   ];
-  const resolvedUsers = await resolveClerkUsers(memberClerkIds);
+  const activityActorIds = activityEvents.map((e) => e.clerkUserId);
+  const allClerkIds = [...new Set([...memberClerkIds, ...activityActorIds])];
+  const resolvedUsers = await resolveClerkUsers(allClerkIds);
   const dealParties = dealPartiesResult.ok ? dealPartiesResult.value : [];
   const milestones = milestonesResult.ok ? milestonesResult.value : [];
   const comments = commentsResult.ok ? commentsResult.value : [];
