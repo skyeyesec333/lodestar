@@ -523,7 +523,31 @@ function AssistantTab({
 
 // ─── Signals tab ──────────────────────────────────────────────────────────────
 
+function deriveAction(detail: string, level: string): string {
+  if (detail.includes("No assigned owner")) return "Assign an owner to unblock this item";
+  if (detail.includes("No linked evidence") || detail.includes("no linked")) return "Upload or link supporting evidence";
+  if (detail.includes("overdue")) return "Escalate — past target date";
+  if (detail.includes("Due in")) return "Prepare evidence before deadline";
+  if (detail.includes("no linked file")) return "Attach a draft document";
+  if (detail.includes("Draft stage")) return "Assign an owner and begin tracking";
+  if (level === "critical") return "Resolve before gate review";
+  if (level === "warning") return "Address soon to stay on track";
+  return "Review and update status";
+}
+
 function SignalsTab({ readinessPct, loiBlockerCount, signals }: Pick<BeaconPanelProps, "readinessPct" | "loiBlockerCount" | "signals">) {
+  const sorted = [...(signals ?? [])].sort((a, b) => {
+    const order = { critical: 0, warning: 1, info: 2 };
+    return (order[a.level] ?? 3) - (order[b.level] ?? 3);
+  });
+  const critCount = sorted.filter((s) => s.level === "critical").length;
+  const warnCount = sorted.filter((s) => s.level === "warning").length;
+
+  // Quick wins: info-level items that just need an owner assignment
+  const quickWins = sorted.filter(
+    (s) => s.level === "info" || s.detail.includes("No assigned owner")
+  ).slice(0, 3);
+
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Summary row */}
@@ -559,7 +583,7 @@ function SignalsTab({ readinessPct, loiBlockerCount, signals }: Pick<BeaconPanel
           }}
         >
           <p style={{ margin: "0 0 4px", fontSize: "11px", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            LOI Blockers
+            Gate Blockers
           </p>
           <p style={{ margin: 0, fontSize: "22px", fontWeight: 600, color: "var(--color-critical, #ef4444)", lineHeight: 1 }}>
             {loiBlockerCount ?? 0}
@@ -567,72 +591,140 @@ function SignalsTab({ readinessPct, loiBlockerCount, signals }: Pick<BeaconPanel
         </div>
       </div>
 
+      {/* Severity breakdown pill */}
+      {sorted.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            flexWrap: "wrap",
+          }}
+        >
+          {critCount > 0 && (
+            <span style={{
+              fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+              padding: "3px 8px", borderRadius: "4px",
+              color: "var(--color-critical, #ef4444)",
+              background: "color-mix(in srgb, var(--color-critical, #ef4444) 10%, var(--bg-card))",
+              border: "1px solid color-mix(in srgb, var(--color-critical, #ef4444) 25%, var(--border))",
+            }}>
+              {critCount} critical
+            </span>
+          )}
+          {warnCount > 0 && (
+            <span style={{
+              fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+              padding: "3px 8px", borderRadius: "4px",
+              color: "var(--color-warning, #f59e0b)",
+              background: "color-mix(in srgb, var(--color-warning, #f59e0b) 10%, var(--bg-card))",
+              border: "1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 25%, var(--border))",
+            }}>
+              {warnCount} warning
+            </span>
+          )}
+          {sorted.length - critCount - warnCount > 0 && (
+            <span style={{
+              fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
+              padding: "3px 8px", borderRadius: "4px",
+              color: "var(--ink-muted)",
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+            }}>
+              {sorted.length - critCount - warnCount} info
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Signal list */}
       <div>
         <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 600, color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
           Top pressure items
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-          {(signals ?? []).length === 0 && (
+          {sorted.length === 0 && (
             <p style={{ margin: 0, fontSize: "13px", color: "var(--ink-muted)" }}>
               No active pressure items — all requirements are on track.
             </p>
           )}
-          {(signals ?? []).map((s, i) => (
+          {sorted.map((s, i) => (
             <div
               key={i}
               style={{
                 display: "flex",
-                alignItems: "center",
-                gap: "10px",
+                flexDirection: "column",
+                gap: "6px",
                 padding: "10px 12px",
                 borderRadius: "10px",
                 border: "1px solid var(--border)",
                 background: "var(--bg-card)",
               }}
             >
-              <SignalDotGlyph level={s.level} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: "0 0 2px", fontSize: "13px", fontWeight: 500, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {s.label}
-                </p>
-                <p style={{ margin: 0, fontSize: "11px", color: "var(--ink-muted)" }}>
-                  {s.detail}
-                </p>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <SignalDotGlyph level={s.level} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: "0 0 2px", fontSize: "13px", fontWeight: 500, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {s.label}
+                  </p>
+                  <p style={{ margin: 0, fontSize: "11px", color: "var(--ink-muted)" }}>
+                    {s.detail}
+                  </p>
+                </div>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    color: "var(--ink-muted)",
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "4px",
+                    padding: "2px 6px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  {s.category}
+                </span>
               </div>
-              <span
-                style={{
-                  fontSize: "10px",
-                  color: "var(--ink-muted)",
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "4px",
-                  padding: "2px 6px",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                }}
-              >
-                {s.category}
-              </span>
+              <p style={{
+                margin: 0,
+                fontSize: "11px",
+                color: s.level === "critical" ? "var(--color-critical, #ef4444)" : "var(--ink-muted)",
+                fontStyle: "italic",
+                paddingLeft: "18px",
+              }}>
+                → {deriveAction(s.detail, s.level)}
+              </p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Mock nudge */}
-      <div
-        style={{
-          padding: "12px",
-          borderRadius: "10px",
-          border: "1px solid color-mix(in srgb, var(--accent) 25%, var(--border))",
-          background: "color-mix(in srgb, var(--accent) 6%, var(--bg-card))",
-          fontSize: "12px",
-          color: "var(--ink-muted)",
-          lineHeight: 1.6,
-        }}
-      >
-        <span style={{ color: "var(--accent)", fontWeight: 600 }}>Beacon</span> will surface why each item is blocking and suggest the fastest path to close it.
-      </div>
+      {/* Quick wins */}
+      {quickWins.length > 0 && (
+        <div>
+          <p style={{ margin: "0 0 10px", fontSize: "11px", fontWeight: 600, color: "var(--teal, #2ba37a)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            Quick wins
+          </p>
+          <div
+            style={{
+              padding: "10px 12px",
+              borderRadius: "10px",
+              border: "1px solid color-mix(in srgb, var(--teal, #2ba37a) 25%, var(--border))",
+              background: "color-mix(in srgb, var(--teal, #2ba37a) 6%, var(--bg-card))",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+            }}
+          >
+            {quickWins.map((s, i) => (
+              <p key={i} style={{ margin: 0, fontSize: "12px", color: "var(--ink-mid)", lineHeight: 1.5 }}>
+                <span style={{ color: "var(--teal, #2ba37a)", fontWeight: 600 }}>•</span>{" "}
+                Assign an owner to <span style={{ fontWeight: 500, color: "var(--ink)" }}>{s.label}</span> to move it from draft to tracked
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -768,20 +860,36 @@ function DocumentsTab({ documentCoverage }: Pick<BeaconPanelProps, "documentCove
         );
       })}
 
-      <div
-        style={{
-          marginTop: "4px",
-          padding: "12px",
-          borderRadius: "10px",
-          border: "1px solid color-mix(in srgb, var(--accent) 25%, var(--border))",
-          background: "color-mix(in srgb, var(--accent) 6%, var(--bg-card))",
-          fontSize: "12px",
-          color: "var(--ink-muted)",
-          lineHeight: 1.6,
-        }}
-      >
-        <span style={{ color: "var(--accent)", fontWeight: 600 }}>Beacon</span> will analyze each uploaded document and flag whether it meets EXIM substantially-final standards.
-      </div>
+      {/* Coverage summary */}
+      {coverage.length > 0 && (() => {
+        const totalCovered = coverage.reduce((s, c) => s + c.covered, 0);
+        const totalItems = coverage.reduce((s, c) => s + c.total, 0);
+        const totalGaps = coverage.reduce((s, c) => s + c.gap.length, 0);
+        const overallPct = totalItems > 0 ? Math.round((totalCovered / totalItems) * 100) : 0;
+        return (
+          <div
+            style={{
+              marginTop: "4px",
+              padding: "12px",
+              borderRadius: "10px",
+              border: `1px solid color-mix(in srgb, ${overallPct >= 80 ? "var(--teal, #2ba37a)" : "var(--gold, #d4a843)"} 25%, var(--border))`,
+              background: `color-mix(in srgb, ${overallPct >= 80 ? "var(--teal, #2ba37a)" : "var(--gold, #d4a843)"} 6%, var(--bg-card))`,
+              fontSize: "12px",
+              color: "var(--ink-mid)",
+              lineHeight: 1.6,
+            }}
+          >
+            <span style={{ fontWeight: 600, color: overallPct >= 80 ? "var(--teal, #2ba37a)" : "var(--gold, #d4a843)" }}>
+              {overallPct}% covered
+            </span>
+            {" — "}
+            {totalCovered} of {totalItems} requirements have linked evidence.
+            {totalGaps > 0 && (
+              <> Expand categories above to see the {totalGaps} gap{totalGaps !== 1 ? "s" : ""}.</>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

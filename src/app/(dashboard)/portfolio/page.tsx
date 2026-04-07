@@ -9,6 +9,7 @@ import { ReadinessDistributionBar } from "@/components/portfolio/ReadinessDistri
 import { StagnantDealsTable } from "@/components/portfolio/StagnantDealsTable";
 import { VelocityLeaderboard } from "@/components/portfolio/VelocityLeaderboard";
 import { UpcomingDeadlines } from "@/components/portfolio/UpcomingDeadlines";
+import { DealComparisonTable } from "@/components/portfolio/DealComparisonTable";
 import {
   Card,
   CardContent,
@@ -508,6 +509,24 @@ export default async function PortfolioPage({
 
       <UpcomingMilestonesWidget
         milestones={milestonesResult.ok ? milestonesResult.value : []}
+      />
+
+      <DealComparisonTable
+        deals={projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          dealType: p.dealType,
+          stage: p.stage,
+          countryCode: p.countryCode,
+          sector: p.sector,
+          readinessScore: p.readinessScore,
+          capexUsdCents: p.capexUsdCents,
+          completedRequirements: p.completedRequirements,
+          totalRequirements: p.totalRequirements,
+          targetLoiDate: p.targetLoiDate?.toISOString() ?? null,
+          targetCloseDate: p.targetCloseDate?.toISOString() ?? null,
+        }))}
       />
 
       {/* Projects table */}
