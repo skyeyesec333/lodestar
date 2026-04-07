@@ -43,7 +43,7 @@ function ctaStyle(primary?: boolean): React.CSSProperties {
     borderRadius: "999px",
     padding: "9px 14px",
     border: primary ? "none" : "1px solid var(--border)",
-    color: primary ? "#ffffff" : "var(--ink)",
+    color: primary ? "var(--text-inverse)" : "var(--ink)",
     backgroundColor: primary ? "var(--accent)" : "var(--bg-card)",
     display: "inline-flex",
     alignItems: "center",

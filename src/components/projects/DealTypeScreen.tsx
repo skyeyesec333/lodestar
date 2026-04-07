@@ -267,7 +267,7 @@ export function DealTypeScreen({ onSelect, onExit }: Props) {
               fontWeight: 500,
               letterSpacing: "0.10em",
               textTransform: "uppercase",
-              color: selected ? "#ffffff" : "var(--ink-muted)",
+              color: selected ? "var(--text-inverse)" : "var(--ink-muted)",
               backgroundColor: selected ? "var(--teal)" : "var(--border)",
               border: "none",
               borderRadius: "3px",
