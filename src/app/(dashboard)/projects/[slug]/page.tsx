@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 // notFound used for project lookup; requirements errors throw to surface the actual message
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { computeReadiness } from "@/lib/scoring/index";
@@ -19,25 +20,21 @@ import { StakeholderPanel } from "@/components/stakeholders/StakeholderPanel";
 import { getProjectActivity } from "@/lib/db/activity";
 import { getProjectStakeholders } from "@/lib/db/stakeholders";
 import { GateBlockersPanel } from "@/components/requirements/LoiBlockersPanel";
+import { LoiProjectionWidget } from "@/components/projects/LoiProjectionWidget";
 import { RequirementsChecklist } from "@/components/requirements/RequirementsChecklist";
 import { DocumentPanel } from "@/components/documents/DocumentPanel";
 import { getProjectDocuments } from "@/lib/db/documents";
-import { MeetingsLog } from "@/components/meetings/MeetingsLog";
 import { getProjectMeetings } from "@/lib/db/meetings";
-import { EpcBidsPanel } from "@/components/projects/EpcBidsPanel";
 import { getProjectEpcBids } from "@/lib/db/epc-bids";
-import { FunderWorkspace } from "@/components/projects/FunderWorkspace";
 import { getProjectFunders } from "@/lib/db/funders";
 import { getProjectDealParties } from "@/lib/db/deal-parties";
 import { getProjectMilestones } from "@/lib/db/milestones";
 import { MilestonePanel } from "@/components/projects/MilestonePanel";
 import { CollaboratorsPanel } from "@/components/projects/CollaboratorsPanel";
 import { getProjectMembers } from "@/lib/db/members";
-import { GanttChart } from "@/components/projects/GanttChart";
 import { TourGuide } from "@/components/projects/TourGuide";
 import { getProjectDetailChatPresets } from "@/lib/ai/chat-presets";
 import { BeaconProvider } from "@/components/beacon/BeaconProvider";
-import { BeaconPanel } from "@/components/beacon/BeaconPanel";
 import { WorkspaceBeaconSync } from "@/components/beacon/WorkspaceBeaconSync";
 import { CriticalPathBoard } from "@/components/projects/CriticalPathBoard";
 import { DocumentCoverageMap } from "@/components/projects/DocumentCoverageMap";
@@ -51,12 +48,10 @@ import { getUserWatchList } from "@/lib/db/watchers";
 import { buildGateReview } from "@/lib/projects/gate-review";
 import { getProjectConcept } from "@/lib/db/project-concepts";
 import { getProjectExternalEvidence } from "@/lib/db/external-evidence";
-import { CovenantMonitoringPanel } from "@/components/projects/CovenantMonitoringPanel";
 import { getProjectCovenants } from "@/lib/db/covenants";
 import { ResponsibilityMatrix } from "@/components/projects/ResponsibilityMatrix";
 import { ExpiryTimeline } from "@/components/documents/ExpiryTimeline";
 import { ReadinessBreakdown } from "@/components/projects/ReadinessBreakdown";
-import { ScenarioSimulator } from "@/components/projects/ScenarioSimulator";
 import { ShareLinksPanel } from "@/components/projects/ShareLinksPanel";
 import { getShareLinksForProject } from "@/lib/db/share-links";
 import type { CategoryBreakdown } from "@/lib/db/requirements";
@@ -77,6 +72,29 @@ import { ExecutiveSummary } from "@/components/projects/ExecutiveSummary";
 import { assessFinancingReadiness } from "@/lib/scoring/financing";
 import { FinancingRiskBadge } from "@/components/projects/FinancingRiskBadge";
 import type { FinancingRisk } from "@/lib/scoring/financing";
+
+// ── Lazy-loaded heavy components (below-fold / tab-gated) ────────────────────
+const MeetingsLog = dynamic(
+  () => import("@/components/meetings/MeetingsLog").then((m) => ({ default: m.MeetingsLog }))
+);
+const FunderWorkspace = dynamic(
+  () => import("@/components/projects/FunderWorkspace").then((m) => ({ default: m.FunderWorkspace }))
+);
+const CovenantMonitoringPanel = dynamic(
+  () => import("@/components/projects/CovenantMonitoringPanel").then((m) => ({ default: m.CovenantMonitoringPanel }))
+);
+const GanttChart = dynamic(
+  () => import("@/components/projects/GanttChart").then((m) => ({ default: m.GanttChart }))
+);
+const ScenarioSimulator = dynamic(
+  () => import("@/components/projects/ScenarioSimulator").then((m) => ({ default: m.ScenarioSimulator }))
+);
+const EpcBidsPanel = dynamic(
+  () => import("@/components/projects/EpcBidsPanel").then((m) => ({ default: m.EpcBidsPanel }))
+);
+const BeaconPanel = dynamic(
+  () => import("@/components/beacon/BeaconPanel").then((m) => ({ default: m.BeaconPanel }))
+);
 import { getUpcomingMilestones } from "@/lib/db/milestones-upcoming";
 import { UpcomingMilestonesWidget } from "@/components/projects/UpcomingMilestonesWidget";
 import { ReadinessTrendlineChart } from "@/components/projects/ReadinessTrendlineChart";
@@ -226,7 +244,10 @@ export default async function ProjectPage({
   const { slug } = await params;
 
   const projectResult = await getProjectBySlug(slug, userId);
-  if (!projectResult.ok) notFound();
+  if (!projectResult.ok) {
+    if (projectResult.error.code === "NOT_FOUND") notFound();
+    throw new Error(`Project load failed: ${projectResult.error.message}`);
+  }
   const project = projectResult.value;
 
   const reqResult = await getProjectRequirements(project.id, project.dealType, project.sector);
@@ -278,6 +299,12 @@ export default async function ProjectPage({
   ]);
   const activityEvents = activityResult.ok ? activityResult.value.items : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
+
+  const twentyEightDaysAgo = new Date(Date.now() - 28 * 86_400_000);
+  const recentCompletions = activityEvents.filter(
+    (e) => e.eventType === "requirement_status_updated" && new Date(e.createdAt) >= twentyEightDaysAgo
+  ).length;
+  const recentVelocity = recentCompletions / 4;
   const documents = documentsResult.ok ? documentsResult.value.items : [];
   const meetings = meetingsResult.ok ? meetingsResult.value : [];
   const epcBids = epcBidsResult.ok ? epcBidsResult.value : [];
@@ -429,6 +456,25 @@ export default async function ProjectPage({
   const expiringDocuments = documents.filter(
     (d) => d.expiresAt !== null && d.expiresAt > now && d.expiresAt <= ninetyDaysOut
   );
+
+  const sixtyDaysOut = new Date(now.getTime() + 60 * 86_400_000);
+  const primaryGateRequirementIds = new Set(rows.filter((r) => r.isPrimaryGate).map((r) => r.projectRequirementId));
+  const expiringGateDocs = documents
+    .filter(
+      (d) =>
+        d.expiresAt !== null &&
+        d.expiresAt <= sixtyDaysOut &&
+        d.projectRequirementId !== null &&
+        primaryGateRequirementIds.has(d.projectRequirementId)
+    )
+    .map((d) => {
+      const req = rows.find((r) => r.projectRequirementId === d.projectRequirementId);
+      return {
+        name: d.filename,
+        expiresAt: d.expiresAt as Date,
+        requirementTitle: req?.name ?? "Unknown requirement",
+      };
+    });
   const evidenceMissingRows = rows
     .filter((row) => {
       if (row.isApplicable === false) return false;
@@ -1470,6 +1516,7 @@ export default async function ProjectPage({
           slug={project.slug}
           initialFunders={funders}
           requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
+          stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
           capexUsdCents={project.capexUsdCents}
         />
 
@@ -1534,8 +1581,16 @@ export default async function ProjectPage({
               name: rows.find((r) => r.requirementId === id)?.name ?? id,
             }))}
             gateLabel={programConfig.primaryGateLabel}
+            expiringDocuments={expiringGateDocs}
           />
         )}
+
+        <LoiProjectionWidget
+          loiBlockerCount={loiBlockers.length}
+          recentVelocity={recentVelocity}
+          targetLoiDate={project.targetLoiDate ?? project.targetCloseDate}
+          dealType={project.dealType}
+        />
 
         <ReadinessTrendlineChart projectSlug={project.slug} />
 
@@ -1870,6 +1925,7 @@ export default async function ProjectPage({
                 name: r.name,
                 status: r.status,
               }))}
+              dealType={project.dealType ?? undefined}
               teamMembers={teamMembers}
               currentUserId={userId}
               actorName={actorName}
