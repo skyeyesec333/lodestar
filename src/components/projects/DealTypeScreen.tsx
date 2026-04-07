@@ -9,7 +9,6 @@ export type DealTypeValue =
   | "commercial_finance"
   | "development_finance"
   | "private_equity"
-  | "blended_finance"
   | "other";
 
 export interface DealTypeResult {
@@ -49,11 +48,6 @@ export const DEAL_TYPES: {
     value: "private_equity",
     label: "Private Equity / Sponsor Finance",
     description: "Equity-led structure — no lender or ECA involved yet.",
-  },
-  {
-    value: "blended_finance",
-    label: "Blended / Concessional Finance",
-    description: "Layered structure combining donor grants, first-loss tranches, and commercial capital.",
   },
   {
     value: "other",

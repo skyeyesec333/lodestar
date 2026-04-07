@@ -2,12 +2,19 @@
 
 import { useRef, useState } from "react";
 
+type ExpiringDocument = {
+  name: string;
+  expiresAt: Date;
+  requirementTitle: string;
+};
+
 type GateBlockersPanelProps = {
   blockers: Array<{ id: string; name: string }>;
   gateLabel: string;
+  expiringDocuments?: ExpiringDocument[];
 };
 
-export function GateBlockersPanel({ blockers, gateLabel }: GateBlockersPanelProps) {
+export function GateBlockersPanel({ blockers, gateLabel, expiringDocuments = [] }: GateBlockersPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showReturnJump, setShowReturnJump] = useState(false);
@@ -244,7 +251,7 @@ export function GateBlockersPanel({ blockers, gateLabel }: GateBlockersPanelProp
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                 gap: "10px",
                 marginTop: "2px",
               }}
@@ -382,6 +389,7 @@ export function GateBlockersPanel({ blockers, gateLabel }: GateBlockersPanelProp
         <button
           type="button"
           onClick={scrollBackToBlockers}
+          aria-label="Return to top"
           style={{
             position: "fixed",
             right: "24px",

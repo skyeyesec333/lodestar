@@ -8,6 +8,7 @@ import { updateRequirementStatus } from "@/actions/requirements";
 import type { MeetingExtractionResult, ExtractedActionItem, ExtractedCommitment } from "@/lib/ai/meeting-extraction";
 import type { CommentRow } from "@/lib/db/comments";
 import type { TeamMember } from "@/types/collaboration";
+import type { DealType } from "@/types";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { WatchButton } from "@/components/collaboration/WatchButton";
 import { ActionItemsPanel } from "@/components/meetings/ActionItemsPanel";
@@ -354,6 +355,7 @@ type Props = {
   initialMeetings: MeetingRow[];
   stakeholders: StakeholderRow[];
   requirements?: RequirementOption[];
+  dealType?: DealType;
   // Collaboration
   teamMembers?: TeamMember[];
   currentUserId?: string;
@@ -537,7 +539,7 @@ function AddMeetingForm({
           disabled={pending}
           style={{
             fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 500, letterSpacing: "0.10em",
-            textTransform: "uppercase", color: "#fff", backgroundColor: pending ? "var(--ink-muted)" : "var(--accent)",
+            textTransform: "uppercase", color: "var(--text-inverse)", backgroundColor: pending ? "var(--ink-muted)" : "var(--accent)",
             border: "none", borderRadius: "3px", padding: "8px 18px", cursor: pending ? "not-allowed" : "pointer",
           }}
         >
@@ -655,7 +657,7 @@ function AddActionItemForm({
       </div>
       {error && <p style={{ fontSize: "12px", color: "var(--accent)", margin: "0 0 10px" }}>{error}</p>}
       <div style={{ display: "flex", gap: "8px" }}>
-        <button onClick={submit} disabled={pending} style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "#fff", backgroundColor: pending ? "var(--ink-muted)" : "var(--accent)", border: "none", borderRadius: "3px", padding: "6px 14px", cursor: pending ? "not-allowed" : "pointer" }}>
+        <button onClick={submit} disabled={pending} style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-inverse)", backgroundColor: pending ? "var(--ink-muted)" : "var(--accent)", border: "none", borderRadius: "3px", padding: "6px 14px", cursor: pending ? "not-allowed" : "pointer" }}>
           {pending ? "Adding…" : "Add"}
         </button>
         <button onClick={onCancel} style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)", backgroundColor: "transparent", border: "1px solid var(--border)", borderRadius: "3px", padding: "6px 14px", cursor: "pointer" }}>
@@ -748,7 +750,7 @@ function ActionItemCard({
             cursor: canEdit ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          {done && <span style={{ color: "#fff", fontSize: "9px", lineHeight: 1 }}>✓</span>}
+          {done && <span style={{ color: "var(--text-inverse)", fontSize: "9px", lineHeight: 1 }}>✓</span>}
         </button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -825,7 +827,7 @@ function ActionItemCard({
                 fontWeight: 500,
                 letterSpacing: "0.10em",
                 textTransform: "uppercase",
-                color: "#fff",
+                color: "var(--text-inverse)",
                 backgroundColor: advancePending ? "var(--ink-muted)" : "var(--gold)",
                 border: "none",
                 borderRadius: "3px",
@@ -1025,7 +1027,7 @@ function ExtractInsightsPanel({
           fontWeight: 500,
           letterSpacing: "0.10em",
           textTransform: "uppercase",
-          color: "#fff",
+          color: "var(--text-inverse)",
           backgroundColor: loading ? "var(--ink-muted)" : "var(--teal)",
           border: "none",
           borderRadius: "3px",
@@ -1227,7 +1229,7 @@ function ExtractInsightsPanel({
                           fontWeight: 500,
                           letterSpacing: "0.08em",
                           textTransform: "uppercase",
-                          color: addedIndices.has(i) ? "var(--teal)" : "#fff",
+                          color: addedIndices.has(i) ? "var(--teal)" : "var(--text-inverse)",
                           backgroundColor: addedIndices.has(i)
                             ? "transparent"
                             : addingIndex === i

@@ -113,6 +113,7 @@ type EditDraft = {
 function Spinner() {
   return (
     <span
+      role="status"
       aria-label="Loading"
       style={{
         display: "inline-block",
@@ -588,10 +589,8 @@ export function CovenantMonitoringPanel({
                           }}
                         >
                           <div
+                            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]"
                             style={{
-                              display: "grid",
-                              gridTemplateColumns: "1fr 1fr 1fr auto",
-                              gap: "12px",
                               alignItems: "end",
                             }}
                           >
@@ -946,7 +945,7 @@ export function CovenantMonitoringPanel({
               <button
                 type="button"
                 onClick={() => setShowAddSheet(false)}
-                aria-label="Close"
+                aria-label="Close covenant panel"
                 style={{
                   background: "none",
                   border: "none",

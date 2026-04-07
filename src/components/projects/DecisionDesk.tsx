@@ -145,7 +145,7 @@ export function DecisionDesk({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: "14px",
             marginBottom: "18px",
           }}
@@ -240,7 +240,7 @@ export function DecisionDesk({
             alignItems: "center",
           }}
         >
-          <button type="button" onClick={() => setIsGateModalOpen(true)} style={ctaStyle(true)}>
+          <button type="button" onClick={() => setIsGateModalOpen(true)} style={ctaStyle(true)} aria-label="Review gate readiness">
             Review Gate
           </button>
           <Link href={`/projects/${projectSlug}#section-workplan`} style={ctaStyle()}>
@@ -256,10 +256,8 @@ export function DecisionDesk({
       </div>
 
       <div
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_0.9fr]"
         style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1.3fr) minmax(300px, 0.9fr)",
-          gap: "18px",
           alignItems: "start",
         }}
       >

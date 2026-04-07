@@ -328,6 +328,7 @@ export function ExecutiveSummary({
                   {["Category", "Score", "Progress", "Blockers"].map((heading) => (
                     <TableHead
                       key={heading}
+                      scope="col"
                       style={{
                         fontFamily: "'DM Mono', monospace",
                         fontSize: "9px",

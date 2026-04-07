@@ -339,7 +339,7 @@ export function ScenarioSimulator({ projectSlug, requirements }: Props) {
 
           <div
             style={{
-              maxHeight: "400px",
+              maxHeight: "min(400px, 60vh)",
               overflowY: "auto",
               border: "1px solid var(--border)",
               borderRadius: "6px",
