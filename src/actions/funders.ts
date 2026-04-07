@@ -10,8 +10,10 @@ import {
   addFunderCondition,
   updateFunderConditionStatus,
   deleteFunderCondition,
+  confirmConditionSatisfaction,
 } from "@/lib/db/funders";
 import { assertProjectAccess } from "@/lib/db/project-access";
+import { recordActivity } from "@/lib/db/activity";
 import { db } from "@/lib/db";
 import type { Result } from "@/types";
 
@@ -213,7 +215,7 @@ export async function setConditionStatus(raw: unknown): Promise<Result<void>> {
   const { conditionId, slug, status, satisfiedAt } = parsed.data;
 
   const cond = await db.funderCondition.findUnique({ where: { id: conditionId }, select: { funderRelationship: { select: { projectId: true } } } });
-  if (!cond) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+  if (!cond || !cond.funderRelationship) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
   const access = await assertProjectAccess(cond.funderRelationship.projectId, userId, "editor");
   if (!access.ok) return access;
 
@@ -238,7 +240,7 @@ export async function removeCondition(raw: unknown): Promise<Result<void>> {
   }
 
   const cond = await db.funderCondition.findUnique({ where: { id: parsed.data.conditionId }, select: { funderRelationship: { select: { projectId: true } } } });
-  if (!cond) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+  if (!cond || !cond.funderRelationship) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
   const access = await assertProjectAccess(cond.funderRelationship.projectId, userId, "editor");
   if (!access.ok) return access;
 
@@ -246,5 +248,115 @@ export async function removeCondition(raw: unknown): Promise<Result<void>> {
   if (!result.ok) return result;
 
   revalidatePath(`/projects/${parsed.data.slug}`);
+  return { ok: true, value: undefined };
+}
+
+const confirmCpSatisfactionSchema = z.object({
+  conditionId: z.string().min(1),
+  slug: z.string().min(1),
+  evidenceDocumentId: z.string().nullable().optional(),
+});
+
+export async function confirmCpSatisfaction(raw: unknown): Promise<Result<void>> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: { code: "UNAUTHORIZED", message: "Not signed in" } };
+
+  const parsed = confirmCpSatisfactionSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } };
+  }
+
+  const { conditionId, slug, evidenceDocumentId } = parsed.data;
+
+  const cond = await db.funderCondition.findUnique({
+    where: { id: conditionId },
+    select: {
+      description: true,
+      status: true,
+      funderRelationship: { select: { projectId: true } },
+    },
+  });
+  if (!cond || !cond.funderRelationship) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+  if (cond.status !== "open" && cond.status !== "in_progress") {
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: "Condition is already satisfied or waived." } };
+  }
+
+  const access = await assertProjectAccess(cond.funderRelationship.projectId, userId, "editor");
+  if (!access.ok) return access;
+
+  const result = await confirmConditionSatisfaction(
+    conditionId,
+    userId,
+    evidenceDocumentId ?? undefined
+  );
+  if (!result.ok) return result;
+
+  recordActivity(
+    cond.funderRelationship.projectId,
+    userId,
+    "cp_satisfied",
+    `CP satisfied: ${cond.description}`,
+    { conditionId, description: cond.description }
+  ).catch(() => {});
+
+  revalidatePath(`/projects/${slug}`);
+  return { ok: true, value: undefined };
+}
+
+const requestCpEvidenceSchema = z.object({
+  conditionId: z.string().min(1),
+  slug: z.string().min(1),
+  assigneeStakeholderId: z.string().min(1),
+  dueAt: z.coerce.date(),
+});
+
+export async function requestCpEvidence(raw: unknown): Promise<Result<void>> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: { code: "UNAUTHORIZED", message: "Not signed in" } };
+
+  const parsed = requestCpEvidenceSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } };
+  }
+
+  const { conditionId, slug, assigneeStakeholderId, dueAt } = parsed.data;
+
+  const cond = await db.funderCondition.findUnique({
+    where: { id: conditionId },
+    select: {
+      description: true,
+      funderRelationship: { select: { projectId: true } },
+    },
+  });
+  if (!cond || !cond.funderRelationship) return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
+
+  const access = await assertProjectAccess(cond.funderRelationship.projectId, userId, "editor");
+  if (!access.ok) return access;
+
+  try {
+    await db.documentRequest.create({
+      data: {
+        projectId: cond.funderRelationship.projectId,
+        stakeholderId: assigneeStakeholderId,
+        title: `Evidence for CP: ${cond.description}`,
+        dueDate: dueAt,
+        createdBy: userId,
+      },
+      select: { id: true },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+
+  recordActivity(
+    cond.funderRelationship.projectId,
+    userId,
+    "cp_evidence_requested",
+    `Evidence requested for CP: ${cond.description}`,
+    { conditionId, description: cond.description, assigneeStakeholderId }
+  ).catch(() => {});
+
+  revalidatePath(`/projects/${slug}`);
   return { ok: true, value: undefined };
 }
