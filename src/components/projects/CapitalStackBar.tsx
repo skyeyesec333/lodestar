@@ -21,8 +21,8 @@ const SEGMENT_COLOR: Record<string, string> = {
   exim:            "var(--teal)",
   dfi:             "var(--gold)",
   commercial_bank: "var(--ink-mid)",
-  equity:          "#7c6fcf",
-  mezzanine:       "#b07a4f",
+  equity:          "var(--equity)",
+  mezzanine:       "var(--mezz)",
   other:           "var(--ink-muted)",
 };
 
@@ -30,8 +30,8 @@ const SEGMENT_BG: Record<string, string> = {
   exim:            "var(--teal-soft)",
   dfi:             "var(--gold-soft)",
   commercial_bank: "var(--border)",
-  equity:          "#ede9fb",
-  mezzanine:       "#f5ede4",
+  equity:          "var(--equity-soft)",
+  mezzanine:       "var(--mezz-soft)",
   other:           "var(--bg)",
 };
 

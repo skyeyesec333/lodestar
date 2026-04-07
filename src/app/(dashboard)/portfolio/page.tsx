@@ -1,10 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getPortfolioStats } from "@/lib/db/portfolio";
+import { getPortfolioStats, getPortfolioVelocity } from "@/lib/db/portfolio";
 import { getUpcomingMilestones } from "@/lib/db/milestones-upcoming";
 import { PortfolioTriageBoard } from "@/components/projects/PortfolioTriageBoard";
 import { UpcomingMilestonesWidget } from "@/components/projects/UpcomingMilestonesWidget";
+import { ReadinessDistributionBar } from "@/components/portfolio/ReadinessDistributionBar";
+import { StagnantDealsTable } from "@/components/portfolio/StagnantDealsTable";
+import { VelocityLeaderboard } from "@/components/portfolio/VelocityLeaderboard";
+import { UpcomingDeadlines } from "@/components/portfolio/UpcomingDeadlines";
 import {
   Card,
   CardContent,
@@ -78,8 +82,12 @@ export default async function PortfolioPage({
 
   const { dealType: dealTypeFilter } = await searchParams;
 
-  const result = await getPortfolioStats(userId);
-  const milestonesResult = await getUpcomingMilestones(userId);
+  const [result, milestonesResult, velocityResult] = await Promise.all([
+    getPortfolioStats(userId),
+    getUpcomingMilestones(userId),
+    getPortfolioVelocity(userId),
+  ]);
+  const velocityMap = velocityResult.ok ? velocityResult.value : new Map<string, number>();
 
   if (!result.ok) {
     return (
@@ -168,6 +176,70 @@ export default async function PortfolioPage({
     return acc;
   }, {});
 
+  // Readiness distribution buckets
+  const distribution = { not_started: 0, at_risk: 0, progressing: 0, ready: 0 };
+  for (const p of projects) {
+    const bps = p.readinessBps ?? p.readinessScore * 100;
+    if (bps >= 7500) distribution.ready++;
+    else if (bps >= 5000) distribution.progressing++;
+    else if (bps >= 2500) distribution.at_risk++;
+    else distribution.not_started++;
+  }
+
+  // Stagnant deals: readiness < 50% AND last activity > 14 days ago
+  const fourteenDaysAgo = new Date(Date.now() - 14 * 86_400_000);
+  const stagnantDeals = projects
+    .filter((p) => {
+      const bps = p.readinessBps ?? p.readinessScore * 100;
+      const isLowReadiness = bps < 5000;
+      const isStagnant = p.lastActivityAt == null || new Date(p.lastActivityAt) < fourteenDaysAgo;
+      return isLowReadiness && isStagnant;
+    })
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      readinessScore: p.readinessScore,
+      daysSinceLastActivity: p.lastActivityAt
+        ? Math.floor((Date.now() - new Date(p.lastActivityAt).getTime()) / 86_400_000)
+        : 999,
+    }))
+    .sort((a, b) => b.daysSinceLastActivity - a.daysSinceLastActivity)
+    .slice(0, 10);
+
+  // Velocity leaderboard: top 10 by completions in last 30 days
+  const velocityLeaderboard = [...projects]
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      completionsLast30Days: velocityMap.get(p.id) ?? 0,
+    }))
+    .filter((p) => p.completionsLast30Days > 0)
+    .sort((a, b) => b.completionsLast30Days - a.completionsLast30Days)
+    .slice(0, 10);
+
+  // Upcoming deadlines: target date within next 90 days
+  const now = new Date();
+  const ninetyDaysOut = new Date(now.getTime() + 90 * 86_400_000);
+  const upcomingDeadlines = projects
+    .flatMap((p) => {
+      const dates: Array<{ date: Date; label: string }> = [];
+      if (p.targetLoiDate && p.targetLoiDate > now && p.targetLoiDate <= ninetyDaysOut)
+        dates.push({ date: p.targetLoiDate, label: "LOI" });
+      if (p.targetCloseDate && p.targetCloseDate > now && p.targetCloseDate <= ninetyDaysOut)
+        dates.push({ date: p.targetCloseDate, label: "Close" });
+      return dates.map((d) => ({
+        id: `${p.id}-${d.label}`,
+        name: p.name,
+        slug: p.slug,
+        targetDate: d.date,
+        daysRemaining: Math.ceil((d.date.getTime() - now.getTime()) / 86_400_000),
+        label: d.label,
+      }));
+    })
+    .sort((a, b) => a.daysRemaining - b.daysRemaining);
+
   return (
     <div className="space-y-8">
       {/* Title + filter */}
@@ -240,131 +312,197 @@ export default async function PortfolioPage({
         </Card>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "10px",
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--text-secondary)",
-                fontWeight: 500,
-              }}
-            >
-              Total Projects
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+      {/* Bento grid: summary stats + distribution */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateRows: "auto auto",
+          gap: "12px",
+        }}
+        className="ls-bento-grid"
+      >
+        {/* Row 1, Col 1 — Total Projects */}
+        <div
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "20px 24px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              fontWeight: 500,
+              margin: "0 0 8px",
+            }}
+          >
+            Total Projects
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "32px",
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            {projects.length}
+          </p>
+        </div>
+
+        {/* Row 1, Col 2 — Total CAPEX */}
+        <div
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "20px 24px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              fontWeight: 500,
+              margin: "0 0 8px",
+            }}
+          >
+            Total CAPEX
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Serif Display', Georgia, serif",
+              fontSize: "32px",
+              color: "var(--ink)",
+              margin: 0,
+            }}
+          >
+            {formatCapex(totalCapexCents > 0 ? totalCapexCents : null)}
+          </p>
+        </div>
+
+        {/* Row 1, Col 3 — Readiness Distribution */}
+        <div>
+          <ReadinessDistributionBar distribution={distribution} total={projects.length} />
+        </div>
+
+        {/* Row 2, Col 1 — Avg Readiness with radial gauge */}
+        <div
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "20px 24px",
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+          }}
+        >
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 48 48"
+            style={{ flexShrink: 0 }}
+            aria-label={`Average readiness: ${Math.round(avgReadiness)} percent`}
+            role="img"
+          >
+            <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border)" strokeWidth="3" />
+            <circle
+              cx="24" cy="24" r="20"
+              fill="none"
+              stroke={avgReadiness >= 75 ? "var(--teal)" : avgReadiness >= 40 ? "var(--gold)" : "var(--accent)"}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={`${(avgReadiness / 100) * 125.6} 125.6`}
+              transform="rotate(-90 24 24)"
+            />
+          </svg>
+          <div>
             <p
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontSize: "32px",
-                color: "var(--text-primary)",
-              }}
-            >
-              {projects.length}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle
-              style={{
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "10px",
                 letterSpacing: "0.10em",
                 textTransform: "uppercase",
-                color: "var(--text-secondary)",
+                color: "var(--ink-muted)",
                 fontWeight: 500,
-              }}
-            >
-              Total CAPEX
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p
-              style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontSize: "32px",
-                color: "var(--text-primary)",
-              }}
-            >
-              {formatCapex(totalCapexCents > 0 ? totalCapexCents : null)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "10px",
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--text-secondary)",
-                fontWeight: 500,
+                margin: "0 0 4px",
               }}
             >
               Avg Readiness
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            </p>
             <p
               style={{
                 fontFamily: "'DM Serif Display', Georgia, serif",
                 fontSize: "32px",
-                color: "var(--text-primary)",
+                color: "var(--ink)",
+                margin: 0,
+                lineHeight: 1,
               }}
             >
               {Math.round(avgReadiness)}%
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "10px",
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--text-secondary)",
-                fontWeight: 500,
-              }}
-            >
-              By Stage
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1">
-              {Object.entries(stageBreakdown).map(([stage, count]) => (
-                <li
-                  key={stage}
-                  className="flex items-center justify-between"
-                  style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: "11px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  <span>{formatStage(stage)}</span>
-                  <span
-                    style={{ color: "var(--text-primary)", fontWeight: 600 }}
-                  >
-                    {count}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        {/* Row 2, Cols 2-3 — Stage Breakdown */}
+        <div
+          className="ls-bento-stage"
+          style={{
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "20px 24px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: "var(--ink-muted)",
+              fontWeight: 500,
+              margin: "0 0 12px",
+            }}
+          >
+            By Stage
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {Object.entries(stageBreakdown).map(([stage, count]) => (
+              <div key={stage} style={{
+                display: "inline-flex", alignItems: "center", gap: "6px",
+                padding: "6px 12px",
+                borderRadius: "100px",
+                border: "1px solid var(--border)",
+                backgroundColor: "var(--bg)",
+              }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-muted)" }}>
+                  {formatStage(stage)}
+                </span>
+                <span style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: "18px", color: "var(--ink)" }}>
+                  {count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <StagnantDealsTable deals={stagnantDeals} />
+        <VelocityLeaderboard entries={velocityLeaderboard} />
+      </div>
+
+      <UpcomingDeadlines deadlines={upcomingDeadlines} />
 
       <PortfolioTriageBoard projects={projects} />
 

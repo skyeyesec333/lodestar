@@ -56,6 +56,7 @@ export default async function DashboardLayout({
                 fontWeight: 400,
                 color: "var(--nav-text)",
                 letterSpacing: "0.01em",
+                transition: "color 0.15s ease",
               }}
             >
               Lodestar
@@ -84,6 +85,7 @@ export default async function DashboardLayout({
           >
             <Link
               href="/projects"
+              className="ls-nav-link"
               style={{
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "11px",
@@ -93,13 +95,14 @@ export default async function DashboardLayout({
                 color: "var(--nav-link)",
                 textDecoration: "none",
                 flexShrink: 0,
+                transition: "color 0.15s ease",
               }}
             >
               Projects
             </Link>
             <Link
-              href="/experts"
-              className="ls-nav-hide-sm"
+              href="/portfolio"
+              className="ls-nav-hide-sm ls-nav-link"
               style={{
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "11px",
@@ -109,13 +112,31 @@ export default async function DashboardLayout({
                 color: "var(--nav-link)",
                 textDecoration: "none",
                 flexShrink: 0,
+                transition: "color 0.15s ease",
+              }}
+            >
+              Portfolio
+            </Link>
+            <Link
+              href="/experts"
+              className="ls-nav-hide-sm ls-nav-link"
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "11px",
+                fontWeight: 500,
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: "var(--nav-link)",
+                textDecoration: "none",
+                flexShrink: 0,
+                transition: "color 0.15s ease",
               }}
             >
               Expert Network
             </Link>
             <Link
               href="/templates"
-              className="ls-nav-hide-sm"
+              className="ls-nav-hide-sm ls-nav-link"
               style={{
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "11px",
@@ -125,6 +146,7 @@ export default async function DashboardLayout({
                 color: "var(--nav-link)",
                 textDecoration: "none",
                 flexShrink: 0,
+                transition: "color 0.15s ease",
               }}
             >
               Templates

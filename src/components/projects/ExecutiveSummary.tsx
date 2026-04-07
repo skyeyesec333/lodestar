@@ -247,8 +247,8 @@ export function ExecutiveSummary({
                     gap: "10px",
                     padding: "10px 12px",
                     borderRadius: "8px",
-                    backgroundColor: risk.severity === "critical" ? "rgba(239,68,68,0.05)" : "rgba(234,179,8,0.05)",
-                    border: `1px solid ${risk.severity === "critical" ? "rgba(239,68,68,0.2)" : "rgba(234,179,8,0.2)"}`,
+                    backgroundColor: risk.severity === "critical" ? "var(--accent-soft)" : "var(--gold-soft)",
+                    border: `1px solid ${risk.severity === "critical" ? "var(--accent)" : "var(--gold)"}`,
                   }}
                 >
                   <Badge variant="outline" style={{ flexShrink: 0, marginTop: "1px", ...severityStyle(risk.severity) }}>

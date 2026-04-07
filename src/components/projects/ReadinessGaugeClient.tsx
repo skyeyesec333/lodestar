@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useTransition } from "react";
 import {
   detailMicroMonoStyle,
   detailMonoLabelStyle,
-  detailSerifTitleStyle,
   detailSurfaceCardStyle,
 } from "./projectDetailStyles";
 import { recalculateReadiness } from "@/actions/projects";
@@ -107,222 +106,214 @@ export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealT
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(180px, 280px) minmax(0, 1fr)",
-          alignItems: "start",
+          gridTemplateColumns: "1fr",
           gap: "24px",
         }}
       >
-        {/* Score */}
-        <div style={{ minWidth: 0 }}>
-          <p
+        {/* Radial gauge */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+          <svg width="160" height="160" viewBox="0 0 160 160" aria-label={`Readiness score: ${pct.toFixed(1)} percent`}>
+            {/* Background track */}
+            <circle
+              cx="80" cy="80" r="68"
+              fill="none"
+              stroke="var(--border)"
+              strokeWidth="8"
+            />
+            {/* Progress arc */}
+            <circle
+              cx="80" cy="80" r="68"
+              fill="none"
+              stroke={color}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={`${mounted ? (finalPct / 100) * 427.3 : 0} 427.3`}
+              transform="rotate(-90 80 80)"
+              style={{ transition: "stroke-dasharray 0.9s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s ease" }}
+            />
+            {/* Center text */}
+            <text
+              x="80" y="72"
+              textAnchor="middle"
+              style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: "36px", fill: color }}
+            >
+              {pct.toFixed(1)}
+            </text>
+            <text
+              x="80" y="96"
+              textAnchor="middle"
+              style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", fill: "var(--ink-muted)" }}
+            >
+              READINESS
+            </text>
+          </svg>
+        </div>
+
+        {/* LOI badge — centered */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "8px" }}>
+          <span
             style={{
               ...detailMonoLabelStyle,
               fontSize: "10px",
-              margin: "0 0 8px",
+              letterSpacing: "0.10em",
+              color: loiReady ? "var(--teal)" : "var(--gold)",
+              backgroundColor: loiReady ? "var(--teal-soft)" : "var(--gold-soft)",
+              padding: "4px 10px",
+              borderRadius: "2px",
             }}
           >
-            Next Gate Readiness
-          </p>
-          <p
-            style={{
-              ...detailSerifTitleStyle("64px"),
-              color,
-              margin: "0 0 4px",
-              lineHeight: 1,
-              transition: "color 0.3s ease",
-            }}
-          >
-            {pct.toFixed(1)}
-            <span style={{ fontSize: "32px", color: "var(--ink-muted)" }}>%</span>
-          </p>
-
-          {/* LOI badge */}
-          <div style={{ marginTop: "16px" }}>
-            <span
-              style={{
-                ...detailMonoLabelStyle,
-                fontSize: "10px",
-                letterSpacing: "0.10em",
-                color: loiReady ? "var(--teal)" : "var(--gold)",
-                backgroundColor: loiReady ? "var(--teal-soft)" : "var(--gold-soft)",
-                padding: "4px 10px",
-                borderRadius: "2px",
-              }}
-            >
-              {isExim ? (loiReady ? "LOI Ready" : "LOI Pending") : (loiReady ? "Gate Ready" : "Gate Pending")}
-            </span>
-          </div>
-
-          {orderedCategoryScores.length > 0 ? (
-            <div style={{ marginTop: "20px", display: "grid", gap: "10px" }}>
-              {orderedCategoryScores.map((entry) => (
-                <div key={entry.key} style={{ display: "grid", gap: "5px" }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "10px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        ...detailMonoLabelStyle,
-                        letterSpacing: "0.10em",
-                      }}
-                    >
-                      {entry.label}
-                    </span>
-                    <span
-                      style={{
-                        ...detailMicroMonoStyle,
-                        fontWeight: 400,
-                        textTransform: "none",
-                        color: "var(--ink-mid)",
-                      }}
-                    >
-                      {(entry.scoreBps / 100).toFixed(0)}%
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      height: "3px",
-                      backgroundColor: "var(--border)",
-                      borderRadius: "2px",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: "100%",
-                        width: mounted ? `${entry.scoreBps / 100}%` : "0%",
-                        backgroundColor: "var(--teal)",
-                        borderRadius: "2px",
-                        transition: "width 0.9s cubic-bezier(0.16, 1, 0.3, 1)",
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          <div style={{ marginTop: "20px", display: "flex", alignItems: "center", gap: "10px", justifyContent: "space-between" }}>
-            <span
-              style={{
-                ...detailMicroMonoStyle,
-                color: "var(--ink-muted)",
-              }}
-            >
-              Last updated: {getRelativeTime(cachedScoreUpdatedAt)}
-            </span>
-            <button
-              onClick={() => {
-                startTransition(async () => {
-                  await recalculateReadiness(projectId, projectSlug);
-                });
-              }}
-              disabled={isPending}
-              style={{
-                padding: "6px 12px",
-                fontSize: "11px",
-                fontWeight: 600,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-                border: "1px solid var(--border)",
-                borderRadius: "4px",
-                backgroundColor: isPending ? "var(--bg-card)" : "var(--bg)",
-                color: isPending ? "var(--ink-muted)" : "var(--ink)",
-                cursor: isPending ? "default" : "pointer",
-                opacity: isPending ? 0.6 : 1,
-                transition: "all 0.2s ease",
-              }}
-            >
-              {isPending ? "Calculating..." : "Recalculate"}
-            </button>
-          </div>
+            {isExim ? (loiReady ? "LOI Ready" : "LOI Pending") : (loiReady ? "Gate Ready" : "Gate Pending")}
+          </span>
         </div>
 
-        {/* Progress bar */}
-        <div style={{ display: "grid", gap: "14px", alignContent: "start" }}>
-          <div>
+        {/* Stat cards */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "12px",
+          }}
+        >
+          {[
+            {
+              label: "Gate status",
+              value: loiReady ? "LOI ready" : "LOI pending",
+              tone: loiReady ? "var(--teal)" : "var(--gold)",
+            },
+            {
+              label: "Strongest category",
+              value: strongestCategory ? `${strongestCategory.label} ${(strongestCategory.scoreBps / 100).toFixed(0)}%` : "—",
+              tone: strongestCategory ? "var(--teal)" : "var(--ink-muted)",
+            },
+            {
+              label: "Weakest category",
+              value: weakestCategory ? `${weakestCategory.label} ${(weakestCategory.scoreBps / 100).toFixed(0)}%` : "—",
+              tone: weakestCategory ? "var(--accent)" : "var(--ink-muted)",
+            },
+          ].map((item) => (
             <div
+              key={item.label}
               style={{
-                height: "6px",
-                backgroundColor: "var(--bg)",
-                borderRadius: "3px",
-                overflow: "hidden",
+                padding: "12px 14px",
+                borderRadius: "12px",
                 border: "1px solid var(--border)",
+                backgroundColor: "color-mix(in srgb, var(--bg) 68%, var(--bg-card))",
               }}
             >
-              <div
+              <p
                 style={{
-                  height: "100%",
-                  width: mounted ? `${finalPct}%` : "0%",
-                  backgroundColor: scoreColor(scoreBps),
-                  borderRadius: "3px",
-                  transition: "width 0.9s cubic-bezier(0.16, 1, 0.3, 1)",
-                }}
-              />
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-              gap: "12px",
-            }}
-          >
-            {[
-              {
-                label: "Gate status",
-                value: loiReady ? "LOI ready" : "LOI pending",
-                tone: loiReady ? "var(--teal)" : "var(--gold)",
-              },
-              {
-                label: "Strongest category",
-                value: strongestCategory ? `${strongestCategory.label} ${(strongestCategory.scoreBps / 100).toFixed(0)}%` : "—",
-                tone: strongestCategory ? "var(--teal)" : "var(--ink-muted)",
-              },
-              {
-                label: "Weakest category",
-                value: weakestCategory ? `${weakestCategory.label} ${(weakestCategory.scoreBps / 100).toFixed(0)}%` : "—",
-                tone: weakestCategory ? "var(--accent)" : "var(--ink-muted)",
-              },
-            ].map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  border: "1px solid var(--border)",
-                  backgroundColor: "color-mix(in srgb, var(--bg) 68%, var(--bg-card))",
+                  ...detailMonoLabelStyle,
+                  margin: "0 0 8px",
                 }}
               >
-                <p
+                {item.label}
+              </p>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  lineHeight: 1.45,
+                  color: item.tone,
+                  margin: 0,
+                }}
+              >
+                {item.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Category breakdown bars */}
+        {orderedCategoryScores.length > 0 ? (
+          <div style={{ display: "grid", gap: "10px" }}>
+            {orderedCategoryScores.map((entry) => (
+              <div key={entry.key} style={{ display: "grid", gap: "5px" }}>
+                <div
                   style={{
-                    ...detailMonoLabelStyle,
-                    margin: "0 0 8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "10px",
                   }}
                 >
-                  {item.label}
-                </p>
-                <p
+                  <span
+                    style={{
+                      ...detailMonoLabelStyle,
+                      letterSpacing: "0.10em",
+                    }}
+                  >
+                    {entry.label}
+                  </span>
+                  <span
+                    style={{
+                      ...detailMicroMonoStyle,
+                      fontWeight: 400,
+                      textTransform: "none",
+                      color: "var(--ink-mid)",
+                    }}
+                  >
+                    {(entry.scoreBps / 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div
                   style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    lineHeight: 1.45,
-                    color: item.tone,
-                    margin: 0,
+                    height: "3px",
+                    backgroundColor: "var(--border)",
+                    borderRadius: "2px",
+                    overflow: "hidden",
                   }}
                 >
-                  {item.value}
-                </p>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: mounted ? `${entry.scoreBps / 100}%` : "0%",
+                      backgroundColor: "var(--teal)",
+                      borderRadius: "2px",
+                      transition: "width 0.9s cubic-bezier(0.16, 1, 0.3, 1)",
+                    }}
+                  />
+                </div>
               </div>
             ))}
           </div>
+        ) : null}
+
+        {/* Recalculate button + timestamp */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "space-between" }}>
+          <span
+            style={{
+              ...detailMicroMonoStyle,
+              color: "var(--ink-muted)",
+            }}
+          >
+            Last updated: {getRelativeTime(cachedScoreUpdatedAt)}
+          </span>
+          <button
+            aria-label="Recalculate readiness score"
+            onClick={() => {
+              startTransition(async () => {
+                await recalculateReadiness(projectId, projectSlug);
+              });
+            }}
+            disabled={isPending}
+            style={{
+              padding: "6px 12px",
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              border: "1px solid var(--border)",
+              borderRadius: "4px",
+              backgroundColor: isPending ? "var(--bg-card)" : "var(--bg)",
+              color: isPending ? "var(--ink-muted)" : "var(--ink)",
+              cursor: isPending ? "default" : "pointer",
+              opacity: isPending ? 0.6 : 1,
+              transition: "all 0.2s ease",
+            }}
+          >
+            {isPending ? "Calculating..." : "Recalculate"}
+          </button>
         </div>
       </div>
 

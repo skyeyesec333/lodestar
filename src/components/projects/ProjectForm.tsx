@@ -25,13 +25,14 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   fontFamily: "'Inter', sans-serif",
   fontSize: "15px",
-  color: "#0d0d0b",
-  backgroundColor: "#ffffff",
-  border: "1px solid #d9d4c8",
+  color: "var(--ink)",
+  backgroundColor: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: "4px",
   padding: "10px 14px",
   outline: "none",
   lineHeight: 1.5,
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
 };
 
 const selectStyle: React.CSSProperties = {
@@ -50,7 +51,7 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.12em",
   textTransform: "uppercase" as const,
-  color: "#6b6b64",
+  color: "var(--ink-muted)",
   display: "block",
   marginBottom: "6px",
 };
@@ -73,7 +74,7 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
 
   const getFocusStyle = (name: string): React.CSSProperties =>
     focusedField === name
-      ? { borderColor: "#c24a1e", boxShadow: "0 0 0 2px #f5e8e2" }
+      ? { borderColor: "var(--accent)", boxShadow: "0 0 0 2px var(--accent-soft)" }
       : {};
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -134,7 +135,7 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
         />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div style={fieldStyle}>
           <label htmlFor="countryCode" style={labelStyle}>Country code *</label>
           <input
@@ -175,7 +176,7 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div style={fieldStyle}>
           <label htmlFor="capexUsd" style={labelStyle}>CAPEX (USD)</label>
           <input
@@ -243,9 +244,10 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
 
       {errorMessage && (
         <div
+          role="alert"
           style={{
-            backgroundColor: "#f5e8e2",
-            border: "1px solid #c24a1e",
+            backgroundColor: "var(--accent-soft)",
+            border: "1px solid var(--accent)",
             borderRadius: "4px",
             padding: "12px 16px",
             marginBottom: "24px",
@@ -255,7 +257,7 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
             style={{
               fontFamily: "'Inter', sans-serif",
               fontSize: "14px",
-              color: "#c24a1e",
+              color: "var(--accent)",
               margin: 0,
             }}
           >
@@ -274,8 +276,8 @@ export function ProjectForm({ initialSector }: ProjectFormProps) {
           fontWeight: 500,
           letterSpacing: "0.10em",
           textTransform: "uppercase",
-          color: "#ffffff",
-          backgroundColor: isSubmitting ? "#d9d4c8" : "#c24a1e",
+          color: "var(--text-inverse)",
+          backgroundColor: isSubmitting ? "var(--border)" : "var(--accent)",
           border: "none",
           borderRadius: "3px",
           padding: "14px 24px",

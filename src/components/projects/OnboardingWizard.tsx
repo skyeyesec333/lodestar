@@ -254,78 +254,54 @@ function ContextBox({ label, children }: { label?: string; children: React.React
 }
 
 function StepIndicator({ current, steps }: { current: number; steps: string[] }) {
+  const totalSteps = steps.length;
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
+        gap: "14px",
         marginBottom: "32px",
       }}
     >
-      {steps.map((label, idx) => {
-        const stepNum = idx + 1;
-        const isCompleted = stepNum < current;
-        const isCurrent = stepNum === current;
-
-        const circleStyle: React.CSSProperties = {
-          width: "28px",
-          height: "28px",
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "11px",
-          fontWeight: 600,
-          flexShrink: 0,
-          backgroundColor: isCompleted ? "var(--teal)" : "transparent",
-          border: isCompleted
-            ? "2px solid var(--teal)"
-            : isCurrent
-              ? "2px solid var(--teal)"
-              : "2px solid var(--border)",
-          color: isCompleted ? "#ffffff" : isCurrent ? "var(--teal)" : "var(--ink-muted)",
-        };
-
-        return (
-          <div key={stepNum} style={{ display: "flex", alignItems: "center", flex: idx < steps.length - 1 ? 1 : "none" }}>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-              <div style={circleStyle}>
-                {isCompleted ? (
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6l3 3 5-5" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : (
-                  stepNum
-                )}
-              </div>
-              <span
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "8px",
-                  letterSpacing: "0.10em",
-                  textTransform: "uppercase",
-                  color: isCurrent ? "var(--teal)" : "var(--ink-muted)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {label}
-              </span>
-            </div>
-            {idx < steps.length - 1 && (
-              <div
-                style={{
-                  flex: 1,
-                  height: "1px",
-                  backgroundColor: isCompleted ? "var(--teal)" : "var(--border)",
-                  margin: "0 6px",
-                  marginBottom: "18px",
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-label={`Step ${current} of ${totalSteps}`}>
+        <circle cx="20" cy="20" r="16" fill="none" stroke="var(--border)" strokeWidth="2.5" />
+        <circle cx="20" cy="20" r="16" fill="none" stroke="var(--teal)" strokeWidth="2.5" strokeLinecap="round"
+          strokeDasharray={`${(current / totalSteps) * 100.5} 100.5`}
+          transform="rotate(-90 20 20)"
+          style={{ transition: "stroke-dasharray 0.3s ease" }}
+        />
+        <text x="20" y="24" textAnchor="middle"
+          style={{ fontFamily: "'DM Mono', monospace", fontSize: "12px", fontWeight: 600, fill: "var(--ink)" }}>
+          {current}
+        </text>
+      </svg>
+      <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+        {steps.map((label, idx) => {
+          const stepNum = idx + 1;
+          const isCompleted = stepNum < current;
+          const isCurrent = stepNum === current;
+          return (
+            <span
+              key={stepNum}
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "9px",
+                letterSpacing: "0.10em",
+                textTransform: "uppercase",
+                color: isCurrent ? "var(--teal)" : isCompleted ? "var(--ink)" : "var(--ink-muted)",
+                fontWeight: isCurrent ? 600 : 400,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {label}
+              {idx < steps.length - 1 ? (
+                <span style={{ margin: "0 2px", color: "var(--border)" }}>/</span>
+              ) : null}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -388,7 +364,7 @@ function Field({
         {required && <span style={{ color: "var(--accent)", marginLeft: "2px" }}>*</span>}
       </label>
       {children}
-      {error && <p style={errorStyle}>{error}</p>}
+      {error && <p role="alert" style={errorStyle}>{error}</p>}
     </div>
   );
 }
@@ -592,11 +568,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
   }
 
 
-  const twoColGrid: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "16px",
-  };
+  const twoColGridClass = "grid grid-cols-1 gap-4 sm:grid-cols-2";
 
   return (
     <>
@@ -736,12 +708,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
               </p>
 
               <div
-                className="wizard-layout"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-                  gap: "24px",
-                }}
+                className="wizard-layout grid grid-cols-1 gap-6 md:grid-cols-[2fr_1fr]"
               >
                 <div>
                   <Field id="name" label="Workspace name" required error={errors.name}>
@@ -757,7 +724,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                     />
                   </Field>
 
-                  <div style={twoColGrid}>
+                  <div className={twoColGridClass}>
                     <Field id="countryCode" label="Country" required error={errors.countryCode}>
                       <select
                         id="countryCode"
@@ -842,7 +809,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                     >
                       Your role on this deal
                     </label>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {(
                         [
                           { value: "sponsor", label: "Sponsor / Developer", desc: "I own or am developing the project" },
@@ -865,6 +832,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                               borderRadius: "4px",
                               padding: "10px 12px",
                               cursor: "pointer",
+                              transition: "border-color 0.15s ease, background-color 0.15s ease",
                             }}
                           >
                             <p
@@ -944,15 +912,10 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
               </p>
 
               <div
-                className="wizard-layout"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-                  gap: "24px",
-                }}
+                className="wizard-layout grid grid-cols-1 gap-6 md:grid-cols-[2fr_1fr]"
               >
                 <div>
-                  <div style={twoColGrid}>
+                  <div className={twoColGridClass}>
                     <Field id="capexMillions" label="CAPEX ($M)" error={errors.capexMillions}>
                       <input
                         id="capexMillions"
@@ -1166,12 +1129,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
               </p>
 
               <div
-                className="wizard-layout"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-                  gap: "24px",
-                }}
+                className="wizard-layout grid grid-cols-1 gap-6 md:grid-cols-[2fr_1fr]"
               >
                 <div>
                   <Field id="dealType" label="Financing path" required error={errors.dealType}>
@@ -1250,7 +1208,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
 
                       {eligibilityResult ? (
                         <div style={{ display: "grid", gap: "12px" }}>
-                          <div style={twoColGrid}>
+                          <div className={twoColGridClass}>
                             <Field id="programPath" label="Program path">
                               <select
                                 id="programPath"
@@ -1281,7 +1239,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                             </Field>
                           </div>
 
-                          <div style={twoColGrid}>
+                          <div className={twoColGridClass}>
                             <Field id="eximCoverType" label="EXIM cover type">
                               <select
                                 id="eximCoverType"
@@ -1372,12 +1330,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
               </p>
 
               <div
-                className="wizard-layout"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-                  gap: "24px",
-                }}
+                className="wizard-layout grid grid-cols-1 gap-6 md:grid-cols-[2fr_1fr]"
               >
                 <div>
                   <Field id="sourceProject" label="Source project">
@@ -1399,7 +1352,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
                   </Field>
 
                   {copyError ? (
-                    <p style={errorStyle}>{copyError}</p>
+                    <p role="alert" style={errorStyle}>{copyError}</p>
                   ) : null}
                 </div>
 
@@ -1503,12 +1456,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
               </p>
 
               <div
-                className="wizard-layout"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-                  gap: "24px",
-                }}
+                className="wizard-layout grid grid-cols-1 gap-6 md:grid-cols-[2fr_1fr]"
               >
                 <div>
                   <div
@@ -1680,6 +1628,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
 
           {submitError ? (
             <p
+              role="alert"
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontSize: "13px",
@@ -1693,14 +1642,7 @@ export function OnboardingWizard({ onComplete, onBack, templateId, existingProje
           ) : null}
         </div>
 
-        <style>{`
-          @media (max-width: 639px) {
-            .wizard-layout,
-            [style*="minmax(0, 2fr) minmax(0, 1fr)"] {
-              grid-template-columns: 1fr !important;
-            }
-          }
-        `}</style>
+        {/* Responsive grid handled by Tailwind classes on wizard-layout */}
       </div>
     </>
   );
