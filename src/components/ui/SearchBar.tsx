@@ -18,9 +18,35 @@ type SearchStakeholder = {
   projectSlug: string | null;
 };
 
+type SearchRequirement = {
+  id: string;
+  name: string;
+  projectName: string;
+  projectSlug: string;
+  status: string;
+};
+
+type SearchDocument = {
+  id: string;
+  filename: string;
+  projectName: string;
+  projectSlug: string;
+};
+
+type SearchFunder = {
+  id: string;
+  organizationName: string;
+  projectName: string;
+  projectSlug: string;
+  engagementStage: string;
+};
+
 type SearchResponse = {
   projects: SearchProject[];
   stakeholders: SearchStakeholder[];
+  requirements?: SearchRequirement[];
+  documents?: SearchDocument[];
+  funders?: SearchFunder[];
 };
 
 type SearchEntry =
@@ -34,6 +60,13 @@ type SearchEntry =
     }
   | {
       kind: "stakeholder";
+      key: string;
+      label: string;
+      href: string;
+      subtitle: string;
+    }
+  | {
+      kind: "result";
       key: string;
       label: string;
       href: string;
@@ -69,6 +102,9 @@ export function SearchBar() {
   const [results, setResults] = useState<SearchResponse>({
     projects: [],
     stakeholders: [],
+    requirements: [],
+    documents: [],
+    funders: [],
   });
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -100,7 +136,7 @@ export function SearchBar() {
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length < 2) {
-      setResults({ projects: [], stakeholders: [] });
+      setResults({ projects: [], stakeholders: [], requirements: [], documents: [], funders: [] });
       setIsLoading(false);
       setErrorMessage(null);
       setActiveIndex(0);
@@ -119,7 +155,7 @@ export function SearchBar() {
 
         if (!response.ok) {
           setErrorMessage("Search temporarily unavailable.");
-          setResults({ projects: [], stakeholders: [] });
+          setResults({ projects: [], stakeholders: [], requirements: [], documents: [], funders: [] });
           setIsOpen(true);
           return;
         }
@@ -176,8 +212,47 @@ export function SearchBar() {
       }
     }
 
+    if (results.requirements && results.requirements.length > 0) {
+      nextEntries.push({ kind: "header", key: "requirements-header", label: "Requirements" });
+      for (const req of results.requirements) {
+        nextEntries.push({
+          kind: "result",
+          key: `req-${req.id}`,
+          label: req.name,
+          href: `/projects/${req.projectSlug}#section-workplan`,
+          subtitle: req.projectName,
+        });
+      }
+    }
+
+    if (results.documents && results.documents.length > 0) {
+      nextEntries.push({ kind: "header", key: "documents-header", label: "Documents" });
+      for (const doc of results.documents) {
+        nextEntries.push({
+          kind: "result",
+          key: `doc-${doc.id}`,
+          label: doc.filename,
+          href: `/projects/${doc.projectSlug}#section-documents`,
+          subtitle: doc.projectName,
+        });
+      }
+    }
+
+    if (results.funders && results.funders.length > 0) {
+      nextEntries.push({ kind: "header", key: "funders-header", label: "Funders" });
+      for (const funder of results.funders) {
+        nextEntries.push({
+          kind: "result",
+          key: `funder-${funder.id}`,
+          label: funder.organizationName,
+          href: `/projects/${funder.projectSlug}#section-capital`,
+          subtitle: `${funder.projectName} · ${formatStage(funder.engagementStage)}`,
+        });
+      }
+    }
+
     return nextEntries;
-  }, [results.projects, results.stakeholders]);
+  }, [results]);
 
   const selectableEntries = entries.filter((entry) => entry.kind !== "header");
   const hasResults = selectableEntries.length > 0;
@@ -409,7 +484,7 @@ export function SearchBar() {
                       >
                         {entry.label}
                       </span>
-                      {entry.kind === "stakeholder" ? (
+                      {(entry.kind === "stakeholder" || entry.kind === "result") ? (
                         <span
                           style={{
                             fontFamily: "'DM Mono', monospace",
@@ -427,7 +502,7 @@ export function SearchBar() {
                         </span>
                       ) : null}
                     </span>
-                    {entry.kind === "project" ? (
+                    {"stage" in entry && entry.kind === "project" ? (
                       <span
                         style={{
                           fontFamily: "'DM Mono', monospace",

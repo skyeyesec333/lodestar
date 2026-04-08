@@ -1,5 +1,7 @@
 type Bucket = { not_started: number; at_risk: number; progressing: number; ready: number };
 
+import { EmptyState } from "@/components/ui/EmptyState";
+
 type Props = { distribution: Bucket; total: number };
 
 const SEGMENTS: Array<{ key: keyof Bucket; label: string; color: string; bg: string }> = [
@@ -10,7 +12,7 @@ const SEGMENTS: Array<{ key: keyof Bucket; label: string; color: string; bg: str
 ];
 
 export function ReadinessDistributionBar({ distribution, total }: Props) {
-  if (total === 0) return null;
+  if (total === 0) return <EmptyState headline="No readiness data" body="Readiness data will appear as requirements are tracked across your portfolio." />;
 
   return (
     <div

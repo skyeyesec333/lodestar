@@ -111,6 +111,7 @@ export function PortfolioTriageCard({ project, lane }: PortfolioTriageCardProps)
               }}
             >
               {formatLabel(project.sector)} · {project.countryCode} · {formatLabel(project.stage)} · {formatLabel(project.dealType)}
+            {project.environmentalCategory ? ` · Cat ${project.environmentalCategory.toUpperCase()}` : ""}
             </p>
           </div>
 

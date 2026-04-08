@@ -126,6 +126,7 @@ export type PortfolioProjectRow = {
   readinessScore: number;
   readinessBps: number | null;
   capexUsdCents: number | null;
+  environmentalCategory: string | null;
   totalRequirements: number;
   completedRequirements: number;
   createdAt: Date;
@@ -157,6 +158,7 @@ export async function getPortfolioStats(
         targetCloseDate: true,
         cachedReadinessScore: true,
         capexUsdCents: true,
+        environmentalCategory: true,
         createdAt: true,
         activityEvents: {
           select: { createdAt: true },
@@ -180,6 +182,7 @@ export async function getPortfolioStats(
         targetCloseDate: project.targetCloseDate,
         cachedReadinessScore: project.cachedReadinessScore,
         capexUsdCents: project.capexUsdCents != null ? Number(project.capexUsdCents) : null,
+        environmentalCategory: project.environmentalCategory ?? null,
         createdAt: project.createdAt,
         lastActivityAt: project.activityEvents[0]?.createdAt ?? null,
       }))
@@ -255,6 +258,7 @@ export async function getPortfolioStats(
         readinessScore: readiness.readinessScore,
         readinessBps: readiness.readinessBps,
         capexUsdCents: project.capexUsdCents != null ? Number(project.capexUsdCents) : null,
+        environmentalCategory: project.environmentalCategory ?? null,
         totalRequirements: applicableRequirements.length,
         completedRequirements: metrics.doneCount,
         createdAt: project.createdAt,
@@ -265,6 +269,39 @@ export async function getPortfolioStats(
     });
 
     return { ok: true, value: rows };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+/**
+ * Returns a map of projectId → count of requirement_status_updated activity
+ * events in the last 30 days, for all projects the user can access.
+ */
+export async function getPortfolioVelocity(
+  clerkUserId: string
+): Promise<Result<Map<string, number>>> {
+  try {
+    const since = new Date(Date.now() - 30 * 86_400_000);
+    const events = await db.activityEvent.findMany({
+      where: {
+        eventType: "requirement_status_updated",
+        createdAt: { gte: since },
+        project: {
+          OR: [
+            { ownerClerkId: clerkUserId },
+            { members: { some: { clerkUserId } } },
+          ],
+        },
+      },
+      select: { projectId: true },
+    });
+    const map = new Map<string, number>();
+    for (const e of events) {
+      map.set(e.projectId, (map.get(e.projectId) ?? 0) + 1);
+    }
+    return { ok: true, value: map };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };

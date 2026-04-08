@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, X, Copy, Check, Loader2, Download } from "lucide-react";
 import type { StatusReport } from "@/lib/ai/status-report";
 
@@ -35,6 +35,14 @@ export function StatusReportButton({ projectSlug }: Props) {
       setState("error");
     }
   }
+
+  const isModalOpen = state === "done" || state === "error";
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isModalOpen]);
 
   function handleClose() {
     setState("idle");
@@ -145,7 +153,7 @@ export function StatusReportButton({ projectSlug }: Props) {
         }}
       >
         {state === "loading" ? (
-          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+          <Loader2 size={14} style={{ animation: "ls-spin 1s linear infinite" }} />
         ) : (
           <FileText size={14} />
         )}
@@ -375,7 +383,7 @@ export function StatusReportButton({ projectSlug }: Props) {
                       }}
                     >
                       <Download size={13} />
-                      Download PDF
+                      Print / Save as PDF
                     </button>
                     <button onClick={handleClose} style={actionButtonStyle}>
                       <X size={13} />
@@ -389,12 +397,6 @@ export function StatusReportButton({ projectSlug }: Props) {
         </div>
       )}
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

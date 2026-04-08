@@ -5,6 +5,7 @@ import {
   detailMutedBodyStyle,
   detailSurfaceCardStyle,
 } from "./projectDetailStyles";
+import { ActivityFeedClient } from "./ActivityFeedClient";
 
 function formatTimestamp(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -352,65 +353,7 @@ export async function ActivityFeed({ projectId, events, teamMemberNamesById = {}
           </div>
         </div>
       ) : (
-        <div
-          style={{
-            ...detailSurfaceCardStyle(),
-            padding: "12px 16px",
-          }}
-        >
-          <div style={{ display: "grid" }}>
-            {previewEvents.map((event, index) => (
-              <div
-                key={event.id}
-                style={{
-                  borderTop: index === 0 ? "none" : "1px solid var(--border)",
-                }}
-              >
-                  <ActivityRow event={event} teamMemberNamesById={teamMemberNamesById} />
-              </div>
-            ))}
-          </div>
-
-          {hasOverflow ? (
-            <details
-              style={{
-                marginTop: "2px",
-                borderTop: "1px solid var(--border)",
-                paddingTop: "10px",
-              }}
-            >
-              <summary
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "10px",
-                  cursor: "pointer",
-                  listStyle: "none",
-                  ...detailMonoLabelStyle,
-                }}
-              >
-                <span>Show {overflowEvents.length} more</span>
-                <span aria-hidden="true" style={{ fontSize: "12px", lineHeight: 1 }}>
-                  ▾
-                </span>
-              </summary>
-
-              <div style={{ display: "grid", marginTop: "2px" }}>
-                {overflowEvents.map((event, index) => (
-                  <div
-                    key={event.id}
-                    style={{
-                      borderTop: index === 0 ? "none" : "1px solid var(--border)",
-                    }}
-                  >
-                    <ActivityRow event={event} teamMemberNamesById={teamMemberNamesById} />
-                  </div>
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </div>
+        <ActivityFeedClient events={resolvedEvents} teamMemberNamesById={teamMemberNamesById} />
       )}
     </div>
   );

@@ -49,7 +49,11 @@ import { buildGateReview } from "@/lib/projects/gate-review";
 import { getProjectConcept } from "@/lib/db/project-concepts";
 import { getProjectExternalEvidence } from "@/lib/db/external-evidence";
 import { getProjectCovenants } from "@/lib/db/covenants";
+import { getProjectDebtTranches } from "@/lib/db/debt-tranches";
+import { getProjectDocumentRequests } from "@/lib/db/document-requests";
+import { DocumentRequestPanel } from "@/components/documents/DocumentRequestPanel";
 import { ResponsibilityMatrix } from "@/components/projects/ResponsibilityMatrix";
+import { ApplicabilitySuggestions } from "@/components/requirements/ApplicabilitySuggestions";
 import { ExpiryTimeline } from "@/components/documents/ExpiryTimeline";
 import { ReadinessBreakdown } from "@/components/projects/ReadinessBreakdown";
 import { ShareLinksPanel } from "@/components/projects/ShareLinksPanel";
@@ -71,29 +75,38 @@ import { TimelineRiskBadge } from "@/components/projects/TimelineRiskBadge";
 import { ExecutiveSummary } from "@/components/projects/ExecutiveSummary";
 import { assessFinancingReadiness } from "@/lib/scoring/financing";
 import { FinancingRiskBadge } from "@/components/projects/FinancingRiskBadge";
+import { CovenantHealthBadge } from "@/components/projects/CovenantHealthBadge";
+import { OverdueActionItems } from "@/components/projects/OverdueActionItems";
 import type { FinancingRisk } from "@/lib/scoring/financing";
 
 // ── Lazy-loaded heavy components (below-fold / tab-gated) ────────────────────
 const MeetingsLog = dynamic(
-  () => import("@/components/meetings/MeetingsLog").then((m) => ({ default: m.MeetingsLog }))
+  () => import("@/components/meetings/MeetingsLog").then((m) => ({ default: m.MeetingsLog })),
+  { loading: () => <SectionSkeleton /> }
 );
 const FunderWorkspace = dynamic(
-  () => import("@/components/projects/FunderWorkspace").then((m) => ({ default: m.FunderWorkspace }))
+  () => import("@/components/projects/FunderWorkspace").then((m) => ({ default: m.FunderWorkspace })),
+  { loading: () => <SectionSkeleton /> }
 );
 const CovenantMonitoringPanel = dynamic(
-  () => import("@/components/projects/CovenantMonitoringPanel").then((m) => ({ default: m.CovenantMonitoringPanel }))
+  () => import("@/components/projects/CovenantMonitoringPanel").then((m) => ({ default: m.CovenantMonitoringPanel })),
+  { loading: () => <SectionSkeleton /> }
 );
 const GanttChart = dynamic(
-  () => import("@/components/projects/GanttChart").then((m) => ({ default: m.GanttChart }))
+  () => import("@/components/projects/GanttChart").then((m) => ({ default: m.GanttChart })),
+  { loading: () => <SectionSkeleton /> }
 );
 const ScenarioSimulator = dynamic(
-  () => import("@/components/projects/ScenarioSimulator").then((m) => ({ default: m.ScenarioSimulator }))
+  () => import("@/components/projects/ScenarioSimulator").then((m) => ({ default: m.ScenarioSimulator })),
+  { loading: () => <SectionSkeleton /> }
 );
 const EpcBidsPanel = dynamic(
-  () => import("@/components/projects/EpcBidsPanel").then((m) => ({ default: m.EpcBidsPanel }))
+  () => import("@/components/projects/EpcBidsPanel").then((m) => ({ default: m.EpcBidsPanel })),
+  { loading: () => <SectionSkeleton /> }
 );
 const BeaconPanel = dynamic(
-  () => import("@/components/beacon/BeaconPanel").then((m) => ({ default: m.BeaconPanel }))
+  () => import("@/components/beacon/BeaconPanel").then((m) => ({ default: m.BeaconPanel })),
+  { loading: () => <SectionSkeleton /> }
 );
 import { getUpcomingMilestones } from "@/lib/db/milestones-upcoming";
 import { UpcomingMilestonesWidget } from "@/components/projects/UpcomingMilestonesWidget";
@@ -103,6 +116,7 @@ import { StatusReportButton } from "@/components/projects/StatusReportButton";
 import { SectionSubNav } from "@/components/projects/SectionSubNav";
 import { FirstRunOverlay } from "@/components/projects/FirstRunOverlay";
 import { SetupChecklist } from "@/components/projects/SetupChecklist";
+import { SectionSkeleton } from "@/components/ui/SectionSkeleton";
 
 function roleLabel(role: TeamMember["role"]): string {
   switch (role) {
@@ -276,6 +290,8 @@ export default async function ProjectPage({
     timelineRisksResult,
     financingRiskResult,
     upcomingMilestonesResult,
+    debtTranchesResult,
+    docRequestsResult,
   ] = await Promise.all([
     getProjectActivity(project.id),
     getProjectStakeholders(project.id),
@@ -296,6 +312,8 @@ export default async function ProjectPage({
     getTimelineRisks(project.id),
     assessFinancingReadiness(project.id),
     getUpcomingMilestones(userId),
+    getProjectDebtTranches(project.id),
+    getProjectDocumentRequests(project.id),
   ]);
   const activityEvents = activityResult.ok ? activityResult.value.items : [];
   const stakeholders = stakeholdersResult.ok ? stakeholdersResult.value : [];
@@ -309,6 +327,8 @@ export default async function ProjectPage({
   const meetings = meetingsResult.ok ? meetingsResult.value : [];
   const epcBids = epcBidsResult.ok ? epcBidsResult.value : [];
   const funders = fundersResult.ok ? fundersResult.value : [];
+  const debtTranches = debtTranchesResult.ok ? debtTranchesResult.value : [];
+  const documentRequests = docRequestsResult.ok ? docRequestsResult.value : [];
   const members = membersResult.ok ? membersResult.value : [];
 
   const memberClerkIds = [
@@ -331,6 +351,19 @@ export default async function ProjectPage({
   const upcomingMilestones = upcomingMilestonesResult.ok ? upcomingMilestonesResult.value : [];
   const DEFAULT_FINANCING_RISK: FinancingRisk = { level: "none", penaltyBps: 0, flags: [] };
   const financingRisk = financingRiskResult.ok ? financingRiskResult.value : DEFAULT_FINANCING_RISK;
+
+  const now = new Date();
+  const fourteenDaysFromNow = new Date(now.getTime() + 14 * 86_400_000);
+  const covenantHealth = {
+    active: covenants.filter((c) => c.status === "active" && (!c.nextDueAt || new Date(c.nextDueAt) > fourteenDaysFromNow)).length,
+    breached: covenants.filter((c) => c.status === "breached").length,
+    atRisk: covenants.filter((c) => c.status === "active" && c.nextDueAt && new Date(c.nextDueAt) <= fourteenDaysFromNow).length,
+    satisfied: covenants.filter((c) => c.status === "satisfied").length,
+    waived: covenants.filter((c) => c.status === "waived").length,
+  };
+
+  const milestonesDone = milestones.filter((m) => m.completedAt !== null).length;
+  const milestonesTotal = milestones.length;
   const currentMembership = members.find((member) => member.clerkUserId === userId);
   const currentProjectRole =
     project.ownerClerkId === userId
@@ -451,7 +484,6 @@ export default async function ProjectPage({
   })();
 
   // Compute documents expiring within 90 days for ExpiryTimeline
-  const now = new Date();
   const ninetyDaysOut = new Date(now.getTime() + 90 * 86_400_000);
   const expiringDocuments = documents.filter(
     (d) => d.expiresAt !== null && d.expiresAt > now && d.expiresAt <= ninetyDaysOut
@@ -644,8 +676,57 @@ export default async function ProjectPage({
     };
   });
 
+  // ── Beacon walkthrough data: assembled from already-fetched data ───────────
+  const walkthroughData: import("@/types").WalkthroughData = {
+    projectName: project.name,
+    dealType: project.dealType,
+    stage: project.stage,
+    country: project.countryCode,
+    sector: project.sector,
+    readinessPct: Math.round(scoreBps / 100),
+    loiReady,
+    loiBlockerCount: loiBlockers.length,
+    loiBlockerNames: loiBlockers
+      .slice(0, 5)
+      .map((reqId) => rows.find((r) => r.requirementId === reqId)?.name ?? reqId),
+    categoryBreakdown: categoryBreakdown.map((c) => ({
+      category: c.category,
+      label: c.label,
+      total: c.total,
+      completed: c.completed,
+      scorePct: c.scorePct,
+    })),
+    conceptThesis: concept?.thesis ?? null,
+    conceptPromptsRemaining: conceptPrompts.length,
+    goNoGoRecommendation: concept?.goNoGoRecommendation ?? null,
+    stakeholderCount: stakeholders.length,
+    epcBidCount: epcBids.length,
+    funderCount: funders.length,
+    covenantCount: covenants.length,
+    capexUsdCents: project.capexUsdCents,
+    eximCoverType: project.eximCoverType,
+    totalRequirements: applicableRequirementCount,
+    doneRequirements: rows.filter((r) => r.isApplicable !== false && ["substantially_final", "executed", "waived"].includes(r.status)).length,
+    overdueCount: operatingMetrics.overdueCount,
+    unassignedCriticalCount: operatingMetrics.unassignedCriticalCount,
+    missingEvidenceCount: operatingMetrics.missingEvidenceCount,
+    documentCount: documents.length,
+    linkedCoveragePct,
+    orphanedEvidenceCount,
+    expiringDocumentCount: expiringDocuments.length,
+    meetingCount: meetings.length,
+    recentVelocity,
+    daysToNextGate: targetGateDaysRemaining,
+    nextGateLabel,
+    actualLoiSubmittedDate: project.actualLoiSubmittedDate?.toISOString() ?? null,
+    actualLoiApprovedDate: project.actualLoiApprovedDate?.toISOString() ?? null,
+    actualCommitmentDate: project.actualCommitmentDate?.toISOString() ?? null,
+    actualCloseDate: project.actualCloseDate?.toISOString() ?? null,
+  };
+
   return (
     <BeaconProvider>
+      <span data-project-name={project.name} hidden />
       <Suspense fallback={null}>
         <FirstRunOverlay
           dealType={project.dealType}
@@ -697,8 +778,32 @@ export default async function ProjectPage({
       </div>
       <div style={{ height: "32px" }} />
 
-      <TimelineRiskBadge risks={timelineRisks} />
-      <FinancingRiskBadge risk={financingRisk} />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", marginBottom: covenantHealth.active + covenantHealth.breached + covenantHealth.atRisk + covenantHealth.satisfied + covenantHealth.waived > 0 || milestonesTotal > 0 ? "12px" : "0" }}>
+        <TimelineRiskBadge risks={timelineRisks} />
+        <FinancingRiskBadge risk={financingRisk} />
+        <CovenantHealthBadge {...covenantHealth} />
+        {milestonesTotal > 0 && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "4px 10px",
+              borderRadius: "999px",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--bg-card)",
+              color: "var(--ink-mid)",
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+            }}
+          >
+            Milestones: {milestonesDone}/{milestonesTotal}
+          </span>
+        )}
+      </div>
 
       <section id="section-executive-summary" style={{ marginBottom: "40px", scrollMarginTop: "72px" }}>
         <div style={{ marginBottom: "16px" }}>
@@ -932,7 +1037,16 @@ export default async function ProjectPage({
           gateResult={gateResult}
         />
 
-        <StageStepper current={project.stage} dealType={project.dealType} />
+        <StageStepper
+          current={project.stage}
+          dealType={project.dealType}
+          actualDates={{
+            loiSubmitted: project.actualLoiSubmittedDate,
+            loiApproved: project.actualLoiApprovedDate,
+            commitment: project.actualCommitmentDate,
+            close: project.actualCloseDate,
+          }}
+        />
 
         <div
           style={{
@@ -1518,6 +1632,7 @@ export default async function ProjectPage({
           requirements={rows.map((r) => ({ requirementId: r.requirementId, name: r.name }))}
           stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
           capexUsdCents={project.capexUsdCents}
+          debtTranches={debtTranches}
         />
 
         <CovenantMonitoringPanel
@@ -1574,6 +1689,10 @@ export default async function ProjectPage({
           />
         </section>
 
+        <Suspense fallback={<SectionSkeleton />}>
+          <OverdueActionItems projectId={project.id} />
+        </Suspense>
+
         {programConfig.hasBlockerColumn && !loiReady && (
           <GateBlockersPanel
             blockers={loiBlockers.map((id) => ({
@@ -1590,6 +1709,7 @@ export default async function ProjectPage({
           recentVelocity={recentVelocity}
           targetLoiDate={project.targetLoiDate ?? project.targetCloseDate}
           dealType={project.dealType}
+          actualLoiSubmittedDate={project.actualLoiSubmittedDate}
         />
 
         <ReadinessTrendlineChart projectSlug={project.slug} />
@@ -1735,6 +1855,8 @@ export default async function ProjectPage({
           />
         </section>
 
+        <ApplicabilitySuggestions projectSlug={project.slug} projectId={project.id} />
+
         <ResponsibilityMatrix requirements={rows} />
       </section>
 
@@ -1809,6 +1931,14 @@ export default async function ProjectPage({
             category: row.category,
             isPrimaryGate: row.isPrimaryGate,
           }))}
+        />
+
+        <DocumentRequestPanel
+          projectId={project.id}
+          slug={project.slug}
+          initialRequests={documentRequests}
+          stakeholders={stakeholders.map((s) => ({ id: s.id, name: s.name }))}
+          requirementOptions={rows.map((r) => ({ projectRequirementId: r.projectRequirementId, name: r.name }))}
         />
 
         <DocumentCoverageMap
@@ -2009,6 +2139,7 @@ export default async function ProjectPage({
       loiBlockerCount={loiBlockers.length}
       signals={beaconSignals}
       documentCoverage={beaconDocumentCoverage}
+      walkthroughData={walkthroughData}
     />
     </BeaconProvider>
   );

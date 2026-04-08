@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type ExpiringDocument = {
   name: string;
@@ -21,7 +22,7 @@ export function GateBlockersPanel({ blockers, gateLabel, expiringDocuments = [] 
   const previewBlockers = blockers.slice(0, 3);
   const remainingPreviewCount = blockers.length - previewBlockers.length;
 
-  if (blockers.length === 0) return null;
+  if (blockers.length === 0) return <EmptyState headline="No gate blockers" body="All critical requirements are on track — no blockers for the next gate." />;
 
   function scrollTo(id: string) {
     const el = document.getElementById(`req-${id}`);

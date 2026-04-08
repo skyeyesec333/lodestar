@@ -1,7 +1,10 @@
 import { resolveShareToken } from "@/lib/db/share-links";
 import { getProjectDocuments } from "@/lib/db/documents";
 import { getProjectByIdPublic } from "@/lib/db/projects";
+import { getProjectDocumentRequests } from "@/lib/db/document-requests";
 import { countryLabel } from "@/lib/projects/country-label";
+import { DownloadButton } from "@/components/share/DownloadButton";
+import { FeedbackForm } from "@/components/share/FeedbackForm";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -240,14 +243,18 @@ export default async function SharedDataRoomPage({
 
   const { projectId, projectName } = tokenResult.value;
 
-  const [documentsResult, projectResult] = await Promise.all([
+  const [documentsResult, projectResult, docRequestsResult] = await Promise.all([
     getProjectDocuments(projectId),
     getProjectByIdPublic(projectId),
+    getProjectDocumentRequests(projectId),
   ]);
 
   const documents = documentsResult.ok ? documentsResult.value.items : [];
   const currentDocuments = documents.filter((d) => d.state === "current");
   const project = projectResult.ok ? projectResult.value : null;
+  const openRequests = docRequestsResult.ok
+    ? docRequestsResult.value.filter((r) => r.status === "requested")
+    : [];
 
   const readinessPctNum = project?.cachedReadinessScore != null
     ? Math.round(project.cachedReadinessScore / 100)
@@ -588,27 +595,136 @@ export default async function SharedDataRoomPage({
                   >
                     {formatDate(doc.createdAt)}
                   </span>
-                  <span
-                    style={{
-                      padding: "5px 12px",
-                      borderRadius: "999px",
-                      border: "1px solid var(--border, #e5e7eb)",
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "9px",
-                      letterSpacing: "0.08em",
-                      textTransform: "uppercase",
-                      color: "var(--ink-muted, #9ca3af)",
-                      backgroundColor: "var(--bg, #f9f8f6)",
-                      textAlign: "center",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Contact for access
-                  </span>
+                  <DownloadButton token={token} documentId={doc.id} />
                 </div>
               ))}
             </div>
           )}
+        </div>
+
+        {/* Document requests */}
+        {openRequests.length > 0 && (
+          <div style={{ marginBottom: "40px" }}>
+            <div style={{ marginBottom: "16px" }}>
+              <p
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "10px",
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--accent, #e05252)",
+                  margin: "0 0 6px",
+                }}
+              >
+                Requested from you
+              </p>
+              <h2
+                style={{
+                  fontFamily: "'DM Serif Display', Georgia, serif",
+                  fontSize: "22px",
+                  fontWeight: 400,
+                  color: "var(--ink, #111827)",
+                  margin: 0,
+                }}
+              >
+                Outstanding Document Requests
+              </h2>
+            </div>
+
+            <div
+              style={{
+                border: "1px solid var(--border, #e5e7eb)",
+                borderLeft: "3px solid var(--accent, #e05252)",
+                borderRadius: "12px",
+                overflow: "hidden",
+                backgroundColor: "var(--bg-card, #ffffff)",
+              }}
+            >
+              {openRequests.map((req, idx) => (
+                <div
+                  key={req.id}
+                  style={{
+                    padding: "14px 20px",
+                    borderTop: idx === 0 ? "none" : "1px solid var(--border, #e5e7eb)",
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: "12px",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: "var(--ink, #111827)",
+                        margin: "0 0 4px",
+                      }}
+                    >
+                      {req.title}
+                    </p>
+                    {req.description && (
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--ink-mid, #6b7280)",
+                          margin: "0 0 4px",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {req.description}
+                      </p>
+                    )}
+                    {req.requirementName && (
+                      <span
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "9px",
+                          letterSpacing: "0.08em",
+                          color: "var(--ink-muted, #9ca3af)",
+                        }}
+                      >
+                        Linked to: {req.requirementName}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: "1px solid var(--gold, #d4a843)",
+                        color: "var(--gold, #d4a843)",
+                      }}
+                    >
+                      Requested
+                    </span>
+                    {req.dueDate && (
+                      <p
+                        style={{
+                          fontFamily: "'DM Mono', monospace",
+                          fontSize: "10px",
+                          color: "var(--ink-muted, #9ca3af)",
+                          margin: "6px 0 0",
+                        }}
+                      >
+                        Due {formatDate(req.dueDate)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Feedback form */}
+        <div style={{ marginBottom: "40px" }}>
+          <FeedbackForm token={token} />
         </div>
 
         {/* Confidentiality notice */}

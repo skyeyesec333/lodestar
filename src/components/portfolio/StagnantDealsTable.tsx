@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type StagnantDeal = {
   id: string;
@@ -11,7 +12,7 @@ type StagnantDeal = {
 type Props = { deals: StagnantDeal[] };
 
 export function StagnantDealsTable({ deals }: Props) {
-  if (deals.length === 0) return null;
+  if (deals.length === 0) return <EmptyState headline="No stagnant deals" body="All projects are progressing — no deals have been inactive for 14+ days." />;
 
   return (
     <div

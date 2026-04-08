@@ -126,7 +126,7 @@ function computeActions(projects: Array<DailyPriorityWidgetProject>): PriorityAc
           headline: `${p.name} readiness stalled at ${readinessPct}%`,
           body: `This deal hasn't advanced recently. Review open workplan items.`,
           ctaLabel: "View Workplan",
-          ctaHref: `/projects/${p.slug}#section-requirements`,
+          ctaHref: `/projects/${p.slug}#section-workplan`,
         },
       });
       continue;

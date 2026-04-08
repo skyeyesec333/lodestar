@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type VelocityEntry = {
   id: string;
@@ -10,7 +11,7 @@ type VelocityEntry = {
 type Props = { entries: VelocityEntry[] };
 
 export function VelocityLeaderboard({ entries }: Props) {
-  if (entries.length === 0) return null;
+  if (entries.length === 0) return <EmptyState headline="No velocity data" body="Complete requirements to see velocity rankings across your portfolio." />;
 
   const max = entries[0]?.completionsLast30Days ?? 1;
 

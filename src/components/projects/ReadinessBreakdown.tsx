@@ -17,23 +17,23 @@ type Props = {
 };
 
 function barColor(scorePct: number): string {
-  if (scorePct >= 70) return "#16a34a";
-  if (scorePct >= 30) return "#d97706";
-  return "#dc2626";
+  if (scorePct >= 70) return "var(--score-high)";
+  if (scorePct >= 30) return "var(--score-mid)";
+  return "var(--score-low)";
 }
 
 function statusBadgeColor(status: string): { bg: string; text: string } {
   switch (status) {
     case "not_started":
-      return { bg: "#f3f4f6", text: "#6b7280" };
+      return { bg: "var(--bg)", text: "var(--ink-muted)" };
     case "in_progress":
-      return { bg: "#dbeafe", text: "#0284c7" };
+      return { bg: "color-mix(in srgb, var(--teal) 12%, var(--bg-card))", text: "var(--teal)" };
     case "draft":
-      return { bg: "#fef08a", text: "#854d0e" };
+      return { bg: "var(--gold-soft)", text: "var(--gold)" };
     case "substantially_final":
-      return { bg: "#fed7aa", text: "#92400e" };
+      return { bg: "var(--accent-soft)", text: "var(--accent)" };
     default:
-      return { bg: "#f3f4f6", text: "#6b7280" };
+      return { bg: "var(--bg)", text: "var(--ink-muted)" };
   }
 }
 
@@ -78,6 +78,9 @@ export function ReadinessBreakdown({ breakdown }: Props) {
             <div key={item.category}>
               {/* Clickable row: Label + score + chevron */}
               <div
+                role={item.blockingRequirements.length > 0 ? "button" : undefined}
+                tabIndex={item.blockingRequirements.length > 0 ? 0 : undefined}
+                aria-expanded={item.blockingRequirements.length > 0 ? isExpanded : undefined}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -87,6 +90,12 @@ export function ReadinessBreakdown({ breakdown }: Props) {
                 }}
                 onClick={() => {
                   if (item.blockingRequirements.length > 0) {
+                    setExpandedCategory(isExpanded ? null : item.category);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && item.blockingRequirements.length > 0) {
+                    e.preventDefault();
                     setExpandedCategory(isExpanded ? null : item.category);
                   }
                 }}
@@ -144,6 +153,7 @@ export function ReadinessBreakdown({ breakdown }: Props) {
                     width: `${item.scorePct}%`,
                     backgroundColor: color,
                     borderRadius: "3px",
+                    transition: "width 500ms ease",
                   }}
                 />
               </div>

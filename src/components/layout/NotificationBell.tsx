@@ -40,11 +40,31 @@ function formatRelativeTime(date: Date): string {
   return `${days}d ago`;
 }
 
+type NotificationCategory = "all" | "approvals" | "documents" | "requirements" | "mentions" | "other";
+
+const CATEGORY_TABS: { key: NotificationCategory; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "approvals", label: "Approvals" },
+  { key: "documents", label: "Docs" },
+  { key: "requirements", label: "Reqs" },
+  { key: "mentions", label: "Mentions" },
+  { key: "other", label: "Other" },
+];
+
+function categorize(type: string): NotificationCategory {
+  if (type.startsWith("approval")) return "approvals";
+  if (type.startsWith("document") || type.includes("document")) return "documents";
+  if (type.startsWith("requirement") || type.includes("requirement")) return "requirements";
+  if (type === "mention_created" || type.includes("mention")) return "mentions";
+  return "other";
+}
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [activeCategory, setActiveCategory] = useState<NotificationCategory>("all");
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Hydrate readIds from localStorage on mount (client-only)
@@ -143,8 +163,8 @@ export function NotificationBell() {
               minWidth: "14px",
               height: "14px",
               borderRadius: "7px",
-              backgroundColor: "#ef4444",
-              color: "#fff",
+              backgroundColor: "var(--accent)",
+              color: "var(--text-inverse)",
               fontSize: "9px",
               fontWeight: 700,
               lineHeight: "14px",
@@ -199,18 +219,82 @@ export function NotificationBell() {
             >
               Notifications
             </span>
-            {unreadCount > 0 && (
-              <span
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {unreadCount > 0 && (
+                <>
+                  <span
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "10px",
+                      color: "#ef4444",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {unreadCount} new
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allIds = new Set(readIds);
+                      for (const item of items) allIds.add(item.id);
+                      saveReadIds(allIds);
+                      setReadIds(allIds);
+                    }}
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px",
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color: "var(--nav-text)",
+                      opacity: 0.6,
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    Mark all read
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Category tabs */}
+          <div
+            style={{
+              display: "flex",
+              gap: "2px",
+              padding: "6px 12px",
+              borderBottom: "1px solid var(--border)",
+              overflowX: "auto",
+            }}
+          >
+            {CATEGORY_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveCategory(tab.key)}
                 style={{
                   fontFamily: "'DM Mono', monospace",
-                  fontSize: "10px",
-                  color: "#ef4444",
-                  fontWeight: 600,
+                  fontSize: "9px",
+                  fontWeight: 500,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  whiteSpace: "nowrap",
+                  padding: "5px 8px",
+                  borderRadius: "999px",
+                  border: "none",
+                  cursor: "pointer",
+                  color: activeCategory === tab.key ? "var(--teal)" : "var(--nav-text)",
+                  backgroundColor: activeCategory === tab.key ? "rgba(43,163,122,0.1)" : "transparent",
+                  opacity: activeCategory === tab.key ? 1 : 0.6,
+                  transition: "all 0.12s ease",
                 }}
               >
-                {unreadCount} new
-              </span>
-            )}
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           {/* Body */}
@@ -242,7 +326,7 @@ export function NotificationBell() {
             </div>
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {items.map((item) => (
+              {items.filter((item) => activeCategory === "all" || categorize(item.type) === activeCategory).map((item) => (
                 <li key={item.id}>
                   <Link
                     href={`/projects/${item.projectSlug}`}
@@ -265,7 +349,7 @@ export function NotificationBell() {
                             width: "6px",
                             height: "6px",
                             borderRadius: "50%",
-                            backgroundColor: "#ef4444",
+                            backgroundColor: "var(--accent)",
                           }}
                         />
                       )}

@@ -10,6 +10,17 @@ import { StagnantDealsTable } from "@/components/portfolio/StagnantDealsTable";
 import { VelocityLeaderboard } from "@/components/portfolio/VelocityLeaderboard";
 import { UpcomingDeadlines } from "@/components/portfolio/UpcomingDeadlines";
 import { DealComparisonTable } from "@/components/portfolio/DealComparisonTable";
+import { SectorConcentrationChart } from "@/components/portfolio/SectorConcentrationChart";
+import { GeographyBreakdown } from "@/components/portfolio/GeographyBreakdown";
+import { DealTypePipeline } from "@/components/portfolio/DealTypePipeline";
+import { PortfolioRiskSummary } from "@/components/portfolio/PortfolioRiskSummary";
+import { CovenantHealthSummary } from "@/components/portfolio/CovenantHealthSummary";
+import { assessFinancingReadiness } from "@/lib/scoring/financing";
+import { getProjectCovenants } from "@/lib/db/covenants";
+import { PrintReportButton } from "@/components/portfolio/PrintReportButton";
+import { ExecutiveDashboard } from "@/components/portfolio/ExecutiveDashboard";
+import { PortfolioFilterBar } from "@/components/portfolio/PortfolioFilterBar";
+import { PortfolioTrendlineChart } from "@/components/portfolio/PortfolioTrendlineChart";
 import {
   Card,
   CardContent,
@@ -76,12 +87,12 @@ const DEAL_TYPE_LABELS: Record<string, string> = {
 export default async function PortfolioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dealType?: string }>;
+  searchParams: Promise<{ dealType?: string; stage?: string; sector?: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const { dealType: dealTypeFilter } = await searchParams;
+  const { dealType: dealTypeFilter, stage: stageFilter, sector: sectorFilter } = await searchParams;
 
   const [result, milestonesResult, velocityResult] = await Promise.all([
     getPortfolioStats(userId),
@@ -115,13 +126,59 @@ export default async function PortfolioPage({
   }
 
   const allProjects = result.value;
-  const projects =
-    dealTypeFilter && dealTypeFilter !== "all"
-      ? allProjects.filter((p) => p.dealType === dealTypeFilter)
-      : allProjects;
+  let projects = allProjects;
+  if (dealTypeFilter && dealTypeFilter !== "all") {
+    projects = projects.filter((p) => p.dealType === dealTypeFilter);
+  }
+  if (stageFilter) {
+    projects = projects.filter((p) => p.stage === stageFilter);
+  }
+  if (sectorFilter) {
+    projects = projects.filter((p) => p.sector === sectorFilter);
+  }
 
-  // Derive available deal types from actual data for filter UI
+  // Financing risk rollup + covenant health (parallel per-project queries)
+  const [financingRisks, allCovenants] = await Promise.all([
+    Promise.all(
+      allProjects.map(async (p) => {
+        const r = await assessFinancingReadiness(p.id);
+        return r.ok ? r.value : { level: "none" as const, penaltyBps: 0, flags: [] as string[] };
+      })
+    ),
+    Promise.all(
+      allProjects.map(async (p) => {
+        const r = await getProjectCovenants(p.id);
+        return r.ok ? r.value : [];
+      })
+    ).then((arrays) => arrays.flat()),
+  ]);
+
+  const riskLevelCounts = { none: 0, low: 0, medium: 0, high: 0 };
+  let totalPenaltyBps = 0;
+  const allFlags: string[] = [];
+  for (const fr of financingRisks) {
+    riskLevelCounts[fr.level as keyof typeof riskLevelCounts]++;
+    totalPenaltyBps += fr.penaltyBps;
+    allFlags.push(...fr.flags);
+  }
+  const flagCounts = allFlags.reduce<Record<string, number>>((acc, f) => { acc[f] = (acc[f] ?? 0) + 1; return acc; }, {});
+  const topFlags = Object.entries(flagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const nowCov = new Date();
+  const fourteenDaysMs = 14 * 86_400_000;
+  const covenantHealth = {
+    total: allCovenants.length,
+    active: allCovenants.filter((c) => c.status === "active").length,
+    breached: allCovenants.filter((c) => c.status === "active" && c.nextDueAt && c.nextDueAt < nowCov).length,
+    atRisk: allCovenants.filter((c) => c.status === "active" && c.nextDueAt && c.nextDueAt >= nowCov && (c.nextDueAt.getTime() - nowCov.getTime()) <= fourteenDaysMs).length,
+    waived: allCovenants.filter((c) => c.status === "waived").length,
+    satisfied: allCovenants.filter((c) => c.status === "satisfied").length,
+  };
+
+  // Derive available filter options from actual data
   const dealTypesInPortfolio = Array.from(new Set(allProjects.map((p) => p.dealType))).sort();
+  const stagesInPortfolio = Array.from(new Set(allProjects.map((p) => p.stage))).sort();
+  const sectorsInPortfolio = Array.from(new Set(allProjects.map((p) => p.sector).filter(Boolean))).sort();
 
   if (allProjects.length === 0) {
     return (
@@ -241,10 +298,36 @@ export default async function PortfolioPage({
     })
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 
+  // Sector concentration
+  const sectorBreakdown = projects.reduce<Record<string, { count: number; capexCents: number }>>((acc, p) => {
+    const s = p.sector || "unspecified";
+    acc[s] = acc[s] ?? { count: 0, capexCents: 0 };
+    acc[s].count++;
+    acc[s].capexCents += p.capexUsdCents ?? 0;
+    return acc;
+  }, {});
+
+  // Geography concentration
+  const countryBreakdown = projects.reduce<Record<string, { count: number; capexCents: number }>>((acc, p) => {
+    const c = p.countryCode || "Unknown";
+    acc[c] = acc[c] ?? { count: 0, capexCents: 0 };
+    acc[c].count++;
+    acc[c].capexCents += p.capexUsdCents ?? 0;
+    return acc;
+  }, {});
+
+  // Deal type pipeline (stage counts by deal type)
+  const dealTypePipeline = projects.reduce<Record<string, Record<string, number>>>((acc, p) => {
+    acc[p.dealType] = acc[p.dealType] ?? {};
+    acc[p.dealType][p.stage] = (acc[p.dealType][p.stage] ?? 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-8">
       {/* Title + filter */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
         <h1
           style={{
             fontFamily: "'DM Serif Display', Georgia, serif",
@@ -256,6 +339,8 @@ export default async function PortfolioPage({
         >
           Portfolio Overview
         </h1>
+        <PrintReportButton />
+        </div>
         {dealTypesInPortfolio.length > 1 && (
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             <Link
@@ -312,6 +397,29 @@ export default async function PortfolioPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Advanced filter bar + saved views */}
+      <PortfolioFilterBar
+        config={{
+          dealTypes: dealTypesInPortfolio,
+          stages: stagesInPortfolio,
+          sectors: sectorsInPortfolio,
+        }}
+      />
+
+      {/* Executive dashboard */}
+      <ExecutiveDashboard
+        totalDeals={projects.length}
+        totalCapexCents={totalCapexCents}
+        avgReadiness={avgReadiness}
+        stagnantCount={stagnantDeals.length}
+        upcomingDeadlineCount={upcomingDeadlines.length}
+        riskFlags={topFlags}
+        distribution={distribution}
+      />
+
+      {/* Portfolio trendline */}
+      <PortfolioTrendlineChart />
 
       {/* Bento grid: summary stats + distribution */}
       <div
@@ -496,6 +604,24 @@ export default async function PortfolioPage({
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Concentration & Pipeline views */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <SectorConcentrationChart breakdown={sectorBreakdown} totalProjects={projects.length} />
+        <GeographyBreakdown breakdown={countryBreakdown} totalProjects={projects.length} />
+      </div>
+
+      <DealTypePipeline pipeline={dealTypePipeline} />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <PortfolioRiskSummary
+          riskLevelCounts={riskLevelCounts}
+          totalPenaltyBps={totalPenaltyBps}
+          topFlags={topFlags}
+          projectCount={projects.length}
+        />
+        <CovenantHealthSummary health={covenantHealth} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

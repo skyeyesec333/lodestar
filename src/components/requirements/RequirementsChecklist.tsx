@@ -12,6 +12,7 @@ import type { TeamMember } from "@/types/collaboration";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
 import { WatchButton } from "@/components/collaboration/WatchButton";
+import { BulkStatusBar } from "@/components/requirements/BulkStatusBar";
 import { getProgramConfig, getCategoryLabel } from "@/lib/requirements/index";
 
 type StakeholderOption = { id: string; name: string };
@@ -268,7 +269,7 @@ function RequirementNoteThread({
               fontWeight: 500,
               letterSpacing: "0.10em",
               textTransform: "uppercase",
-              color: "#fff",
+              color: "var(--text-inverse)",
               backgroundColor: submitting || !draft.trim() ? "var(--ink-muted)" : "var(--accent)",
               border: "none",
               borderRadius: "3px",
@@ -780,7 +781,7 @@ function RequirementResponsibilityPanel({
                 fontWeight: 500,
                 letterSpacing: "0.10em",
                 textTransform: "uppercase",
-                color: "#fff",
+                color: "var(--text-inverse)",
                 backgroundColor: saving ? "var(--ink-muted)" : "var(--teal)",
                 border: "none",
                 borderRadius: "3px",
@@ -892,6 +893,16 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
   );
   const [expandedResponsibility, setExpandedResponsibility] = useState<Set<string>>(new Set());
   const [expandedInfo, setExpandedInfo] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [viewFilter, setViewFilter] = useState<"all" | "mine" | "compliance">("all");
+
+  function toggleSelection(requirementId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(requirementId) ? next.delete(requirementId) : next.add(requirementId);
+      return next;
+    });
+  }
 
   function toggleInfo(requirementId: string) {
     setExpandedInfo((prev) => {
@@ -1048,16 +1059,30 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
     a.click();
   }
 
+  const filteredRows = rows.filter((r) => {
+    if (viewFilter === "mine") {
+      return r.responsibleStakeholderId != null || r.responsibleOrganizationId != null;
+    }
+    if (viewFilter === "compliance") {
+      return r.category === "environmental_social";
+    }
+    return true;
+  });
+
   const grouped = CATEGORY_ORDER.map((cat) => ({
     category: cat,
     label: getCategoryLabel(cat),
-    items: rows.filter((r) => r.category === cat),
+    items: filteredRows.filter((r) => r.category === cat),
+    total: rows.filter((r) => r.category === cat).length,
+    completed: rows.filter((r) => r.category === cat && (statuses[r.requirementId] === "executed" || statuses[r.requirementId] === "substantially_final" || statuses[r.requirementId] === "waived")).length,
   }));
 
   const ifcGrouped = IFC_CATEGORY_ORDER.map((cat) => ({
     category: cat,
     label: getCategoryLabel(cat),
-    items: rows.filter((r) => r.category === cat),
+    items: filteredRows.filter((r) => r.category === cat),
+    total: rows.filter((r) => r.category === cat).length,
+    completed: rows.filter((r) => r.category === cat && (statuses[r.requirementId] === "executed" || statuses[r.requirementId] === "substantially_final" || statuses[r.requirementId] === "waived")).length,
   }));
 
   const allNotStarted = rows.every((r) => r.status === "not_started");
@@ -1126,10 +1151,46 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
         ))}
       </div>
 
+      {/* View filter pills */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          marginBottom: "24px",
+        }}
+      >
+        {([
+          { key: "all" as const, label: "All" },
+          { key: "mine" as const, label: "Assigned" },
+          { key: "compliance" as const, label: "E&S Compliance" },
+        ]).map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setViewFilter(f.key)}
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "10px",
+              fontWeight: 500,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: viewFilter === f.key ? "var(--ink)" : "var(--ink-muted)",
+              backgroundColor: viewFilter === f.key ? "var(--bg)" : "transparent",
+              border: viewFilter === f.key ? "1px solid var(--ink-mid)" : "1px solid var(--border)",
+              borderRadius: "999px",
+              padding: "5px 14px",
+              cursor: "pointer",
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* IFC interactive checklist — uses live rows from the same rows prop */}
       {activeProgram === "ifc" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-          {ifcGrouped.map(({ category, label, items }) => {
+          {ifcGrouped.map(({ category, label, items, total, completed }) => {
             if (items.length === 0) return null;
             return (
               <div key={category}>
@@ -1144,18 +1205,32 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                     marginBottom: "2px",
                   }}
                 >
-                  <span
-                    style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: "10px",
-                      fontWeight: 500,
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      color: "var(--ink)",
-                    }}
-                  >
-                    {label}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "10px",
+                        fontWeight: 500,
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "var(--ink)",
+                      }}
+                    >
+                      {label}
+                    </span>
+                    <span
+                      style={{
+                        fontFamily: "'DM Mono', monospace",
+                        fontSize: "9px",
+                        color: completed === total ? "var(--teal)" : "var(--ink-muted)",
+                      }}
+                    >
+                      {completed}/{total}
+                    </span>
+                    <div style={{ width: "48px", height: "4px", backgroundColor: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
+                      <div style={{ width: total > 0 ? `${(completed / total) * 100}%` : "0%", height: "100%", backgroundColor: completed === total ? "var(--teal)" : "var(--gold)", borderRadius: "2px", transition: "width 400ms ease" }} />
+                    </div>
+                  </div>
                   <span
                     style={{
                       fontFamily: "'DM Mono', monospace",
@@ -1227,6 +1302,15 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         {/* Requirement info */}
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: compact ? "0" : "2px", flexWrap: "wrap" }}>
+                            {canEdit && (
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(row.requirementId)}
+                                onChange={() => toggleSelection(row.requirementId)}
+                                aria-label={`Select ${row.name}`}
+                                style={{ flexShrink: 0, cursor: "pointer", accentColor: "var(--teal)" }}
+                              />
+                            )}
                             <span
                               style={{
                                 fontFamily: "'Inter', sans-serif",
@@ -1702,7 +1786,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-        {grouped.map(({ category, label, items }) => (
+        {grouped.map(({ category, label, items, total, completed }) => (
           <div key={category}>
             {/* Category header */}
             <div
@@ -1715,18 +1799,32 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                 marginBottom: "2px",
               }}
             >
-              <span
-                style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: "10px",
-                  fontWeight: 500,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  color: "var(--ink)",
-                }}
-              >
-                {label}
-              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "10px",
+                    fontWeight: 500,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "var(--ink)",
+                  }}
+                >
+                  {label}
+                </span>
+                <span
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "9px",
+                    color: completed === total ? "var(--teal)" : "var(--ink-muted)",
+                  }}
+                >
+                  {completed}/{total}
+                </span>
+                <div style={{ width: "48px", height: "4px", backgroundColor: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
+                  <div style={{ width: total > 0 ? `${(completed / total) * 100}%` : "0%", height: "100%", backgroundColor: completed === total ? "var(--teal)" : "var(--gold)", borderRadius: "2px", transition: "width 400ms ease" }} />
+                </div>
+              </div>
               <span
                 style={{
                   fontFamily: "'DM Mono', monospace",
@@ -1799,6 +1897,15 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                     {/* Requirement info */}
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: compact ? "0" : "2px", flexWrap: "wrap" }}>
+                        {canEdit && (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(row.requirementId)}
+                            onChange={() => toggleSelection(row.requirementId)}
+                            aria-label={`Select ${row.name}`}
+                            style={{ flexShrink: 0, cursor: "pointer", accentColor: "var(--teal)" }}
+                          />
+                        )}
                         <span
                           style={{
                             fontFamily: "'Inter', sans-serif",
@@ -2337,6 +2444,15 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
         ))}
       </div>
       </div>
+      )}
+
+      {canEdit && selectedIds.size > 0 && (
+        <BulkStatusBar
+          projectId={projectId}
+          slug={slug}
+          selectedIds={Array.from(selectedIds)}
+          onClear={() => setSelectedIds(new Set())}
+        />
       )}
     </div>
   );

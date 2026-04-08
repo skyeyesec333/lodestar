@@ -186,11 +186,15 @@ function StatTile({
     >
       <div style={monoLabelStyle}>{label}</div>
       <div
+        title={typeof value === "string" ? value : undefined}
         style={{
           ...detailSerifTitleStyle("30px"),
           lineHeight: 1.05,
           color: accent,
           marginTop: "8px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
         }}
       >
         {value}
@@ -435,7 +439,7 @@ export function CriticalPathBoard({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", borderBottom: "1px solid var(--border)" }}>
           <StatTile label="Open items" value={activeItems.length} accent="var(--ink)" />
           <StatTile label="Ready" value={readyCount} accent="var(--teal)" />
-          <StatTile label="Highest risk" value={focusItems.length > 0 ? focusItems[0].row.name.split(" ")[0] : "None"} accent="var(--accent)" />
+          <StatTile label="Highest risk" value={focusItems.length > 0 ? focusItems[0].row.name : "None"} accent="var(--accent)" />
           <StatTile label="Owner groups" value={ownerBuckets.length} accent="var(--gold)" />
         </div>
 

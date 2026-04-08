@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type ComparableDeal = {
   id: string;
@@ -70,7 +71,7 @@ export function DealComparisonTable({ deals }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  if (deals.length < 2) return null;
+  if (deals.length < 2) return <EmptyState headline="Not enough deals" body="Add 2 or more projects to compare deals side by side." />;
 
   const toggle = (id: string) => {
     setSelectedIds((prev) => {

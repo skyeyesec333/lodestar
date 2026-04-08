@@ -6,8 +6,10 @@ import { UserButton } from "@clerk/nextjs";
 import { ThemeSwitcher } from "@/components/ui/ThemeSwitcher";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { NavLinks } from "@/components/layout/NavLinks";
 import { getOverdueLoiProjects } from "@/lib/db/projects";
 import { LoiOverdueBanner } from "@/components/projects/LoiOverdueBanner";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 
 const VALID_THEMES = ["parchment", "minimal", "navy", "forest", "slate", "obsidian", "midnight", "ember", "sky_blue"] as const;
 type ThemeId = (typeof VALID_THEMES)[number];
@@ -34,7 +36,7 @@ export default async function DashboardLayout({
       {overdueProjects.length > 0 && (
         <LoiOverdueBanner projects={overdueProjects} />
       )}
-      <header style={{ backgroundColor: "var(--nav-bg)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <header style={{ backgroundColor: "var(--nav-bg)", borderBottom: "1px solid color-mix(in srgb, var(--nav-text) 12%, transparent)" }}>
         <div
           className="ls-header-inner"
           style={{
@@ -83,74 +85,7 @@ export default async function DashboardLayout({
               flex: 1,
             }}
           >
-            <Link
-              href="/projects"
-              className="ls-nav-link"
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "11px",
-                fontWeight: 500,
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--nav-link)",
-                textDecoration: "none",
-                flexShrink: 0,
-                transition: "color 0.15s ease",
-              }}
-            >
-              Projects
-            </Link>
-            <Link
-              href="/portfolio"
-              className="ls-nav-hide-sm ls-nav-link"
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "11px",
-                fontWeight: 500,
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--nav-link)",
-                textDecoration: "none",
-                flexShrink: 0,
-                transition: "color 0.15s ease",
-              }}
-            >
-              Portfolio
-            </Link>
-            <Link
-              href="/experts"
-              className="ls-nav-hide-sm ls-nav-link"
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "11px",
-                fontWeight: 500,
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--nav-link)",
-                textDecoration: "none",
-                flexShrink: 0,
-                transition: "color 0.15s ease",
-              }}
-            >
-              Expert Network
-            </Link>
-            <Link
-              href="/templates"
-              className="ls-nav-hide-sm ls-nav-link"
-              style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: "11px",
-                fontWeight: 500,
-                letterSpacing: "0.10em",
-                textTransform: "uppercase",
-                color: "var(--nav-link)",
-                textDecoration: "none",
-                flexShrink: 0,
-                transition: "color 0.15s ease",
-              }}
-            >
-              Templates
-            </Link>
+            <NavLinks />
             <SearchBar />
           </div>
           <NotificationBell />
@@ -170,6 +105,7 @@ export default async function DashboardLayout({
         className="ls-main-content"
         style={{ maxWidth: "1200px", margin: "0 auto", padding: "48px 24px" }}
       >
+        <Breadcrumbs />
         {children}
       </main>
     </div>

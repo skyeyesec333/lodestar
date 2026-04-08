@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getStaleAssignments } from "@/lib/db/requirements";
 import { getCategoryLabel } from "@/lib/requirements/index";
 
@@ -57,7 +58,7 @@ export async function StaleAssignmentsPanel({ projectId }: StaleAssignmentsPanel
             height: "20px",
             padding: "0 6px",
             backgroundColor: "var(--gold)",
-            color: "#fff",
+            color: "var(--text-inverse)",
             borderRadius: "999px",
             fontFamily: "'DM Mono', monospace",
             fontSize: "10px",
@@ -107,6 +108,7 @@ export async function StaleAssignmentsPanel({ projectId }: StaleAssignmentsPanel
               {/* Left: name + owner */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p
+                  title={item.name}
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontSize: "13px",
@@ -169,6 +171,23 @@ export async function StaleAssignmentsPanel({ projectId }: StaleAssignmentsPanel
           );
         })}
       </div>
+
+      <Link
+        href="#section-requirements"
+        style={{
+          display: "inline-block",
+          marginTop: "12px",
+          fontFamily: "'DM Mono', monospace",
+          fontSize: "10px",
+          fontWeight: 500,
+          letterSpacing: "0.10em",
+          textTransform: "uppercase",
+          color: "var(--gold)",
+          textDecoration: "none",
+        }}
+      >
+        View in checklist →
+      </Link>
     </div>
   );
 }

@@ -355,6 +355,18 @@
   --color-card-foreground:   #16344b;
 }
 
+/* ── Semantic status & score tokens ────────────────────────────────────────── */
+/* These derive from base theme vars, so they adapt across all 9 themes.      */
+
+:root {
+  --score-high:    var(--teal);
+  --score-mid:     var(--gold);
+  --score-low:     var(--accent);
+  --status-review: #f59e0b;
+  --status-ok:     var(--teal);
+  --status-reject: var(--accent);
+}
+
 /* ── Tailwind theme tokens ──────────────────────────────────────────────────── */
 
 @theme {
@@ -463,7 +475,9 @@
   }
 
   /* Global focus ring for all interactive elements */
-  .ls-focus-ring:focus-visible {
+  .ls-focus-ring:focus-visible,
+  button:focus-visible,
+  [role="button"]:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
     border-radius: var(--radius);
@@ -574,6 +588,32 @@
     }
   }
 
+  /* Modal dialog responsive constraints */
+  [role="dialog"] > div {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Horizontal scroll wrapper for tables on mobile */
+  .ls-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Truncation utilities */
+  .ls-truncate {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ls-line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -633,4 +673,35 @@
       grid-column: 2 / 4;
     }
   }
+}
+
+@keyframes ls-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ls-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes ls-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes ls-skeleton-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.5; }
+}
+.ls-skeleton-pulse {
+  animation: ls-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Print styles ─────────────────────────────────────────────────────────── */
+@media print {
+  header, .ls-nav-links, .ls-header-inner, nav[aria-label="Breadcrumb"] { display: none !important; }
+  .ls-main-content { padding: 0 !important; max-width: 100% !important; }
+  body, .min-h-screen { background-color: #fff !important; }
+  * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  section { break-inside: avoid; }
 }

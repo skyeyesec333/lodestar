@@ -342,7 +342,9 @@ export function ReadinessTrendlineChart({ projectSlug }: Props) {
               fill="var(--bg-card, var(--bg))"
               stroke="var(--accent)"
               strokeWidth={2}
-            />
+            >
+              <title>{p.label}: {p.scorePct.toFixed(0)}%</title>
+            </circle>
           ))}
 
           {/* Projected endpoint dot */}
@@ -355,7 +357,9 @@ export function ReadinessTrendlineChart({ projectSlug }: Props) {
               stroke="var(--accent)"
               strokeWidth={1.5}
               opacity={0.5}
-            />
+            >
+              <title>~{projectedPoint.label}: {projectedPoint.scorePct.toFixed(0)}% (projected)</title>
+            </circle>
           )}
 
           {/* X-axis labels */}
@@ -367,7 +371,7 @@ export function ReadinessTrendlineChart({ projectSlug }: Props) {
               textAnchor="middle"
               fontSize={9}
               fontFamily="'DM Mono', monospace"
-              fill={p.isProjected ? "var(--ink-muted)" : "var(--ink-muted)"}
+              fill="var(--ink-muted)"
               opacity={p.isProjected ? 0.6 : 1}
             >
               {p.isProjected ? `~${p.label}` : p.label}

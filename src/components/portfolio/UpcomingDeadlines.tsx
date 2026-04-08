@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Deadline = {
   id: string;
@@ -12,7 +13,7 @@ type Deadline = {
 type Props = { deadlines: Deadline[] };
 
 export function UpcomingDeadlines({ deadlines }: Props) {
-  if (deadlines.length === 0) return null;
+  if (deadlines.length === 0) return <EmptyState headline="No upcoming deadlines" body="Set LOI or close target dates on projects to see upcoming deadlines." />;
 
   return (
     <div
