@@ -344,7 +344,7 @@ export function ProjectEditForm({
                 fontWeight: 500,
                 letterSpacing: "0.10em",
                 textTransform: "uppercase",
-                color: "#ffffff",
+                color: "var(--text-inverse)",
                 backgroundColor:
                   isAdvancing || !gateReview.canAdvance ? "var(--ink-muted)" : "var(--teal)",
                 border: "none",
@@ -487,7 +487,7 @@ export function ProjectEditForm({
                 fontWeight: 500,
                 letterSpacing: "0.10em",
                 textTransform: "uppercase",
-                color: "#ffffff",
+                color: "var(--text-inverse)",
                 backgroundColor: "var(--accent)",
                 border: "none",
                 borderRadius: "3px",

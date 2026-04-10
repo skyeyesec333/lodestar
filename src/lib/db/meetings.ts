@@ -271,6 +271,24 @@ export async function getMeetingByIdNoProject(
   }
 }
 
+export async function linkActionItemRequirement(
+  actionItemId: string,
+  projectId: string,
+  projectRequirementId: string
+): Promise<Result<void>> {
+  try {
+    await db.actionItem.update({
+      where: { id: actionItemId, projectId },
+      data: { projectRequirementId },
+      select: { id: true },
+    });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
 export async function updateActionItemStatus(
   actionItemId: string,
   projectId: string,

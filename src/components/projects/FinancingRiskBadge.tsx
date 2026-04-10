@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { FinancingRisk } from "@/lib/scoring/financing";
 import { Badge } from "@/components/ui/badge";
 import React from "react";
@@ -26,20 +29,50 @@ const BADGE_COLORS: Record<Exclude<FinancingRisk["level"], "none">, BadgeColors>
   },
 };
 
+const FLAG_ACTIONS: Record<string, { action: string; section: string }> = {
+  "Active covenant breach": {
+    action: "Review covenants in the Capital workspace",
+    section: "#section-capital",
+  },
+  "Covenant at risk": {
+    action: "Check covenant due dates in the Capital workspace",
+    section: "#section-capital",
+  },
+  "Debt coverage below 50%": {
+    action: "Add or update debt tranches in the Capital workspace",
+    section: "#section-capital",
+  },
+  "Debt not yet committed": {
+    action: "Advance tranche status from term sheet to committed",
+    section: "#section-capital",
+  },
+};
+
 export function FinancingRiskBadge({ risk }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
   if (risk.level === "none") return null;
 
   const colors = BADGE_COLORS[risk.level];
 
   return (
     <div style={{ marginBottom: "16px" }}>
-      <Badge
-        variant="outline"
-        style={{ fontFamily: "'DM Mono', monospace", letterSpacing: "0.05em", ...colors.badgeStyle }}
+      <div
+        onClick={() => setExpanded(!expanded)}
+        style={{ cursor: "pointer", display: "inline-block" }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setExpanded(!expanded); }}
       >
-        Financing Risk: {risk.level}
-      </Badge>
-      {risk.flags.length > 0 && (
+        <Badge
+          variant="outline"
+          style={{ fontFamily: "'DM Mono', monospace", letterSpacing: "0.05em", ...colors.badgeStyle }}
+        >
+          Financing Risk: {risk.level} {expanded ? "▾" : "▸"}
+        </Badge>
+      </div>
+
+      {!expanded && risk.flags.length > 0 && (
         <ul
           style={{
             margin: "6px 0 0 2px",
@@ -63,6 +96,83 @@ export function FinancingRiskBadge({ risk }: Props) {
             </li>
           ))}
         </ul>
+      )}
+
+      {expanded && (
+        <div
+          style={{
+            marginTop: "8px",
+            border: `1px solid ${risk.level === "high" ? "var(--accent)" : "var(--gold)"}`,
+            borderRadius: "10px",
+            padding: "14px 16px",
+            backgroundColor: risk.level === "high" ? "var(--accent-soft)" : "var(--gold-soft)",
+          }}
+        >
+          {/* Penalty display */}
+          <p
+            style={{
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "11px",
+              fontWeight: 500,
+              letterSpacing: "0.06em",
+              color: colors.flagColor,
+              margin: "0 0 10px",
+            }}
+          >
+            Readiness penalty: −{(risk.penaltyBps / 100).toFixed(0)} bps
+          </p>
+
+          {/* Flags with actions */}
+          {risk.flags.map((flag) => {
+            const info = FLAG_ACTIONS[flag];
+            return (
+              <div
+                key={flag}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                  marginBottom: "8px",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: colors.flagColor,
+                    flexShrink: 0,
+                  }}
+                >
+                  {flag}
+                </span>
+                {info && (
+                  <>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink-muted)" }}>→</span>
+                    <a
+                      href={info.section}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const el = document.getElementById(info.section.replace("#", ""));
+                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: "12px",
+                        color: "var(--ink)",
+                        textDecoration: "underline",
+                        textDecorationColor: "var(--border)",
+                        textUnderlineOffset: "2px",
+                      }}
+                    >
+                      {info.action}
+                    </a>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

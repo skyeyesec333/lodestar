@@ -299,7 +299,7 @@ const addBtnStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "#fff",
+  color: "var(--text-inverse)",
   backgroundColor: "var(--teal)",
   border: "none",
   borderRadius: "3px",

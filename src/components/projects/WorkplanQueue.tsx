@@ -391,18 +391,24 @@ export function WorkplanQueue({
         }}
       >
         {[
-          { label: "Critical now", value: queue.criticalNow.length, tone: "var(--accent)" },
-          { label: "Missing evidence", value: queue.missingEvidence.length, tone: "var(--gold)" },
-          { label: "Unowned", value: queue.unowned.length, tone: "var(--gold)" },
-          { label: "Overdue", value: queue.overdue.length, tone: "var(--accent)" },
+          { label: "Critical now", value: queue.criticalNow.length, tone: "var(--accent)", tab: "critical" as QueueTab },
+          { label: "Missing evidence", value: queue.missingEvidence.length, tone: "var(--gold)", tab: "evidence" as QueueTab },
+          { label: "Unowned", value: queue.unowned.length, tone: "var(--gold)", tab: "unowned" as QueueTab },
+          { label: "Overdue", value: queue.overdue.length, tone: "var(--accent)", tab: "overdue" as QueueTab },
         ].map((card) => (
           <div
             key={card.label}
+            role="button"
+            tabIndex={0}
+            onClick={() => setActiveTab(card.tab)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveTab(card.tab); }}
             style={{
-              border: "1px solid var(--border)",
+              border: activeTab === card.tab ? `1px solid ${card.tone}` : "1px solid var(--border)",
               borderRadius: "12px",
               padding: "14px 16px",
               backgroundColor: "color-mix(in srgb, var(--bg) 62%, var(--bg-card))",
+              cursor: "pointer",
+              transition: "border-color 0.15s ease",
             }}
           >
             <p style={{ margin: "0 0 6px", fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--ink-muted)" }}>

@@ -2,7 +2,10 @@ import { auth } from "@clerk/nextjs/server";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { getRequirementsForDealType } from "@/lib/requirements/index";
-import { suggestRequirementApplicability } from "@/lib/ai/applicability";
+import {
+  suggestRequirementApplicability,
+  suggestRequirementApplicabilityHeuristic,
+} from "@/lib/ai/applicability";
 import type { ApplicabilitySuggestion } from "@/lib/ai/applicability";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requestLogger } from "@/lib/logger";
@@ -66,10 +69,10 @@ export async function POST(
     description: project.description,
   };
 
-  const suggestions: ApplicabilitySuggestion[] = await suggestRequirementApplicability(
-    projectInput,
-    requirementInputs
-  );
+  const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+  const suggestions: ApplicabilitySuggestion[] = hasApiKey
+    ? await suggestRequirementApplicability(projectInput, requirementInputs)
+    : suggestRequirementApplicabilityHeuristic(projectInput, requirementInputs);
 
   return Response.json(suggestions);
 }

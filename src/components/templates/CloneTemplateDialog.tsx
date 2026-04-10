@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type CSSProperties } from "react";
+import { useState, useEffect, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import type { ProjectTemplate } from "@/lib/templates/index";
 import { cloneTemplate } from "@/actions/templates";
@@ -23,6 +23,13 @@ export function CloneTemplateDialog({ template }: Props) {
     setError(null);
     setOpen(true);
   }
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  });
 
   function handleClose() {
     if (!isPending) setOpen(false);
@@ -270,7 +277,7 @@ const submitBtnStyle: CSSProperties = {
   borderRadius: "999px",
   border: "none",
   backgroundColor: "var(--teal)",
-  color: "#ffffff",
+  color: "var(--text-inverse)",
   cursor: "pointer",
 };
 

@@ -380,7 +380,7 @@ export function DocumentReviewButton({ slug, documentId }: Props) {
               border: "1.5px solid var(--ink-muted)",
               borderTopColor: "transparent",
               borderRadius: "50%",
-              animation: "spin 0.7s linear infinite",
+              animation: "ls-spin 0.7s linear infinite",
             }}
           />
         )}
@@ -443,7 +443,7 @@ export function DocumentReviewButton({ slug, documentId }: Props) {
               fontWeight: 500,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "#fff",
+              color: "var(--text-inverse)",
               backgroundColor: "var(--teal)",
               border: "none",
               borderRadius: "3px",
@@ -470,7 +470,6 @@ export function DocumentReviewButton({ slug, documentId }: Props) {
             gap: "10px",
           }}
         >
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           <span
             style={{
               display: "inline-block",
@@ -479,7 +478,7 @@ export function DocumentReviewButton({ slug, documentId }: Props) {
               border: "2px solid var(--border)",
               borderTopColor: "var(--teal)",
               borderRadius: "50%",
-              animation: "spin 0.7s linear infinite",
+              animation: "ls-spin 0.7s linear infinite",
               flexShrink: 0,
             }}
           />

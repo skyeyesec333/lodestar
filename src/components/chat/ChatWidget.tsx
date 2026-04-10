@@ -921,7 +921,7 @@ export function ChatWidget({
                   style={{
                     border: "1px solid var(--accent)",
                     backgroundColor: "var(--accent)",
-                    color: "#fff",
+                    color: "var(--text-inverse)",
                     borderRadius: "999px",
                     padding: "10px 16px",
                     fontFamily: "'DM Mono', monospace",

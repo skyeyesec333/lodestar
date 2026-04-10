@@ -12,6 +12,56 @@ export type DocumentRequestRow = {
   createdAt: Date;
 };
 
+export type DocumentRequestListRow = DocumentRequestRow & {
+  stakeholderId: string;
+  stakeholderName: string;
+  projectRequirementId: string | null;
+};
+
+export async function getProjectDocumentRequests(
+  projectId: string
+): Promise<Result<DocumentRequestListRow[]>> {
+  try {
+    const rows = await db.documentRequest.findMany({
+      where: { projectId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        status: true,
+        dueDate: true,
+        createdAt: true,
+        stakeholderId: true,
+        projectRequirementId: true,
+        stakeholder: { select: { name: true } },
+        projectRequirement: {
+          select: { requirement: { select: { name: true } } },
+        },
+      },
+    });
+
+    return {
+      ok: true,
+      value: rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        status: r.status,
+        dueDate: r.dueDate,
+        requirementName: r.projectRequirement?.requirement.name ?? null,
+        createdAt: r.createdAt,
+        stakeholderId: r.stakeholderId,
+        stakeholderName: r.stakeholder.name,
+        projectRequirementId: r.projectRequirementId,
+      })),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
 export async function createDocumentRequestRecord(input: {
   projectId: string;
   stakeholderId: string;

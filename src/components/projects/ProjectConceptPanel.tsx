@@ -272,7 +272,7 @@ export function ProjectConceptPanel({
                 fontWeight: 500,
                 letterSpacing: "0.10em",
                 textTransform: "uppercase",
-                color: "#ffffff",
+                color: "var(--text-inverse)",
                 backgroundColor: isPending ? "var(--ink-muted)" : "var(--teal)",
                 border: "none",
                 borderRadius: "3px",

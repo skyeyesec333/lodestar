@@ -178,7 +178,7 @@ export function GapAnalysis({ projectId, dealType }: Props) {
             fontWeight: 500,
             letterSpacing: "0.10em",
             textTransform: "uppercase",
-            color: "#ffffff",
+            color: "var(--text-inverse)",
             backgroundColor: state === "loading" ? "var(--ink-muted)" : "var(--accent)",
             border: "none",
             borderRadius: "3px",
@@ -286,21 +286,11 @@ export function GapAnalysis({ projectId, dealType }: Props) {
                     backgroundColor: "var(--border)",
                     borderRadius: "999px",
                     width: i === 3 ? "58%" : "100%",
-                    animation: "pulse 1.4s ease-in-out infinite",
+                    animation: "ls-pulse 1.4s ease-in-out infinite",
                     animationDelay: `${i * 0.15}s`,
                   }}
                 />
               ))}
-              <style>{`
-                @keyframes pulse {
-                  0%, 100% { opacity: 0.4; }
-                  50% { opacity: 1; }
-                }
-                @keyframes blink {
-                  0%, 100% { opacity: 1; }
-                  50% { opacity: 0; }
-                }
-              `}</style>
             </div>
           ) : (
             <div
@@ -330,7 +320,7 @@ export function GapAnalysis({ projectId, dealType }: Props) {
                     backgroundColor: "var(--accent)",
                     marginLeft: "2px",
                     verticalAlign: "text-bottom",
-                    animation: "blink 0.8s step-end infinite",
+                    animation: "ls-blink 0.8s step-end infinite",
                   }}
                 />
               </p>

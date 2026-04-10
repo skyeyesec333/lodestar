@@ -332,7 +332,7 @@ const filterBtnBase: CSSProperties = {
 const filterBtnActive: CSSProperties = {
   ...filterBtnBase,
   backgroundColor: "var(--teal)",
-  color: "#ffffff",
+  color: "var(--text-inverse)",
   borderColor: "var(--teal)",
 };
 

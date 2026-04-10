@@ -1,4 +1,6 @@
 import { anthropic as client } from "./client";
+import { tokenize } from "@/lib/ai/chat";
+import { getRequirementsForDealType } from "@/lib/requirements";
 
 export type ExtractedActionItem = {
   title: string;
@@ -8,6 +10,7 @@ export type ExtractedActionItem = {
   requirementId: string | null; // matched EXIM requirement ID or null
   requirementName: string | null;
   priority: "low" | "medium" | "high";
+  suggestedRequirementId?: string; // keyword-overlap suggestion (in-memory only)
 };
 
 export type ExtractedCommitment = {
@@ -230,9 +233,34 @@ export async function extractActionItems(
   return parseActionItems(firstBlock.text.trim());
 }
 
+function suggestRequirementForActionItem(
+  title: string,
+  dealType: string
+): string | undefined {
+  const requirements = getRequirementsForDealType(dealType);
+  const titleTokens = new Set(tokenize(title));
+  let bestId: string | undefined;
+  let bestScore = 0;
+
+  for (const req of requirements) {
+    const reqTokens = tokenize(req.name);
+    let overlap = 0;
+    for (const token of reqTokens) {
+      if (titleTokens.has(token)) overlap++;
+    }
+    if (overlap > bestScore) {
+      bestScore = overlap;
+      bestId = req.id;
+    }
+  }
+
+  return bestScore >= 3 ? bestId : undefined;
+}
+
 export async function extractMeetingInsights(
   transcript: string,
-  requirements: RequirementRef[]
+  requirements: RequirementRef[],
+  dealType = "exim_project_finance"
 ): Promise<MeetingExtractionResult> {
   const message = await client.messages.create({
     model: MODEL,
@@ -251,5 +279,14 @@ export async function extractMeetingInsights(
     return emptyResult("No response from model.");
   }
 
-  return parseExtraction(firstBlock.text.trim());
+  const result = parseExtraction(firstBlock.text.trim());
+
+  // Annotate action items with keyword-overlap requirement suggestions
+  const annotatedItems = result.actionItems.map((item) => {
+    if (item.requirementId) return item; // already linked by AI
+    const suggestedRequirementId = suggestRequirementForActionItem(item.title, dealType);
+    return suggestedRequirementId ? { ...item, suggestedRequirementId } : item;
+  });
+
+  return { ...result, actionItems: annotatedItems };
 }

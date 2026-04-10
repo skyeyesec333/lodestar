@@ -13,7 +13,33 @@ const PHASE_ORDER = [
 
 type StageId = (typeof PHASE_ORDER)[number];
 
-export function StageStepper({ current, dealType }: { current: StageId; dealType?: DealType }) {
+type ActualDates = {
+  loiSubmitted?: Date | null;
+  loiApproved?: Date | null;
+  commitment?: Date | null;
+  close?: Date | null;
+};
+
+const STAGE_DATE_MAP: Partial<Record<StageId, keyof ActualDates>> = {
+  loi_submitted: "loiSubmitted",
+  loi_approved: "loiApproved",
+  final_commitment: "commitment",
+  financial_close: "close",
+};
+
+function formatShortDate(d: Date): string {
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+}
+
+export function StageStepper({
+  current,
+  dealType,
+  actualDates,
+}: {
+  current: StageId;
+  dealType?: DealType;
+  actualDates?: ActualDates;
+}) {
   const stages = PHASE_ORDER.map((id) => ({
     id,
     label: getStageLabel(id, dealType ?? "exim_project_finance"),
@@ -57,6 +83,9 @@ export function StageStepper({ current, dealType }: { current: StageId; dealType
           const isCompleted = i < currentIndex;
           const isCurrent   = i === currentIndex;
           const isFuture    = i > currentIndex;
+
+          const dateKey = STAGE_DATE_MAP[stage.id];
+          const actualDate = dateKey && actualDates?.[dateKey];
 
           return (
             <div
@@ -108,6 +137,22 @@ export function StageStepper({ current, dealType }: { current: StageId; dealType
               >
                 {stage.label}
               </span>
+
+              {isCompleted && actualDate && (
+                <span
+                  style={{
+                    fontFamily: "'DM Mono', monospace",
+                    fontSize: "8px",
+                    letterSpacing: "0.06em",
+                    color: "var(--ink-muted)",
+                    marginTop: "2px",
+                    whiteSpace: "nowrap",
+                    textAlign: i === 0 ? "left" : i === stages.length - 1 ? "right" : "center",
+                  }}
+                >
+                  {formatShortDate(actualDate)}
+                </span>
+              )}
             </div>
           );
         })}

@@ -9,6 +9,9 @@ export type FunderConditionRow = {
   requirementName: string | null;
   dueDate: Date | null;
   satisfiedAt: Date | null;
+  satisfiedByUserId: string | null;
+  evidenceDocumentId: string | null;
+  evidenceDocumentFilename: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -36,6 +39,9 @@ function shapeCondition(raw: {
   projectRequirementId: string | null;
   dueDate: Date | null;
   satisfiedAt: Date | null;
+  satisfiedByUserId?: string | null;
+  evidenceDocumentId?: string | null;
+  evidenceDocument?: { filename: string } | null;
   createdAt: Date;
   updatedAt: Date;
   projectRequirement: {
@@ -52,6 +58,9 @@ function shapeCondition(raw: {
     requirementName: raw.projectRequirement?.requirement.name ?? null,
     dueDate: raw.dueDate,
     satisfiedAt: raw.satisfiedAt,
+    satisfiedByUserId: raw.satisfiedByUserId ?? null,
+    evidenceDocumentId: raw.evidenceDocumentId ?? null,
+    evidenceDocumentFilename: raw.evidenceDocument?.filename ?? null,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
   };
@@ -102,6 +111,9 @@ export async function getProjectFunders(
             projectRequirementId: true,
             dueDate: true,
             satisfiedAt: true,
+            satisfiedByUserId: true,
+            evidenceDocumentId: true,
+            evidenceDocument: { select: { filename: true } },
             createdAt: true,
             updatedAt: true,
             projectRequirement: {
@@ -293,13 +305,15 @@ export async function addFunderCondition(data: {
         projectRequirementId: true,
         dueDate: true,
         satisfiedAt: true,
+        satisfiedByUserId: true,
+        evidenceDocumentId: true,
+        evidenceDocument: { select: { filename: true } },
         createdAt: true,
         updatedAt: true,
         projectRequirement: {
           select: {
             requirement: {
-              select: { name: true },
-            },
+              select: { name: true } },
           },
         },
       },
@@ -362,6 +376,46 @@ export async function updateFunderConditionStatus(
 export async function deleteFunderCondition(id: string): Promise<Result<void>> {
   try {
     await db.funderCondition.delete({ where: { id } });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+export async function confirmConditionSatisfaction(
+  conditionId: string,
+  userId: string,
+  evidenceDocumentId?: string
+): Promise<Result<void>> {
+  try {
+    await db.funderCondition.update({
+      where: { id: conditionId },
+      data: {
+        status: "satisfied" as import("@prisma/client").FunderConditionStatus,
+        satisfiedAt: new Date(),
+        satisfiedByUserId: userId,
+        ...(evidenceDocumentId ? { evidenceDocumentId } : {}),
+      },
+      select: { id: true },
+    });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown database error";
+    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+  }
+}
+
+export async function linkConditionEvidence(
+  conditionId: string,
+  documentId: string
+): Promise<Result<void>> {
+  try {
+    await db.funderCondition.update({
+      where: { id: conditionId },
+      data: { evidenceDocumentId: documentId },
+      select: { id: true },
+    });
     return { ok: true, value: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";

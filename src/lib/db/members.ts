@@ -1,6 +1,5 @@
-import { randomUUID } from "crypto";
-import { Prisma } from "@prisma/client";
 import { db } from "./index";
+import type { ProjectMemberRole } from "@prisma/client";
 import type { Result } from "@/types";
 
 export type ProjectMemberRow = {
@@ -12,36 +11,25 @@ export type ProjectMemberRow = {
   createdAt: Date;
 };
 
-type ProjectMemberQueryRow = {
-  id: string;
-  projectId: string;
-  clerkUserId: string;
-  role: string;
-  invitedBy: string | null;
-  createdAt: Date;
-};
-
-function shapeMemberRow(row: ProjectMemberQueryRow): ProjectMemberRow {
-  return row;
-}
+const memberSelect = {
+  id: true,
+  projectId: true,
+  clerkUserId: true,
+  role: true,
+  invitedBy: true,
+  createdAt: true,
+} as const;
 
 export async function getProjectMembers(
   projectId: string
 ): Promise<Result<ProjectMemberRow[]>> {
   try {
-    const rows = await db.$queryRaw<ProjectMemberQueryRow[]>(Prisma.sql`
-      SELECT
-        id,
-        "projectId" AS "projectId",
-        "clerkUserId" AS "clerkUserId",
-        role,
-        "invitedBy" AS "invitedBy",
-        "createdAt" AS "createdAt"
-      FROM project_members
-      WHERE "projectId" = ${projectId}
-      ORDER BY "createdAt" ASC
-    `);
-    return { ok: true, value: rows.map(shapeMemberRow) };
+    const rows = await db.projectMember.findMany({
+      where: { projectId },
+      select: memberSelect,
+      orderBy: { createdAt: "asc" },
+    });
+    return { ok: true, value: rows };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
@@ -55,42 +43,22 @@ export async function addProjectMember(data: {
   invitedBy: string;
 }): Promise<Result<ProjectMemberRow>> {
   try {
-    const rows = await db.$queryRaw<ProjectMemberQueryRow[]>(Prisma.sql`
-      INSERT INTO project_members (
-        id,
-        "projectId",
-        "clerkUserId",
+    const role = data.role as ProjectMemberRole;
+    const row = await db.projectMember.upsert({
+      where: { projectId_clerkUserId: { projectId: data.projectId, clerkUserId: data.clerkUserId } },
+      create: {
+        projectId: data.projectId,
+        clerkUserId: data.clerkUserId,
         role,
-        "invitedBy",
-        "createdAt"
-      )
-      VALUES (
-        ${randomUUID()},
-        ${data.projectId},
-        ${data.clerkUserId},
-        ${data.role},
-        ${data.invitedBy},
-        ${new Date()}
-      )
-      ON CONFLICT ("projectId", "clerkUserId")
-      DO UPDATE SET
-        role = EXCLUDED.role,
-        "invitedBy" = EXCLUDED."invitedBy"
-      RETURNING
-        id,
-        "projectId" AS "projectId",
-        "clerkUserId" AS "clerkUserId",
+        invitedBy: data.invitedBy,
+      },
+      update: {
         role,
-        "invitedBy" AS "invitedBy",
-        "createdAt" AS "createdAt"
-    `);
-
-    const row = rows[0];
-    if (!row) {
-      throw new Error("Upsert returned no member row.");
-    }
-
-    return { ok: true, value: shapeMemberRow(row) };
+        invitedBy: data.invitedBy,
+      },
+      select: memberSelect,
+    });
+    return { ok: true, value: row };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
@@ -102,11 +70,11 @@ export async function updateProjectMemberRole(
   role: string
 ): Promise<Result<void>> {
   try {
-    await db.$executeRaw(Prisma.sql`
-      UPDATE project_members
-      SET role = ${role}
-      WHERE id = ${id}
-    `);
+    await db.projectMember.update({
+      where: { id },
+      data: { role: role as ProjectMemberRole },
+      select: { id: true },
+    });
     return { ok: true, value: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";
@@ -116,10 +84,9 @@ export async function updateProjectMemberRole(
 
 export async function removeProjectMember(id: string): Promise<Result<void>> {
   try {
-    await db.$executeRaw(Prisma.sql`
-      DELETE FROM project_members
-      WHERE id = ${id}
-    `);
+    await db.projectMember.delete({
+      where: { id },
+    });
     return { ok: true, value: undefined };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown database error";

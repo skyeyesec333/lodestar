@@ -8,6 +8,7 @@ import {
   createMeetingRecord,
   createActionItemRecord,
   updateActionItemStatus,
+  linkActionItemRequirement,
 } from "@/lib/db/meetings";
 import { recordActivity } from "@/lib/db/activity";
 import { assertProjectAccess } from "@/lib/db/project-access";
@@ -138,6 +139,48 @@ export async function createActionItem(input: unknown): Promise<Result<ActionIte
 
   revalidatePath(`/projects/${slug}`);
   return result;
+}
+
+const linkActionItemRequirementSchema = z.object({
+  projectId: z.string().min(1),
+  slug: z.string().min(1),
+  actionItemId: z.string().min(1),
+  projectRequirementId: z.string().min(1),
+});
+
+export async function linkActionItemRequirementAction(input: unknown): Promise<Result<void>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return { ok: false, error: { code: "UNAUTHORIZED", message: "You must be signed in." } };
+  }
+
+  const parsed = linkActionItemRequirementSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0]?.message ?? "Invalid input." },
+    };
+  }
+
+  const { projectId, slug, actionItemId, projectRequirementId } = parsed.data;
+
+  const access = await assertProjectAccess(projectId, userId, "editor");
+  if (!access.ok) return access;
+
+  // Verify the projectRequirement belongs to this project before linking
+  const pr = await db.projectRequirement.findUnique({
+    where: { id: projectRequirementId },
+    select: { projectId: true },
+  });
+  if (!pr || pr.projectId !== projectId) {
+    return { ok: false, error: { code: "NOT_FOUND", message: "Requirement not found." } };
+  }
+
+  const result = await linkActionItemRequirement(actionItemId, projectId, projectRequirementId);
+  if (!result.ok) return result;
+
+  revalidatePath(`/projects/${slug}`);
+  return { ok: true, value: undefined };
 }
 
 export async function updateMeetingActionItemStatus(input: unknown): Promise<Result<void>> {

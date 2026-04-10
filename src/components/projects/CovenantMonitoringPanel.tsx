@@ -122,7 +122,7 @@ function Spinner() {
         border: "2px solid currentColor",
         borderTopColor: "transparent",
         borderRadius: "50%",
-        animation: "spin 0.6s linear infinite",
+        animation: "ls-spin 0.6s linear infinite",
       }}
     />
   );
@@ -350,7 +350,6 @@ export function CovenantMonitoringPanel({
 
   return (
     <>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <div
         id="section-covenants"

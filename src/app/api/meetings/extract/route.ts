@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
+import { getRequirementsForDealType } from "@/lib/requirements";
 import { extractMeetingInsights } from "@/lib/ai/meeting-extraction";
 import { checkRateLimit } from "@/lib/rate-limit";
 
@@ -28,7 +28,7 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Request body must be an object" }, { status: 400 });
   }
 
-  const { transcript, projectId } = body as Record<string, unknown>;
+  const { transcript, projectId, dealType } = body as Record<string, unknown>;
 
   if (typeof transcript !== "string" || transcript.trim().length === 0) {
     return Response.json({ error: "transcript is required" }, { status: 400 });
@@ -38,14 +38,15 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "projectId is required" }, { status: 400 });
   }
 
-  const requirements = EXIM_REQUIREMENTS.map((r) => ({
+  const effectiveDealType = typeof dealType === "string" ? dealType : "exim_project_finance";
+  const requirements = getRequirementsForDealType(effectiveDealType).map((r) => ({
     id: r.id,
     name: r.name,
     category: r.category,
   }));
 
   try {
-    const result = await extractMeetingInsights(transcript, requirements);
+    const result = await extractMeetingInsights(transcript, requirements, effectiveDealType);
     return Response.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Extraction failed";

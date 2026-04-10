@@ -129,7 +129,7 @@ function GanttTourGuide({ onClose, containerRef }: { onClose: () => void; contai
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <button
               onClick={advance}
-              style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 600, letterSpacing: "0.10em", textTransform: "uppercase", color: "#fff", backgroundColor: "var(--accent)", border: "none", borderRadius: "4px", padding: "8px 18px", cursor: "pointer", flex: 1, transition: "opacity 0.15s" }}
+              style={{ fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 600, letterSpacing: "0.10em", textTransform: "uppercase", color: "var(--text-inverse)", backgroundColor: "var(--accent)", border: "none", borderRadius: "4px", padding: "8px 18px", cursor: "pointer", flex: 1, transition: "opacity 0.15s" }}
               onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
               onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
             >
@@ -319,7 +319,7 @@ function ControlBar({
   };
   const active: React.CSSProperties = {
     backgroundColor: "var(--accent)",
-    color: "#fff",
+    color: "var(--text-inverse)",
     borderColor: "var(--accent)",
   };
   const inactive: React.CSSProperties = {

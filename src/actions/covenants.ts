@@ -49,7 +49,7 @@ const updateSchema = z.object({
   frequency: z.enum(COVENANT_FREQUENCIES).optional(),
   nextDueAt: z.coerce.date().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
-  status: z.enum(["active", "satisfied", "waived"]).optional(),
+  status: z.enum(["active", "satisfied", "waived", "breached"]).optional(),
   waiverReason: z.string().trim().max(1000).nullable().optional(),
   waiverExpiresAt: z.coerce.date().nullable().optional(),
 });

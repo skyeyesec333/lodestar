@@ -225,7 +225,7 @@ const filterBtnBase: CSSProperties = {
 const filterBtnActive: CSSProperties = {
   ...filterBtnBase,
   backgroundColor: "var(--teal)",
-  color: "#ffffff",
+  color: "var(--text-inverse)",
   borderColor: "var(--teal)",
 };
 
@@ -241,7 +241,7 @@ const resetButtonStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.10em",
   textTransform: "uppercase",
-  color: "#ffffff",
+  color: "var(--text-inverse)",
   backgroundColor: "var(--accent)",
   border: "none",
   borderRadius: "3px",

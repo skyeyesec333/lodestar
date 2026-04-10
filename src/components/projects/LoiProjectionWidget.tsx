@@ -1,41 +1,73 @@
-import type { FC } from "react";
+import { getProgramConfig } from "@/lib/requirements/index";
 
 type Props = {
-  projectId: string;
-  readinessScore: number;
-  loiCriticalCount: number;
-  loiCriticalDone: number;
+  loiBlockerCount: number;
+  recentVelocity: number;
+  targetLoiDate: Date | null;
+  dealType: string;
+  actualLoiSubmittedDate?: Date | null;
 };
 
-function projectedLoiDate(
-  loiCriticalCount: number,
-  loiCriticalDone: number
-): string {
-  if (loiCriticalCount === 0) return "Ready to submit";
-  const ratio = loiCriticalDone / loiCriticalCount;
-  if (ratio >= 0.8) return "Ready to submit";
+export function LoiProjectionWidget({ loiBlockerCount, recentVelocity, targetLoiDate, dealType, actualLoiSubmittedDate }: Props) {
+  const config = getProgramConfig(dealType);
+  const gateLabel = config.primaryGateLabel;
 
-  // Remaining gap expressed as number of 10% increments needed to reach 80%
-  const currentPct = ratio * 100;
-  const targetPct = 80;
-  const gapPct = targetPct - currentPct;
-  const incrementsNeeded = gapPct / 10;
-  // ~3 months per 10% increment
-  const monthsNeeded = Math.ceil(incrementsNeeded * 3);
+  let body: React.ReactNode;
+  let statusColor = "var(--teal)";
+  let statusBg = "var(--teal-soft)";
+  let statusBorder = "var(--teal)";
+  let statusLabel = "";
 
-  const target = new Date();
-  target.setMonth(target.getMonth() + monthsNeeded);
-  return `Est. ready by ${target.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
-}
+  if (loiBlockerCount === 0) {
+    statusLabel = "No blockers";
+    body = (
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--ink-mid)", margin: 0, lineHeight: 1.5 }}>
+        On track — no {gateLabel} blockers remaining.
+      </p>
+    );
+  } else if (recentVelocity === 0) {
+    statusColor = "var(--ink-muted)";
+    statusBg = "var(--bg)";
+    statusBorder = "var(--border)";
+    statusLabel = "Insufficient data";
+    body = (
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--ink-mid)", margin: 0, lineHeight: 1.5 }}>
+        No requirement completions in the last 28 days — cannot project a timeline.
+      </p>
+    );
+  } else {
+    const weeksToReady = Math.ceil(loiBlockerCount / recentVelocity);
+    const projectedReady = new Date(Date.now() + weeksToReady * 7 * 86_400_000);
 
-const LoiProjectionWidget: FC<Props> = ({
-  loiCriticalCount,
-  loiCriticalDone,
-}) => {
-  const ratio = loiCriticalCount > 0 ? loiCriticalDone / loiCriticalCount : 0;
-  const pct = Math.round(ratio * 100);
-  const projection = projectedLoiDate(loiCriticalCount, loiCriticalDone);
-  const isReady = projection === "Ready to submit";
+    let scheduleNote: React.ReactNode = null;
+    if (targetLoiDate) {
+      const targetMs = new Date(targetLoiDate).getTime();
+      const diffWeeks = Math.round((projectedReady.getTime() - targetMs) / (7 * 86_400_000));
+      if (diffWeeks <= 0) {
+        scheduleNote = (
+          <span style={{ color: "var(--teal)", fontWeight: 500 }}>On schedule.</span>
+        );
+      } else {
+        statusColor = "var(--gold)";
+        statusBg = "var(--gold-soft)";
+        statusBorder = "var(--gold)";
+        scheduleNote = (
+          <span style={{ color: "var(--gold)", fontWeight: 500 }}>Behind schedule by ~{diffWeeks} week{diffWeeks !== 1 ? "s" : ""}.</span>
+        );
+      }
+    }
+
+    statusLabel = `~${weeksToReady}w to ${gateLabel}`;
+    body = (
+      <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--ink-mid)", margin: 0, lineHeight: 1.5 }}>
+        At current pace ({recentVelocity.toFixed(1)} req/week), ready in{" "}
+        <strong style={{ color: "var(--ink)" }}>~{weeksToReady} week{weeksToReady !== 1 ? "s" : ""}</strong>
+        {" "}(est.{" "}
+        {projectedReady.toLocaleDateString("en-US", { month: "short", year: "numeric" })}).
+        {scheduleNote && <>{" "}{scheduleNote}</>}
+      </p>
+    );
+  }
 
   return (
     <div
@@ -43,118 +75,67 @@ const LoiProjectionWidget: FC<Props> = ({
         backgroundColor: "var(--bg-card)",
         border: "1px solid var(--border)",
         borderRadius: "4px",
-        padding: "20px 24px",
+        padding: "16px 20px",
       }}
     >
-      {/* Title row */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: "16px",
           gap: "12px",
+          marginBottom: "10px",
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <p
-            style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "10px",
-              fontWeight: 500,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "var(--ink-muted)",
-              margin: 0,
-            }}
-          >
-            LOI Readiness
-          </p>
-          {/* Tooltip anchor */}
-          <div
-            title="LOI-critical items are the subset of EXIM requirements that must be in substantially final or executed form before EXIM will issue a Letter of Interest. These are contractual, financial, and eligibility items that gate the LOI milestone."
-            style={{
-              width: "16px",
-              height: "16px",
-              borderRadius: "50%",
-              border: "1px solid var(--border)",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "9px",
-              fontWeight: 700,
-              color: "var(--ink-muted)",
-              cursor: "help",
-              flexShrink: 0,
-              userSelect: "none",
-            }}
-          >
-            ?
-          </div>
-        </div>
-
-        {/* Status badge */}
-        <span
+        <p
           style={{
             fontFamily: "'DM Mono', monospace",
-            fontSize: "9px",
-            fontWeight: 600,
-            letterSpacing: "0.10em",
+            fontSize: "10px",
+            fontWeight: 500,
+            letterSpacing: "0.12em",
             textTransform: "uppercase",
-            color: isReady ? "var(--teal)" : "var(--ink-muted)",
-            backgroundColor: isReady ? "var(--teal-soft)" : "var(--bg)",
-            border: "1px solid",
-            borderColor: isReady ? "var(--teal)" : "var(--border)",
-            borderRadius: "3px",
-            padding: "3px 10px",
-            flexShrink: 0,
+            color: "var(--ink-muted)",
+            margin: 0,
           }}
         >
-          {isReady ? "Ready to submit" : projection}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div style={{ marginBottom: "10px" }}>
-        <div
-          style={{
-            height: "6px",
-            backgroundColor: "var(--border)",
-            borderRadius: "3px",
-            overflow: "hidden",
-          }}
-        >
-          <div
+          {gateLabel} Projection
+        </p>
+        {statusLabel && (
+          <span
             style={{
-              height: "100%",
-              width: `${pct}%`,
-              backgroundColor: isReady ? "var(--teal)" : pct >= 50 ? "var(--gold)" : "var(--accent)",
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "9px",
+              fontWeight: 600,
+              letterSpacing: "0.10em",
+              textTransform: "uppercase",
+              color: statusColor,
+              backgroundColor: statusBg,
+              border: `1px solid ${statusBorder}`,
               borderRadius: "3px",
-              transition: "width 0.3s ease",
+              padding: "3px 10px",
+              flexShrink: 0,
             }}
-          />
-        </div>
+          >
+            {statusLabel}
+          </span>
+        )}
       </div>
-
-      {/* Legend */}
-      <p
-        style={{
-          fontFamily: "'DM Mono', monospace",
-          fontSize: "10px",
-          color: "var(--ink-muted)",
-          margin: 0,
-          letterSpacing: "0.04em",
-        }}
-      >
-        {loiCriticalDone} of {loiCriticalCount} LOI-critical items complete
-        {" · "}
-        <span style={{ fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
-      </p>
+      {body}
+      {actualLoiSubmittedDate && (
+        <p
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: "12px",
+            color: "var(--teal)",
+            margin: "8px 0 0",
+          }}
+        >
+          {gateLabel} submitted {Math.floor((Date.now() - new Date(actualLoiSubmittedDate).getTime()) / 86_400_000)} days ago
+        </p>
+      )}
     </div>
   );
-};
+}
 
-export { LoiProjectionWidget };
 export default LoiProjectionWidget;

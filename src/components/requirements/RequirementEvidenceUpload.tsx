@@ -133,7 +133,7 @@ export function RequirementEvidenceUpload({
             height="11"
             viewBox="0 0 12 12"
             fill="none"
-            style={{ animation: "spin 0.8s linear infinite" }}
+            style={{ animation: "ls-spin 0.8s linear infinite" }}
           >
             <circle
               cx="6"
@@ -186,8 +186,6 @@ export function RequirementEvidenceUpload({
         </span>
       )}
 
-      {/* Spin keyframe — injected once via a style tag */}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Hidden file input */}
       <input

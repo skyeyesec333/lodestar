@@ -90,7 +90,7 @@ function ActionItemCard({
           padding: 0,
         }}
       >
-        {done && <span style={{ color: "#fff", fontSize: "9px", lineHeight: 1 }}>✓</span>}
+        {done && <span style={{ color: "var(--text-inverse)", fontSize: "9px", lineHeight: 1 }}>✓</span>}
       </button>
 
       {/* Content */}
@@ -431,7 +431,7 @@ export function ActionItemsPanel({
               fontWeight: 500,
               letterSpacing: "0.10em",
               textTransform: "uppercase",
-              color: "#fff",
+              color: "var(--text-inverse)",
               backgroundColor: extracting ? "var(--ink-muted)" : "var(--teal)",
               border: "none",
               borderRadius: "3px",

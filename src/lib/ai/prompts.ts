@@ -56,8 +56,27 @@ function getDealTypeGuidance(dealType: string): string {
       return "Focus on DSCR covenant compliance, financial close conditions precedent, MAC clause definitions, and lender due diligence package completeness. Commercial banks require a fully executed term sheet before credit approval.";
     case "private_equity":
       return "Focus on management team references, LP mandate compliance memo, exit strategy documentation, and ESG baseline. PE sponsors need a clear path to exit and LP approval before deploying capital.";
+    case "blended_finance":
+      return "Focus on donor grant agreement execution, concessional window approval criteria, additionality memo completeness, and results framework alignment. Blended finance requires demonstrating that concessional capital crowds in — not crowds out — commercial investment.";
     default:
       return "Focus on the highest-weighted incomplete items, prioritizing any items that gate the next project stage.";
+  }
+}
+
+function getGapAnalysisPersona(dealType: string): string {
+  switch (dealType) {
+    case "exim_project_finance":
+      return "expert in US EXIM Bank project finance and LOI submission requirements";
+    case "private_equity":
+      return "expert in PE infrastructure investment committee processes and sponsor finance";
+    case "development_finance":
+      return "expert in DFI project finance appraisal and board approval processes";
+    case "commercial_finance":
+      return "expert in commercial bank project finance credit processes and credit committee approval";
+    case "blended_finance":
+      return "expert in blended finance structuring, donor coordination, and concessional window approval";
+    default:
+      return "expert in infrastructure project finance and deal readiness";
   }
 }
 
@@ -94,7 +113,7 @@ export function buildGapAnalysisPrompt(
   const targetDateLabel = effectiveDealType === "exim_project_finance" ? "Target LOI Date" : "Target Gate Date";
   const daysToGateLabel = effectiveDealType === "exim_project_finance" ? "Days to LOI" : "Days to Gate";
 
-  return `You are an expert in project finance. A project sponsor needs concise, actionable guidance on their readiness progress.
+  return `You are an ${getGapAnalysisPersona(effectiveDealType)}. A project sponsor needs concise, actionable guidance on their readiness progress.
 
 DEAL TYPE FOCUS: ${getDealTypeGuidance(effectiveDealType)}
 

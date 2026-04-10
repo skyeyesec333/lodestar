@@ -366,9 +366,9 @@ export function WeeklyDriftPanel({
                           borderRadius: "8px",
                           background:
                             point.count > 0
-                              ? "linear-gradient(180deg, color-mix(in srgb, var(--accent) 26%, var(--bg-card)) 0%, var(--accent) 100%)"
+                              ? `linear-gradient(180deg, color-mix(in srgb, ${itemTone} 26%, var(--bg-card)) 0%, ${itemTone} 100%)`
                               : "color-mix(in srgb, var(--border) 60%, var(--bg-card))",
-                          border: point.count > 0 ? "1px solid color-mix(in srgb, var(--accent) 28%, var(--border))" : "1px solid var(--border)",
+                          border: point.count > 0 ? `1px solid color-mix(in srgb, ${itemTone} 28%, var(--border))` : "1px solid var(--border)",
                         }}
                       />
                     </div>

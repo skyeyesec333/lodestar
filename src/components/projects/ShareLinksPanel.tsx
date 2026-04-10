@@ -292,7 +292,7 @@ export function ShareLinksPanel({ projectId, slug, initialLinks }: Props) {
                 borderRadius: "999px",
                 border: "none",
                 backgroundColor: "var(--ink, #111827)",
-                color: "#ffffff",
+                color: "var(--text-inverse)",
                 cursor: isPending ? "wait" : "pointer",
                 opacity: isPending ? 0.6 : 1,
               }}

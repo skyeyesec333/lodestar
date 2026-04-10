@@ -11,9 +11,10 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useBeacon, type BeaconTab } from "./BeaconProvider";
-import type { ChatCitation, ChatRuntimeContext, BeaconSignal, BeaconDocumentCoverage } from "@/types";
+import type { ChatCitation, ChatRuntimeContext, BeaconSignal, BeaconDocumentCoverage, WalkthroughData } from "@/types";
 import type { ChatPresetQuestion } from "@/components/chat/ChatWidget";
 import { getWorkspaceChatPresets } from "@/lib/ai/chat-presets";
+import { WalkthroughController } from "./WalkthroughController";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ interface ChatMessage {
   role: ChatRole;
   content: string;
   citations?: readonly ChatCitation[];
+  walkthroughLabel?: string;
 }
 
 type ChatStreamEvent =
@@ -43,6 +45,7 @@ export interface BeaconPanelProps {
   loiBlockerCount?: number;
   signals?: BeaconSignal[];
   documentCoverage?: BeaconDocumentCoverage[];
+  walkthroughData?: WalkthroughData;
 }
 
 
@@ -154,6 +157,16 @@ function TabBar({
   activeTab: BeaconTab;
   onChange: (tab: BeaconTab) => void;
 }) {
+  function handleTabKeyDown(e: React.KeyboardEvent, currentIdx: number) {
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowRight") nextIdx = (currentIdx + 1) % TABS.length;
+    if (e.key === "ArrowLeft") nextIdx = (currentIdx - 1 + TABS.length) % TABS.length;
+    if (nextIdx !== null) {
+      e.preventDefault();
+      onChange(TABS[nextIdx].id);
+    }
+  }
+
   return (
     <div
       role="tablist"
@@ -164,15 +177,17 @@ function TabBar({
         padding: "0 16px",
       }}
     >
-      {TABS.map((tab) => {
+      {TABS.map((tab, idx) => {
         const isActive = tab.id === activeTab;
         return (
           <button
             key={tab.id}
             role="tab"
             aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
             type="button"
             onClick={() => onChange(tab.id)}
+            onKeyDown={(e) => handleTabKeyDown(e, idx)}
             style={{
               flex: 1,
               padding: "10px 0",
@@ -204,7 +219,9 @@ function AssistantTab({
   endpoint,
   pageContext,
   context,
-}: Pick<BeaconPanelProps, "presetQuestions" | "placeholder" | "endpoint" | "pageContext" | "context">) {
+  walkthroughData,
+}: Pick<BeaconPanelProps, "presetQuestions" | "placeholder" | "endpoint" | "pageContext" | "context" | "walkthroughData">) {
+  const { walkthroughActive, startWalkthrough: triggerWalkthrough } = useBeacon();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -214,6 +231,17 @@ function AssistantTab({
 
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  function handleWalkthroughInject(msg: { role: "assistant"; content: string; walkthroughLabel?: string }) {
+    const id = makeId("wt");
+    setMessages((prev) => [...prev, { id, role: msg.role, content: msg.content, walkthroughLabel: msg.walkthroughLabel }]);
+    setIsPinnedToBottom(true);
+  }
+
+  function handleStartWalkthrough() {
+    setMessages([]);
+    triggerWalkthrough();
+  }
 
   useEffect(() => {
     if (!isPinnedToBottom) return;
@@ -367,6 +395,31 @@ function AssistantTab({
               Ask about this deal, requirements, or EXIM terms.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {walkthroughData && (
+                <button
+                  type="button"
+                  onClick={handleStartWalkthrough}
+                  style={{
+                    textAlign: "left",
+                    padding: "11px 12px",
+                    borderRadius: "10px",
+                    border: "1px solid color-mix(in srgb, var(--accent) 40%, var(--border))",
+                    background: "color-mix(in srgb, var(--accent) 6%, var(--bg-card))",
+                    color: "var(--accent)",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    lineHeight: 1.4,
+                    cursor: "pointer",
+                    transition: "border-color 0.15s, background 0.15s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  <BeaconGlyph size={14} />
+                  Walk me through this deal
+                </button>
+              )}
               {presetQuestions.slice(0, 4).map((q) => (
                 <button
                   key={q.id}
@@ -402,6 +455,21 @@ function AssistantTab({
               gap: "4px",
             }}
           >
+            {msg.walkthroughLabel && (
+              <span
+                style={{
+                  fontFamily: "'DM Mono', monospace",
+                  fontSize: "9px",
+                  fontWeight: 600,
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  color: "var(--accent)",
+                  paddingLeft: "2px",
+                }}
+              >
+                {msg.walkthroughLabel}
+              </span>
+            )}
             <div
               style={{
                 maxWidth: "88%",
@@ -412,6 +480,7 @@ function AssistantTab({
                     ? "color-mix(in srgb, var(--accent) 18%, var(--bg-card))"
                     : "var(--bg-card)",
                 border: "1px solid var(--border)",
+                borderLeft: msg.walkthroughLabel ? "2px solid var(--accent)" : "1px solid var(--border)",
                 fontSize: "13px",
                 lineHeight: 1.6,
                 color: "var(--ink)",
@@ -464,11 +533,19 @@ function AssistantTab({
         )}
       </div>
 
+      {/* Walkthrough controller */}
+      {walkthroughActive && walkthroughData && (
+        <WalkthroughController
+          walkthroughData={walkthroughData}
+          onInjectMessage={handleWalkthroughInject}
+        />
+      )}
+
       {/* Input */}
       <div
         style={{
           padding: "12px 16px",
-          borderTop: "1px solid var(--border)",
+          borderTop: walkthroughActive ? "none" : "1px solid var(--border)",
           background: "var(--bg-card)",
         }}
       >
@@ -477,7 +554,7 @@ function AssistantTab({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder ?? "Ask Beacon about this deal…"}
+            placeholder={walkthroughActive ? "Ask a follow-up, or continue…" : (placeholder ?? "Ask Beacon about this deal…")}
             rows={2}
             disabled={isStreaming}
             style={{
@@ -1072,6 +1149,7 @@ export function BeaconPanel(props: BeaconPanelProps) {
                 endpoint={props.endpoint}
                 pageContext={effectivePageContext}
                 context={props.context}
+                walkthroughData={props.walkthroughData}
               />
             )}
             {activeTab === "signals" && (

@@ -189,3 +189,80 @@ export const APP_KNOWLEDGE_BASE: readonly AppKnowledgeEntry[] = [
     ],
   })),
 ];
+
+// lastVerifiedAt: 2026-04-05
+export const EXIM_OFFICIAL_KNOWLEDGE: readonly AppKnowledgeEntry[] = [
+  {
+    id: "exim-official-eligibility",
+    title: "EXIM Eligibility Criteria — US Nexus and Content Rules",
+    snippet:
+      "Exports must be US-made goods or services. For project finance, the EPC contract must contain at least 51% US content by value. Greenfield projects are preferred; EXIM typically does not support refinancing of existing assets. The borrower must demonstrate ability to repay in hard currency.",
+    sourceType: "official_exim",
+    url: "https://www.exim.gov/what-we-do/project-finance",
+    aliases: [
+      "eligibility", "us content", "51 percent", "85 percent", "us nexus",
+      "greenfield", "exim eligible", "foreign content", "american content",
+    ],
+  },
+  {
+    id: "exim-official-environmental",
+    title: "EXIM Environmental Review — Category Thresholds",
+    snippet:
+      "Category A projects (significant environmental impact) require a 120-day public disclosure period before board approval. Category B projects (moderate impact) require a 30-day disclosure period. Category C projects (minimal impact) are exempt from disclosure requirements. Classification follows IFC Performance Standards.",
+    sourceType: "official_exim",
+    url: "https://www.exim.gov/about/library/policies/environmental-procedures-guidelines",
+    aliases: [
+      "environmental category", "category a", "category b", "category c",
+      "esia", "environmental review", "disclosure period", "ifc performance standards",
+      "environmental impact", "esap",
+    ],
+  },
+  {
+    id: "exim-official-cls",
+    title: "Country Limitation Schedule (CLS) — Country Eligibility",
+    snippet:
+      "The CLS lists countries where EXIM is open, restricted, or closed for new transactions. Coverage levels vary: full coverage, political-only, or no coverage. Projects in restricted countries require case-by-case approval. EXIM updates the CLS periodically; sponsors should verify current status before LOI submission.",
+    sourceType: "official_exim",
+    url: "https://www.exim.gov/policies/country-limitation-schedule",
+    aliases: [
+      "cls", "country limitation schedule", "country eligibility", "country risk",
+      "restricted country", "closed country", "political only", "coverage",
+    ],
+  },
+  {
+    id: "exim-official-exposure-fee",
+    title: "EXIM Exposure Fee — Risk-Based Pricing",
+    snippet:
+      "EXIM charges an exposure fee (guarantee fee) based on country risk, tenor, and obligor type. Sovereign obligors typically qualify for lower fees than private-sector borrowers. Fees are calculated on the outstanding guaranteed amount and can be financed into the loan. The exact rate is determined during underwriting.",
+    sourceType: "official_exim",
+    url: "https://www.exim.gov/what-we-do/project-finance/fees",
+    aliases: [
+      "exposure fee", "guarantee fee", "pricing", "fee calculation", "idc",
+      "interest during construction", "sovereign obligor", "private obligor", "risk premium",
+    ],
+  },
+  {
+    id: "exim-official-ctep",
+    title: "Clean Technology Export Program (CTEP)",
+    snippet:
+      "CTEP supports exports in 10 strategic clean energy sectors including solar, wind, energy storage, smart grid, and efficiency technology. CTEP transactions receive enhanced support terms including lower exposure fees and higher cover percentages. Projects must demonstrate export of American clean technology goods or services.",
+    sourceType: "official_exim",
+    url: "https://www.exim.gov/what-we-do/clean-energy",
+    aliases: [
+      "ctep", "clean technology", "clean energy", "solar", "wind", "energy storage",
+      "smart grid", "renewable", "energy efficiency", "strategic sectors",
+    ],
+  },
+  {
+    id: "exim-official-mmia",
+    title: "Make More in America Initiative (MMIA)",
+    snippet:
+      "MMIA supports domestic manufacturing and supply chain development. Transactions must involve production or manufacturing in the United States. MMIA provides enhanced financing terms for projects that strengthen American supply chains, particularly in sectors critical to national security and competitiveness.",
+    sourceType: "official_exim",
+    url: "https://www.exim.gov/what-we-do/make-more-in-america",
+    aliases: [
+      "mmia", "make more in america", "domestic manufacturing", "supply chain",
+      "us manufacturing", "american manufacturing", "onshoring", "reshoring",
+    ],
+  },
+];

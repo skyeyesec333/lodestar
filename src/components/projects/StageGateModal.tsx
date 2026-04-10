@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import type { GateCheckResult, GateBlocker } from "@/lib/projects/stage-gate";
 import { getCategoryLabel } from "@/lib/requirements/index";
 
@@ -24,7 +25,7 @@ function CategoryBadge({ category }: { category: string }) {
         letterSpacing: "0.08em",
         textTransform: "uppercase",
         color: "var(--ink-muted)",
-        backgroundColor: "var(--bg-subtle, #f5f5f5)",
+        backgroundColor: "var(--bg)",
         border: "1px solid var(--border)",
         borderRadius: "3px",
         padding: "2px 6px",
@@ -86,6 +87,13 @@ export function StageGateModal({
   onConfirm,
   onCancel,
 }: Props) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   const { canAdvance, hardBlockers, softBlockers } = gateResult;
@@ -168,8 +176,8 @@ export function StageGateModal({
                 display: "flex",
                 alignItems: "center",
                 gap: "12px",
-                backgroundColor: "rgba(34,197,94,0.08)",
-                border: "1px solid rgba(34,197,94,0.3)",
+                backgroundColor: "color-mix(in srgb, var(--teal) 8%, var(--bg))",
+                border: "1px solid color-mix(in srgb, var(--teal) 30%, transparent)",
                 borderRadius: "4px",
                 padding: "14px 16px",
               }}
@@ -182,10 +190,10 @@ export function StageGateModal({
                 fill="none"
                 aria-hidden="true"
               >
-                <circle cx="10" cy="10" r="10" fill="rgba(34,197,94,0.15)" />
+                <circle cx="10" cy="10" r="10" fill="color-mix(in srgb, var(--teal) 15%, transparent)" />
                 <path
                   d="M6 10.5L8.5 13L14 7.5"
-                  stroke="rgb(22,163,74)"
+                  stroke="var(--teal)"
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -195,7 +203,7 @@ export function StageGateModal({
                 style={{
                   fontFamily: "'Inter', sans-serif",
                   fontSize: "14px",
-                  color: "rgb(22,163,74)",
+                  color: "var(--teal)",
                   fontWeight: 500,
                 }}
               >
@@ -211,8 +219,8 @@ export function StageGateModal({
                   display: "flex",
                   alignItems: "center",
                   gap: "10px",
-                  backgroundColor: "rgba(239,68,68,0.07)",
-                  border: "1px solid rgba(239,68,68,0.28)",
+                  backgroundColor: "color-mix(in srgb, var(--accent) 7%, var(--bg))",
+                  border: "1px solid color-mix(in srgb, var(--accent) 28%, transparent)",
                   borderRadius: "4px",
                   padding: "12px 16px",
                   marginBottom: "16px",
@@ -225,10 +233,10 @@ export function StageGateModal({
                   fill="none"
                   aria-hidden="true"
                 >
-                  <circle cx="9" cy="9" r="9" fill="rgba(239,68,68,0.15)" />
+                  <circle cx="9" cy="9" r="9" fill="color-mix(in srgb, var(--accent) 15%, transparent)" />
                   <path
                     d="M9 5v5M9 12.5v.5"
-                    stroke="rgb(220,38,38)"
+                    stroke="var(--accent)"
                     strokeWidth="1.6"
                     strokeLinecap="round"
                   />
@@ -237,7 +245,7 @@ export function StageGateModal({
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontSize: "13px",
-                    color: "rgb(220,38,38)",
+                    color: "var(--accent)",
                     fontWeight: 500,
                   }}
                 >
@@ -260,8 +268,8 @@ export function StageGateModal({
                   display: "flex",
                   alignItems: "center",
                   gap: "10px",
-                  backgroundColor: "rgba(234,179,8,0.08)",
-                  border: "1px solid rgba(234,179,8,0.3)",
+                  backgroundColor: "color-mix(in srgb, var(--gold) 8%, var(--bg))",
+                  border: "1px solid color-mix(in srgb, var(--gold) 30%, transparent)",
                   borderRadius: "4px",
                   padding: "12px 16px",
                   marginBottom: "16px",
@@ -276,14 +284,14 @@ export function StageGateModal({
                 >
                   <path
                     d="M9 1.5L1 16.5h16L9 1.5z"
-                    fill="rgba(234,179,8,0.2)"
-                    stroke="rgb(161,122,0)"
+                    fill="color-mix(in srgb, var(--gold) 20%, transparent)"
+                    stroke="var(--gold)"
                     strokeWidth="1.4"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M9 7v4M9 13v.5"
-                    stroke="rgb(161,122,0)"
+                    stroke="var(--gold)"
                     strokeWidth="1.5"
                     strokeLinecap="round"
                   />
@@ -292,7 +300,7 @@ export function StageGateModal({
                   style={{
                     fontFamily: "'Inter', sans-serif",
                     fontSize: "13px",
-                    color: "rgb(161,122,0)",
+                    color: "var(--gold)",
                     fontWeight: 500,
                   }}
                 >
@@ -337,7 +345,7 @@ export function StageGateModal({
                 style={{
                   ...btnBase,
                   backgroundColor: "var(--accent)",
-                  color: "white",
+                  color: "var(--text-inverse)",
                 }}
               >
                 Confirm
@@ -352,7 +360,7 @@ export function StageGateModal({
                 style={{
                   ...btnBase,
                   backgroundColor: "var(--accent)",
-                  color: "white",
+                  color: "var(--text-inverse)",
                 }}
               >
                 Stay &amp; Fix
@@ -389,7 +397,7 @@ export function StageGateModal({
                 style={{
                   ...btnBase,
                   backgroundColor: "var(--accent)",
-                  color: "white",
+                  color: "var(--text-inverse)",
                 }}
               >
                 Confirm Advance

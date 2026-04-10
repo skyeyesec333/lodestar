@@ -79,6 +79,58 @@ Example format:
 If no requirements are clearly inapplicable, return an empty array: []`;
 }
 
+// ── Heuristic fallback (no LLM needed) ──────────────────────────────────────
+
+const EXIM_CATEGORIES = new Set([
+  "exim_eligibility",
+  "us_content",
+  "exim_environmental",
+  "exim_specific",
+]);
+
+export function suggestRequirementApplicabilityHeuristic(
+  project: ProjectInput,
+  requirements: RequirementInput[]
+): ApplicabilitySuggestion[] {
+  const suggestions: ApplicabilitySuggestion[] = [];
+
+  for (const req of requirements) {
+    // Sector mismatch: requirement scoped to specific sectors that don't include this project's sector
+    if (
+      req.applicableSectors.length > 0 &&
+      project.sector &&
+      !req.applicableSectors.includes(project.sector)
+    ) {
+      suggestions.push({
+        requirementId: req.id,
+        requirementLabel: req.label,
+        suggestedApplicable: false,
+        confidence: "high",
+        reasoning: `This requirement applies to ${req.applicableSectors.join(", ")} projects, but this project is in ${project.sector}.`,
+      });
+      continue;
+    }
+
+    // Non-EXIM deals shouldn't have EXIM-specific requirements
+    if (
+      project.dealType !== "exim_project_finance" &&
+      EXIM_CATEGORIES.has(req.category)
+    ) {
+      suggestions.push({
+        requirementId: req.id,
+        requirementLabel: req.label,
+        suggestedApplicable: false,
+        confidence: "medium",
+        reasoning: `This is an EXIM-specific requirement, but this deal is ${project.dealType.replace(/_/g, " ")}.`,
+      });
+    }
+  }
+
+  return suggestions;
+}
+
+// ── LLM-powered suggestion (requires API key) ───────────────────────────────
+
 export async function suggestRequirementApplicability(
   project: ProjectInput,
   requirements: RequirementInput[]

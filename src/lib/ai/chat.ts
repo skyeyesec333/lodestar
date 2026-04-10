@@ -4,7 +4,7 @@ import type {
   ChatMessage,
   ChatRequest,
 } from "@/types/chat";
-import { APP_KNOWLEDGE_BASE, type AppKnowledgeEntry } from "@/lib/ai/app-knowledge";
+import { APP_KNOWLEDGE_BASE, EXIM_OFFICIAL_KNOWLEDGE, type AppKnowledgeEntry } from "@/lib/ai/app-knowledge";
 
 export interface ChatRetrievalBundle {
   readonly appContext: readonly ChatContextDocument[];
@@ -60,9 +60,26 @@ export async function searchKnowledgeBase(
 }
 
 export async function searchOfficialEximSources(
-  _request: ChatRequest
+  request: ChatRequest
 ): Promise<readonly ChatContextDocument[]> {
-  return [];
+  const query = buildSearchText(request);
+  const queryTokens = tokenize(query);
+
+  return EXIM_OFFICIAL_KNOWLEDGE.map((entry) => ({
+    entry,
+    score: scoreEntry(entry, query, queryTokens),
+  }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.entry.title.localeCompare(b.entry.title))
+    .slice(0, 4)
+    .map(({ entry }) => ({
+      id: entry.id,
+      title: entry.title,
+      snippet: entry.snippet,
+      sourceType: entry.sourceType,
+      url: entry.url,
+      lastVerifiedAt: entry.lastVerifiedAt,
+    }));
 }
 
 function formatHistory(messages: readonly ChatMessage[]): string {
@@ -310,7 +327,7 @@ function buildSearchText(request: ChatRequest): string {
     .trim();
 }
 
-function tokenize(input: string): string[] {
+export function tokenize(input: string): string[] {
   return input
     .toLowerCase()
     .split(/[^a-z0-9]+/g)

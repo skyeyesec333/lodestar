@@ -169,6 +169,53 @@ export type BeaconDocumentCoverage = {
   gap: string[];
 };
 
+// ── Beacon walkthrough types ─────────────────────────────────────────────────
+
+export type WalkthroughData = {
+  projectName: string;
+  dealType: string;
+  stage: string;
+  country: string;
+  sector: string;
+  readinessPct: number;
+  loiReady: boolean;
+  loiBlockerCount: number;
+  loiBlockerNames: string[];
+  categoryBreakdown: Array<{
+    category: string;
+    label: string;
+    total: number;
+    completed: number;
+    scorePct: number;
+  }>;
+  conceptThesis: string | null;
+  conceptPromptsRemaining: number;
+  goNoGoRecommendation: string | null;
+  stakeholderCount: number;
+  epcBidCount: number;
+  funderCount: number;
+  covenantCount: number;
+  capexUsdCents: number | null;
+  eximCoverType: string | null;
+  totalRequirements: number;
+  doneRequirements: number;
+  overdueCount: number;
+  unassignedCriticalCount: number;
+  missingEvidenceCount: number;
+  documentCount: number;
+  linkedCoveragePct: number;
+  orphanedEvidenceCount: number;
+  expiringDocumentCount: number;
+  meetingCount: number;
+  recentVelocity: number;
+  daysToNextGate: number | null;
+  nextGateLabel: string;
+  actualLoiSubmittedDate: string | null;
+  actualLoiApprovedDate: string | null;
+  actualCommitmentDate: string | null;
+  actualCloseDate: string | null;
+};
+
 export type Covenant = {
   id: string;
   projectId: string;

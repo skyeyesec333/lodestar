@@ -9,10 +9,14 @@ import {
   addCondition,
   setConditionStatus,
   removeCondition,
+  confirmCpSatisfaction,
+  requestCpEvidence,
 } from "@/actions/funders";
 import type { FunderRelationshipRow, FunderConditionRow } from "@/lib/db/funders";
 import { CapitalStackBar } from "@/components/projects/CapitalStackBar";
 import { FunderKanban } from "@/components/projects/FunderKanban";
+import { DebtTranchePanel } from "@/components/projects/DebtTranchePanel";
+import type { DebtTrancheRow } from "@/lib/db/debt-tranches";
 
 // ── Label / style constants ───────────────────────────────────────────────────
 
@@ -274,13 +278,17 @@ export function FunderWorkspace({
   slug,
   initialFunders,
   requirements,
+  stakeholders = [],
   capexUsdCents = null,
+  debtTranches = [],
 }: {
   projectId: string;
   slug: string;
   initialFunders: FunderRelationshipRow[];
   requirements: Array<{ requirementId: string; name: string }>;
+  stakeholders?: Array<{ id: string; name: string }>;
   capexUsdCents?: number | null;
+  debtTranches?: DebtTrancheRow[];
 }) {
   const [funders, setFunders] = useState<FunderRelationshipRow[]>(initialFunders);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -295,6 +303,12 @@ export function FunderWorkspace({
 
   const [conditionForm, setConditionForm] = useState<ConditionFormState | null>(null);
   const [conditionError, setConditionError] = useState<string | null>(null);
+
+  // Evidence request form: keyed by conditionId
+  const [evidenceFormId, setEvidenceFormId] = useState<string | null>(null);
+  const [evidenceStakeholderId, setEvidenceStakeholderId] = useState("");
+  const [evidenceDueAt, setEvidenceDueAt] = useState("");
+  const [evidenceError, setEvidenceError] = useState<string | null>(null);
 
   const [isPending, startTransition] = useTransition();
 
@@ -477,6 +491,56 @@ export function FunderWorkspace({
 
   // ── Condition status ──────────────────────────────────────────────────────
 
+  function handleMarkSatisfied(condition: FunderConditionRow, funderRelId: string) {
+    if (!confirm(`Mark "${condition.description}" as satisfied?`)) return;
+    startTransition(async () => {
+      const result = await confirmCpSatisfaction({ conditionId: condition.id, slug });
+      if (!result.ok) return;
+      setFunders((prev) =>
+        prev.map((f) =>
+          f.id === funderRelId
+            ? {
+                ...f,
+                conditions: f.conditions.map((c) =>
+                  c.id === condition.id
+                    ? { ...c, status: "satisfied", satisfiedAt: new Date() }
+                    : c
+                ),
+              }
+            : f
+        )
+      );
+    });
+  }
+
+  function handleRequestEvidence(conditionId: string) {
+    setEvidenceFormId(conditionId);
+    setEvidenceStakeholderId("");
+    setEvidenceDueAt("");
+    setEvidenceError(null);
+  }
+
+  function handleSubmitEvidenceRequest(conditionId: string) {
+    if (!evidenceStakeholderId || !evidenceDueAt) {
+      setEvidenceError("Select a stakeholder and a due date.");
+      return;
+    }
+    setEvidenceError(null);
+    startTransition(async () => {
+      const result = await requestCpEvidence({
+        conditionId,
+        slug,
+        assigneeStakeholderId: evidenceStakeholderId,
+        dueAt: new Date(evidenceDueAt),
+      });
+      if (!result.ok) {
+        setEvidenceError(result.error.message);
+        return;
+      }
+      setEvidenceFormId(null);
+    });
+  }
+
   function handleConditionDone(condition: FunderConditionRow, funderRelId: string) {
     startTransition(async () => {
       const result = await setConditionStatus({
@@ -622,6 +686,14 @@ export function FunderWorkspace({
           capexUsdCents={capexUsdCents}
         />
       )}
+
+      {/* Debt tranches */}
+      <DebtTranchePanel
+        projectId={projectId}
+        slug={slug}
+        initialTranches={debtTranches}
+        funders={funders.map((f) => ({ id: f.id, name: f.organizationName }))}
+      />
 
       {funders.length > 0 && (
         <div
@@ -1483,66 +1555,241 @@ export function FunderWorkspace({
                       const dueDays = daysUntil(condition.dueDate);
                       const dueOverdue = dueDays !== null && dueDays < 0 && condition.status !== "satisfied" && condition.status !== "waived";
 
+                      const isSatisfied = condition.status === "satisfied";
+                      const isWaived = condition.status === "waived";
+                      const isActive = !isSatisfied && !isWaived;
+                      const showEvidenceForm = evidenceFormId === condition.id;
+
                       return (
                         <div
                           key={condition.id}
                           style={{
-                            display: "flex",
-                            alignItems: "flex-start",
-                            justifyContent: "space-between",
-                            gap: "12px",
                             backgroundColor: "var(--bg-card)",
-                            border: "1px solid var(--border)",
+                            border: `1px solid ${isSatisfied ? "var(--teal)" : "var(--border)"}`,
                             borderRadius: "3px",
                             padding: "10px 14px",
-                            flexWrap: "wrap",
                           }}
                         >
-                          <div style={{ flex: 1, minWidth: "200px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
-                              <span
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              justifyContent: "space-between",
+                              gap: "12px",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <div style={{ flex: 1, minWidth: "200px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+                                <span
+                                  style={{
+                                    fontFamily: "'Inter', sans-serif",
+                                    fontSize: "13px",
+                                    color: "var(--ink)",
+                                  }}
+                                >
+                                  {condition.description}
+                                </span>
+                                <ConditionStatusBadge status={condition.status} />
+                              </div>
+                              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
+                                {condition.requirementName && (
+                                  <span
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      color: "var(--ink-muted)",
+                                    }}
+                                  >
+                                    → {condition.requirementName}
+                                  </span>
+                                )}
+                                {condition.dueDate && (
+                                  <span
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      color: dueOverdue ? "var(--accent)" : "var(--ink-muted)",
+                                      letterSpacing: "0.06em",
+                                    }}
+                                  >
+                                    Due {formatDate(condition.dueDate)}
+                                    {dueOverdue && " — overdue"}
+                                  </span>
+                                )}
+                                {isSatisfied && condition.satisfiedAt && (
+                                  <span
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      color: "var(--teal)",
+                                      letterSpacing: "0.06em",
+                                    }}
+                                  >
+                                    ✓ Satisfied {formatDate(condition.satisfiedAt)}
+                                  </span>
+                                )}
+                                {condition.evidenceDocumentFilename && (
+                                  <span
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      color: "var(--teal)",
+                                      backgroundColor: "var(--teal-soft)",
+                                      border: "1px solid var(--teal)",
+                                      borderRadius: "2px",
+                                      padding: "1px 6px",
+                                      letterSpacing: "0.04em",
+                                    }}
+                                  >
+                                    📎 {condition.evidenceDocumentFilename}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "6px", flexShrink: 0, flexWrap: "wrap" }}>
+                              {isActive && (
+                                <>
+                                  <button
+                                    onClick={() => handleMarkSatisfied(condition, funder.id)}
+                                    disabled={isPending}
+                                    style={{
+                                      fontFamily: "'DM Mono', monospace",
+                                      fontSize: "9px",
+                                      fontWeight: 500,
+                                      letterSpacing: "0.08em",
+                                      textTransform: "uppercase",
+                                      color: "var(--teal)",
+                                      backgroundColor: "transparent",
+                                      border: "1px solid var(--teal)",
+                                      borderRadius: "3px",
+                                      padding: "4px 8px",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Mark satisfied
+                                  </button>
+                                  {stakeholders.length > 0 && (
+                                    <button
+                                      onClick={() =>
+                                        showEvidenceForm
+                                          ? setEvidenceFormId(null)
+                                          : handleRequestEvidence(condition.id)
+                                      }
+                                      disabled={isPending}
+                                      style={{
+                                        fontFamily: "'DM Mono', monospace",
+                                        fontSize: "9px",
+                                        letterSpacing: "0.08em",
+                                        textTransform: "uppercase",
+                                        color: "var(--ink-mid)",
+                                        backgroundColor: "transparent",
+                                        border: "1px solid var(--border)",
+                                        borderRadius: "3px",
+                                        padding: "4px 8px",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      {showEvidenceForm ? "Cancel" : "Request evidence"}
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                              <button
+                                onClick={() => handleRemoveCondition(condition.id, funder.id)}
+                                disabled={isPending}
                                 style={{
-                                  fontFamily: "'Inter', sans-serif",
-                                  fontSize: "13px",
-                                  color: "var(--ink)",
+                                  fontFamily: "'DM Mono', monospace",
+                                  fontSize: "9px",
+                                  letterSpacing: "0.08em",
+                                  textTransform: "uppercase",
+                                  color: "var(--accent)",
+                                  backgroundColor: "transparent",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "3px",
+                                  padding: "4px 8px",
+                                  cursor: "pointer",
                                 }}
                               >
-                                {condition.description}
-                              </span>
-                              <ConditionStatusBadge status={condition.status} />
-                            </div>
-                            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
-                              {condition.requirementName && (
-                                <span
-                                  style={{
-                                    fontFamily: "'DM Mono', monospace",
-                                    fontSize: "9px",
-                                    color: "var(--ink-muted)",
-                                  }}
-                                >
-                                  → {condition.requirementName}
-                                </span>
-                              )}
-                              {condition.dueDate && (
-                                <span
-                                  style={{
-                                    fontFamily: "'DM Mono', monospace",
-                                    fontSize: "9px",
-                                    color: dueOverdue ? "var(--accent)" : "var(--ink-muted)",
-                                    letterSpacing: "0.06em",
-                                  }}
-                                >
-                                  Due {formatDate(condition.dueDate)}
-                                  {dueOverdue && " — overdue"}
-                                </span>
-                              )}
+                                Remove
+                              </button>
                             </div>
                           </div>
 
-                          <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                            {condition.status !== "satisfied" && condition.status !== "waived" && (
+                          {/* Evidence request inline form */}
+                          {showEvidenceForm && (
+                            <div
+                              style={{
+                                marginTop: "10px",
+                                paddingTop: "10px",
+                                borderTop: "1px solid var(--border)",
+                                display: "flex",
+                                alignItems: "flex-end",
+                                gap: "8px",
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <label
+                                  style={{
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: "9px",
+                                    letterSpacing: "0.10em",
+                                    textTransform: "uppercase",
+                                    color: "var(--ink-muted)",
+                                  }}
+                                >
+                                  Assign to
+                                </label>
+                                <select
+                                  value={evidenceStakeholderId}
+                                  onChange={(e) => setEvidenceStakeholderId(e.target.value)}
+                                  style={{
+                                    fontFamily: "'Inter', sans-serif",
+                                    fontSize: "12px",
+                                    color: "var(--ink)",
+                                    backgroundColor: "var(--bg-card)",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: "3px",
+                                    padding: "5px 8px",
+                                  }}
+                                >
+                                  <option value="">Select stakeholder…</option>
+                                  {stakeholders.map((s) => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                <label
+                                  style={{
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: "9px",
+                                    letterSpacing: "0.10em",
+                                    textTransform: "uppercase",
+                                    color: "var(--ink-muted)",
+                                  }}
+                                >
+                                  Due by
+                                </label>
+                                <input
+                                  type="date"
+                                  value={evidenceDueAt}
+                                  onChange={(e) => setEvidenceDueAt(e.target.value)}
+                                  style={{
+                                    fontFamily: "'DM Mono', monospace",
+                                    fontSize: "12px",
+                                    color: "var(--ink)",
+                                    backgroundColor: "var(--bg-card)",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: "3px",
+                                    padding: "5px 8px",
+                                  }}
+                                />
+                              </div>
                               <button
-                                onClick={() => handleConditionDone(condition, funder.id)}
+                                onClick={() => handleSubmitEvidenceRequest(condition.id)}
                                 disabled={isPending}
                                 style={{
                                   fontFamily: "'DM Mono', monospace",
@@ -1550,36 +1797,29 @@ export function FunderWorkspace({
                                   fontWeight: 500,
                                   letterSpacing: "0.08em",
                                   textTransform: "uppercase",
-                                  color: "var(--teal)",
-                                  backgroundColor: "transparent",
-                                  border: "1px solid var(--teal)",
+                                  color: "var(--text-inverse)",
+                                  backgroundColor: "var(--teal)",
+                                  border: "none",
                                   borderRadius: "3px",
-                                  padding: "4px 8px",
+                                  padding: "7px 12px",
                                   cursor: "pointer",
                                 }}
                               >
-                                Done
+                                Send request
                               </button>
-                            )}
-                            <button
-                              onClick={() => handleRemoveCondition(condition.id, funder.id)}
-                              disabled={isPending}
-                              style={{
-                                fontFamily: "'DM Mono', monospace",
-                                fontSize: "9px",
-                                letterSpacing: "0.08em",
-                                textTransform: "uppercase",
-                                color: "var(--accent)",
-                                backgroundColor: "transparent",
-                                border: "1px solid var(--border)",
-                                borderRadius: "3px",
-                                padding: "4px 8px",
-                                cursor: "pointer",
-                              }}
-                            >
-                              Remove
-                            </button>
-                          </div>
+                              {evidenceError && (
+                                <span
+                                  style={{
+                                    fontFamily: "'Inter', sans-serif",
+                                    fontSize: "11px",
+                                    color: "var(--accent)",
+                                  }}
+                                >
+                                  {evidenceError}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

@@ -111,7 +111,7 @@ const primaryButtonStyle: React.CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.10em",
   textTransform: "uppercase",
-  color: "#ffffff",
+  color: "var(--text-inverse)",
   backgroundColor: "var(--teal)",
   border: "none",
   borderRadius: "3px",

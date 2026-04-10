@@ -399,7 +399,7 @@ export function TourGuide({
                   fontWeight: 600,
                   letterSpacing: "0.10em",
                   textTransform: "uppercase",
-                  color: "#fff",
+                  color: "var(--text-inverse)",
                   backgroundColor: "var(--accent)",
                   border: "none",
                   borderRadius: "4px",
