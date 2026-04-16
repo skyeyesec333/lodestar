@@ -15,6 +15,7 @@ import {
 import { assertProjectAccess } from "@/lib/db/project-access";
 import { recordActivity } from "@/lib/db/activity";
 import { db } from "@/lib/db";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 const FUNDER_TYPES = ["exim", "dfi", "commercial_bank", "equity", "mezzanine", "other"] as const;
@@ -345,8 +346,7 @@ export async function requestCpEvidence(raw: unknown): Promise<Result<void>> {
       select: { id: true },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 
   recordActivity(

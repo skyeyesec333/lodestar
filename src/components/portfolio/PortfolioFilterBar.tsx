@@ -10,12 +10,22 @@ type SavedView = {
 
 const LS_KEY = "lodestar:portfolio:savedViews";
 
+function isSavedView(v: unknown): v is SavedView {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as Record<string, unknown>).name === "string" &&
+    typeof (v as Record<string, unknown>).params === "object" &&
+    (v as Record<string, unknown>).params !== null
+  );
+}
+
 function loadSavedViews(): SavedView[] {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as SavedView[];
+    if (Array.isArray(parsed)) return parsed.filter(isSavedView);
   } catch {
     // ignore
   }

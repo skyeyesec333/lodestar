@@ -7,19 +7,17 @@
  *
  * IFC (International Finance Corporation) is the private-sector arm of
  * the World Bank Group. This taxonomy is also broadly applicable to AfDB,
- * DFC, EBRD, ADB, FMO, and similar DFIs — the DFI taxonomy in
- * src/lib/dfi/requirements.ts is the generic version; this file retains
- * the original IFC-specific naming for backwards compatibility.
+ * DFC, EBRD, ADB, FMO, and similar DFIs.
  *
  * Phases:
  *   board_approval  — full appraisal, board/investment committee approval
  *   financial_close — all CPs satisfied, signing, first disbursement
  *
- * Shape is compatible with RequirementDef from src/lib/requirements/types.ts.
- * isLoiCritical is retained for backwards compat; maps to isPrimaryGate semantics.
+ * The `isLoiCritical` field on IfcRequirementDef maps to `isPrimaryGate`
+ * when adapted to the universal RequirementDef shape in requirements/index.ts.
  */
 
-import type { RequirementCategory } from "../exim/requirements";
+import type { RequirementCategory } from "@/lib/requirements/types";
 
 export interface IfcRequirementDef {
   readonly id: string;
@@ -839,17 +837,3 @@ export const IFC_REQUIREMENTS: readonly IfcRequirementDef[] = [
   ...corporate,
 ] as const;
 
-/** Lookup by requirement ID. */
-export const IFC_REQUIREMENTS_BY_ID: ReadonlyMap<string, IfcRequirementDef> =
-  new Map(IFC_REQUIREMENTS.map((r) => [r.id, r]));
-
-/** All IFC requirement IDs that are hard gates for board approval. */
-export const IFC_LOI_CRITICAL_IDS: readonly string[] = IFC_REQUIREMENTS.filter(
-  (r) => r.isLoiCritical,
-).map((r) => r.id);
-
-/** Total weight pool — denominator for IFC readiness score calculation. */
-export const IFC_TOTAL_WEIGHT: number = IFC_REQUIREMENTS.reduce(
-  (sum, r) => sum + r.weight,
-  0,
-);

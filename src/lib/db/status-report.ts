@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 import type { StatusReportInput } from "@/lib/ai/status-report";
 
@@ -32,7 +33,6 @@ export async function getStatusReportData(
       return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
     }
 
-    // Recent activity — last 10 events
     const activityRows = await db.activityEvent.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
@@ -40,7 +40,6 @@ export async function getStatusReportData(
       select: { label: true, createdAt: true },
     });
 
-    // Open blockers: applicable LOI-critical requirements not yet substantially final
     const requirementStatuses = await db.projectRequirement.findMany({
       where: { projectId },
       select: {
@@ -50,7 +49,6 @@ export async function getStatusReportData(
       },
     });
 
-    // Pull LOI-critical requirement IDs from taxonomy — import statically
     const { getRequirementsForDealType } = await import("@/lib/requirements/index");
     const taxonomy = getRequirementsForDealType(project.dealType);
     const loiCriticalIds = new Set(
@@ -67,7 +65,6 @@ export async function getStatusReportData(
       })
       .map((r) => taxonomyById.get(r.requirementId)?.name ?? r.requirementId);
 
-    // Upcoming milestones — next 60 days, not yet completed
     const sixtyDaysOut = new Date(Date.now() + 60 * 86_400_000);
     const milestoneRows = await db.dealMilestone.findMany({
       where: {
@@ -91,7 +88,6 @@ export async function getStatusReportData(
         return `${m.name} — due ${date}`;
       });
 
-    // Days since last update
     const lastActivity = activityRows[0];
     const daysSinceLastUpdate = lastActivity
       ? Math.floor((Date.now() - lastActivity.createdAt.getTime()) / 86_400_000)
@@ -127,7 +123,6 @@ export async function getStatusReportData(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

@@ -1,24 +1,10 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { CommentTargetType } from "@prisma/client";
 import type { Result } from "@/types";
+import type { CommentRow, CommentMentionRow } from "@/types/collaboration";
 
-export type CommentMentionRow = {
-  mentionedId: string;
-};
-
-export type CommentRow = {
-  id: string;
-  projectId: string;
-  authorId: string;
-  body: string;
-  editedAt: Date | null;
-  createdAt: Date;
-  targetType: CommentTargetType;
-  projectRequirementId: string | null;
-  documentId: string | null;
-  meetingId: string | null;
-  mentions: CommentMentionRow[];
-};
+export type { CommentRow, CommentMentionRow } from "@/types/collaboration";
 
 const commentSelect = {
   id: true,
@@ -54,7 +40,7 @@ export async function getCommentsForTarget(
     });
     return { ok: true, value: rows };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -69,7 +55,7 @@ export async function getCommentsByProject(
     });
     return { ok: true, value: rows };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -104,7 +90,7 @@ export async function addComment(
     });
     return { ok: true, value: row };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -135,7 +121,7 @@ export async function editComment(
     });
     return { ok: true, value: row };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -151,6 +137,6 @@ export async function deleteComment(
     await db.comment.delete({ where: { id: commentId } });
     return { ok: true, value: undefined };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }

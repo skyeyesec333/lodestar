@@ -6,14 +6,14 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
-import { computeReadiness } from "@/lib/scoring/index";
+import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import { getProgramConfig, getStageLabel, getCategoryLabel } from "@/lib/requirements/index";
 import { countryLabel } from "@/lib/projects/country-label";
 import { resolveClerkUsers } from "@/lib/clerk/resolve-users";
 import { ReadinessGauge } from "@/components/projects/ReadinessGauge";
 import { StageStepper } from "@/components/projects/StageStepper";
 import { ProjectEditForm } from "@/components/projects/ProjectEditForm";
-import type { SerializableProject } from "@/components/projects/ProjectEditForm";
+import type { SerializableProject } from "@/types";
 import { GapAnalysis } from "@/components/projects/GapAnalysis";
 import { ActivityFeed } from "@/components/projects/ActivityFeed";
 import { StakeholderPanel } from "@/components/stakeholders/StakeholderPanel";
@@ -41,7 +41,6 @@ import { DocumentCoverageMap } from "@/components/projects/DocumentCoverageMap";
 import { OwnershipLoadBoard } from "@/components/projects/OwnershipLoadBoard";
 import { WeeklyDriftPanel } from "@/components/projects/WeeklyDriftPanel";
 import { ProjectConceptPanel } from "@/components/projects/ProjectConceptPanel";
-import type { RequirementStatusValue } from "@/types/requirements";
 import { getCommentsByProject } from "@/lib/db/comments";
 import { getApprovalsByProject } from "@/lib/db/approvals";
 import { getUserWatchList } from "@/lib/db/watchers";
@@ -539,12 +538,7 @@ export default async function ProjectPage({
   ).length;
 
   const { scoreBps, loiReady, loiBlockers, categoryScores } = computeReadiness(
-    rows.map((r) => ({
-      requirementId: r.requirementId,
-      status: r.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : (r.status as RequirementStatusValue),
-    })),
+    mapRequirementStatuses(rows),
     project.dealType
   );
   const isExim = project.dealType === "exim_project_finance";

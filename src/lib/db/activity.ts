@@ -1,8 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
-export type ActivityMetadata = Record<string, unknown>;
+type ActivityMetadata = Record<string, unknown>;
 
 export type ActivityEventRow = {
   id: string;
@@ -77,7 +78,6 @@ export async function getProjectActivity(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

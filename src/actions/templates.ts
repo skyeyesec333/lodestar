@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getProjectTemplateById } from "@/lib/templates/index";
 import { createProjectRecord } from "@/lib/db/projects";
 import { createMilestone } from "@/lib/db/milestones";
+import { generateSlug } from "@/lib/utils";
 import type { Result } from "@/types";
 import type {
   ProjectSector,
@@ -26,17 +27,6 @@ const DEAL_TYPE_MAP: Record<string, DealType> = {
   DFI: "development_finance",
   PE: "private_equity",
 };
-
-function generateSlug(name: string): string {
-  const base = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const suffix = Math.random().toString(36).slice(2, 7);
-  return `${base}-${suffix}`;
-}
 
 const cloneTemplateSchema = z.object({
   templateId: z.string().min(1),

@@ -6,41 +6,20 @@
  *   - Phase labels for UI display
  *   - Primary gate label (what the blockers panel calls the key milestone)
  *
- * All four programs (EXIM, DFI/IFC, Commercial Bank, PE) use the same
- * RequirementDef shape. EXIM requirements are adapted from their legacy
- * EximRequirementDef shape inline here.
+ * All programs (EXIM, DFI/IFC, Commercial Bank, PE, Blended) use the same
+ * RequirementDef shape. EXIM and IFC requirements are adapted from their
+ * domain-specific shapes (EximRequirementDef, IfcRequirementDef) inline here.
  */
 
 import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
-import { DFI_REQUIREMENTS } from "@/lib/dfi/requirements";
 import { IFC_REQUIREMENTS } from "@/lib/ifc/requirements";
 import { COMMERCIAL_REQUIREMENTS } from "@/lib/commercial/requirements";
 import { PE_REQUIREMENTS } from "@/lib/pe/requirements";
 import { BLENDED_REQUIREMENTS } from "@/lib/blended/requirements";
 import type { RequirementDef } from "./types";
+import type { DealTypeValue, ProgramConfig } from "@/types";
 
-// ─── DealType values (mirrors Prisma enum) ────────────────────────────────────
-
-export type DealTypeValue =
-  | "exim_project_finance"
-  | "development_finance"
-  | "commercial_finance"
-  | "private_equity"
-  | "blended_finance"
-  | "other";
-
-// ─── Program config ───────────────────────────────────────────────────────────
-
-export interface ProgramConfig {
-  /** Display name for the program (used in headings). */
-  label: string;
-  /** What the primary approval milestone is called (for blockers panel). */
-  primaryGateLabel: string;
-  /** Short code for the phase badge in the checklist. */
-  phaseLabels: Record<string, string>;
-  /** Whether this program has a "LOI-critical" style blocker column. */
-  hasBlockerColumn: boolean;
-}
+export type { DealTypeValue, ProgramConfig } from "@/types";
 
 const PROGRAM_CONFIGS: Record<DealTypeValue, ProgramConfig> = {
   exim_project_finance: {
@@ -155,8 +134,8 @@ export function getCategoryLabel(category: string): string {
 // ─── Taxonomy resolver ────────────────────────────────────────────────────────
 
 /**
- * Adapts the legacy EximRequirementDef shape to RequirementDef.
- * EXIM requirements use `isLoiCritical` and typed phases — we normalize here.
+ * Adapts EximRequirementDef to RequirementDef.
+ * Maps `isLoiCritical` to `isPrimaryGate` and adds display labels.
  */
 function adaptEximRequirements(): RequirementDef[] {
   return EXIM_REQUIREMENTS.map((r) => ({
@@ -175,7 +154,8 @@ function adaptEximRequirements(): RequirementDef[] {
 }
 
 /**
- * Adapts IFC requirements (legacy IfcRequirementDef) to RequirementDef.
+ * Adapts IfcRequirementDef to RequirementDef.
+ * Maps `isLoiCritical` to `isPrimaryGate`.
  */
 function adaptIfcRequirements(): RequirementDef[] {
   return IFC_REQUIREMENTS.map((r) => ({
@@ -208,8 +188,6 @@ export function getRequirementsForDealType(dealType: string): RequirementDef[] {
       return adaptEximRequirements();
 
     case "development_finance":
-      // Use the expanded IFC taxonomy (which covers all major DFIs)
-      // The generic DFI taxonomy in lib/dfi/ is an alternative if needed.
       return adaptIfcRequirements();
 
     case "commercial_finance":

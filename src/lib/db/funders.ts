@@ -1,5 +1,6 @@
 import { db } from "./index";
-import type { AppError, Result } from "@/types";
+import { toDbError } from "@/lib/utils";
+import type { Result } from "@/types";
 
 export type FunderConditionRow = {
   id: string;
@@ -65,20 +66,6 @@ function shapeCondition(raw: {
     updatedAt: raw.updatedAt,
   };
 }
-
-async function findOrCreateOrg(name: string): Promise<{ id: string; name: string }> {
-  const existing = await db.organization.findFirst({
-    where: { name },
-    select: { id: true, name: true },
-  });
-  if (existing) return existing;
-  return db.organization.create({
-    data: { name },
-    select: { id: true, name: true },
-  });
-}
-
-void findOrCreateOrg;
 
 export async function getProjectFunders(
   projectId: string
@@ -147,8 +134,7 @@ export async function getProjectFunders(
       })),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -221,8 +207,7 @@ export async function createFunderRelationship(data: {
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -263,8 +248,7 @@ export async function updateFunderRelationship(
 
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -277,8 +261,7 @@ export async function deleteFunderRelationship(id: string, userId?: string | nul
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -324,8 +307,7 @@ export async function addFunderCondition(data: {
       value: shapeCondition(created),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -335,7 +317,6 @@ export async function updateFunderConditionStatus(
   satisfiedAt?: Date | null
 ): Promise<Result<void>> {
   try {
-    // Fetch the current condition to validate transition
     const existingCondition = await db.funderCondition.findUnique({
       where: { id },
       select: { status: true, satisfiedAt: true },
@@ -344,7 +325,6 @@ export async function updateFunderConditionStatus(
       return { ok: false, error: { code: "NOT_FOUND", message: "Condition not found." } };
     }
 
-    // Block reverting a satisfied condition
     if (existingCondition.status === "satisfied" && status !== "satisfied") {
       return { ok: false, error: { code: "VALIDATION_ERROR", message: "Cannot revert a satisfied condition. Create a new condition if requirements have changed." } };
     }
@@ -353,7 +333,6 @@ export async function updateFunderConditionStatus(
       status: status as import("@prisma/client").FunderConditionStatus,
     };
 
-    // Auto-set satisfiedAt when transitioning to satisfied
     if (status === "satisfied" && !existingCondition.satisfiedAt) {
       updateData.satisfiedAt = new Date();
     } else if (satisfiedAt !== undefined) {
@@ -368,8 +347,7 @@ export async function updateFunderConditionStatus(
 
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -378,8 +356,7 @@ export async function deleteFunderCondition(id: string): Promise<Result<void>> {
     await db.funderCondition.delete({ where: { id } });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -401,28 +378,8 @@ export async function confirmConditionSatisfaction(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
-export async function linkConditionEvidence(
-  conditionId: string,
-  documentId: string
-): Promise<Result<void>> {
-  try {
-    await db.funderCondition.update({
-      where: { id: conditionId },
-      data: { evidenceDocumentId: documentId },
-      select: { id: true },
-    });
-    return { ok: true, value: undefined };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
-  }
-}
 
-// Satisfy the unused AppError import — it is used via Result<T> generic
-const _appErrorCheck: AppError | undefined = undefined;
-void _appErrorCheck;

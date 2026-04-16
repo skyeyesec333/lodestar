@@ -21,8 +21,8 @@ export const REQUIREMENT_CATEGORIES = [
 
 export type RequirementCategory = (typeof REQUIREMENT_CATEGORIES)[number];
 
-export const REQUIREMENT_PHASES = ["loi", "final_commitment"] as const;
-export type RequirementPhase = (typeof REQUIREMENT_PHASES)[number];
+const REQUIREMENT_PHASES = ["loi", "final_commitment"] as const;
+type RequirementPhase = (typeof REQUIREMENT_PHASES)[number];
 
 export interface EximRequirementDef {
   readonly id: string;

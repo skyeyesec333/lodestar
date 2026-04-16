@@ -1,15 +1,10 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { WatchTargetType } from "@prisma/client";
 import type { Result } from "@/types";
+import type { WatcherRow } from "@/types/collaboration";
 
-export type WatcherRow = {
-  id: string;
-  clerkUserId: string;
-  projectId: string;
-  targetType: WatchTargetType;
-  targetId: string | null;
-  createdAt: Date;
-};
+export type { WatcherRow } from "@/types/collaboration";
 
 const watcherSelect = {
   id: true,
@@ -48,7 +43,7 @@ export async function getWatchersForProject(
     });
     return { ok: true, value: rows.map(shapeWatcherRow) };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -99,7 +94,7 @@ export async function watchItem(
     });
     return { ok: true, value: shapeWatcherRow(row) };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -120,7 +115,7 @@ export async function unwatchItem(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -136,6 +131,6 @@ export async function getUserWatchList(
     });
     return { ok: true, value: rows.map(shapeWatcherRow) };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }

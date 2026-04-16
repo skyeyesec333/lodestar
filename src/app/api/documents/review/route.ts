@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { assertProjectAccess } from "@/lib/db/project-access";
 import { reviewDocument } from "@/lib/ai/document-review";
-import { REQUIREMENTS_BY_ID } from "@/lib/exim/requirements";
+import { getRequirementById } from "@/lib/requirements/index";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
   const project = await db.project.findFirst({
     where: { id: projectId },
-    select: { id: true, sector: true, countryCode: true, stage: true },
+    select: { id: true, sector: true, countryCode: true, stage: true, dealType: true },
   });
   if (!project) return new Response("Not found", { status: 404 });
 
@@ -76,10 +76,9 @@ export async function POST(req: Request) {
   const requirementCategory =
     doc.projectRequirement?.requirement.category ?? null;
 
-  // Look up the full requirement definition from the static taxonomy to get the description
   const requirementId = doc.projectRequirement?.requirement.id ?? null;
   const taxonomyEntry =
-    requirementId !== null ? (REQUIREMENTS_BY_ID.get(requirementId) ?? null) : null;
+    requirementId !== null ? (getRequirementById(project.dealType, requirementId) ?? null) : null;
   const requirementDescription = taxonomyEntry?.description ?? null;
 
   try {

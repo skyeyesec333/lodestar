@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 export type TimelineRisk = {
@@ -23,7 +24,6 @@ export async function getTimelineRisks(projectId: string): Promise<Result<Timeli
     const now = new Date();
     const risks: TimelineRisk[] = [];
 
-    // ── 1. milestone_due_soon ────────────────────────────────────────────────
     const milestones = await db.dealMilestone.findMany({
       where: { projectId, completedAt: null, targetDate: { not: null } },
       select: { id: true, name: true, targetDate: true },
@@ -59,7 +59,6 @@ export async function getTimelineRisks(projectId: string): Promise<Result<Timeli
       }
     }
 
-    // ── 2. requirement_overdue ───────────────────────────────────────────────
     const overdueRequirements = await db.projectRequirement.findMany({
       where: {
         projectId,
@@ -94,7 +93,6 @@ export async function getTimelineRisks(projectId: string): Promise<Result<Timeli
       });
     }
 
-    // ── 3. loi_overdue ───────────────────────────────────────────────────────
     const project = await db.project.findUnique({
       where: { id: projectId },
       select: { targetLoiDate: true, stage: true },
@@ -121,7 +119,6 @@ export async function getTimelineRisks(projectId: string): Promise<Result<Timeli
       });
     }
 
-    // ── 4. deal_stalled ──────────────────────────────────────────────────────
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
     const recentActivity = await db.activityEvent.findFirst({
       where: { projectId, createdAt: { gte: thirtyDaysAgo } },
@@ -138,10 +135,6 @@ export async function getTimelineRisks(projectId: string): Promise<Result<Timeli
 
     return { ok: true, value: risks };
   } catch (err) {
-    console.error("[getTimelineRisks]", err);
-    return {
-      ok: false,
-      error: { code: "DATABASE_ERROR", message: "Failed to compute timeline risks" },
-    };
+    return { ok: false, error: toDbError(err) };
   }
 }

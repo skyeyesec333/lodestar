@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DocumentRow } from "@/lib/db/documents";
 
-// Re-export so callers can use it without importing from lib/db directly
 export type { DocumentRow as UploadedDoc };
 
 type Props = {

@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { z } from "zod";
 import { getProjectBySlug } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
-import { computeReadiness } from "@/lib/scoring/index";
+import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import { simulateRequirementChanges } from "@/lib/scoring/simulator";
 import { checkRateLimit } from "@/lib/rate-limit";
 import type { RequirementStatusValue } from "@/types/requirements";
@@ -74,12 +74,7 @@ export async function POST(
   const rows = reqResult.value;
 
   const currentScore = computeReadiness(
-    rows.map((r) => ({
-      requirementId: r.requirementId,
-      status: r.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : r.status,
-    })),
+    mapRequirementStatuses(rows),
     project.dealType
   );
 

@@ -91,30 +91,38 @@ Rules:
 - Do not hedge excessively. Give direct expert judgement.`;
 }
 
+type RawStatusReportJson = {
+  headline: string;
+  readinessSummary: string;
+  keyRisks: string[];
+  progressSummary: string;
+  nextSteps: string[];
+};
+
+function isRawStatusReportJson(value: Record<string, unknown>): value is RawStatusReportJson {
+  return (
+    typeof value.headline === "string" &&
+    typeof value.readinessSummary === "string" &&
+    Array.isArray(value.keyRisks) &&
+    typeof value.progressSummary === "string" &&
+    Array.isArray(value.nextSteps)
+  );
+}
+
 function parseStatusReportJson(raw: string): Omit<StatusReport, "generatedAt"> {
   const cleaned = raw.trim().replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/, "");
-  const parsed: unknown = JSON.parse(cleaned);
+  const parsed: Record<string, unknown> = JSON.parse(cleaned) as Record<string, unknown>;
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    typeof (parsed as Record<string, unknown>).headline !== "string" ||
-    typeof (parsed as Record<string, unknown>).readinessSummary !== "string" ||
-    !Array.isArray((parsed as Record<string, unknown>).keyRisks) ||
-    typeof (parsed as Record<string, unknown>).progressSummary !== "string" ||
-    !Array.isArray((parsed as Record<string, unknown>).nextSteps)
-  ) {
+  if (!isRawStatusReportJson(parsed)) {
     throw new Error("Unexpected shape in status report JSON from model");
   }
 
-  const obj = parsed as Record<string, unknown>;
-
   return {
-    headline: obj.headline as string,
-    readinessSummary: obj.readinessSummary as string,
-    keyRisks: (obj.keyRisks as unknown[]).map(String),
-    progressSummary: obj.progressSummary as string,
-    nextSteps: (obj.nextSteps as unknown[]).map(String),
+    headline: parsed.headline,
+    readinessSummary: parsed.readinessSummary,
+    keyRisks: parsed.keyRisks.map(String),
+    progressSummary: parsed.progressSummary,
+    nextSteps: parsed.nextSteps.map(String),
   };
 }
 

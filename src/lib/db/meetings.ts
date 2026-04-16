@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { MeetingType, ActionItemStatus, ActionItemPriority } from "@prisma/client";
 import type { Result } from "@/types";
 
@@ -128,8 +129,7 @@ export async function getProjectMeetings(
     });
     return { ok: true, value: rows.map(shapeMeeting) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -165,8 +165,7 @@ export async function createMeetingRecord(input: {
     });
     return { ok: true, value: shapeMeeting(row) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -229,8 +228,7 @@ export async function createActionItemRecord(input: {
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -248,8 +246,7 @@ export async function getMeetingById(
     }
     return { ok: true, value: { ...shapeMeeting(row), projectId: row.projectId } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -266,8 +263,7 @@ export async function getMeetingByIdNoProject(
     }
     return { ok: true, value: { projectId: row.projectId, summary: row.summary } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -284,8 +280,7 @@ export async function linkActionItemRequirement(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -305,7 +300,6 @@ export async function updateActionItemStatus(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

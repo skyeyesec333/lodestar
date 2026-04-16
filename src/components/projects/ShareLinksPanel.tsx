@@ -4,15 +4,11 @@ import { useState, useTransition } from "react";
 import type { ShareLinkRow } from "@/lib/db/share-links";
 import { createShareLinkAction, revokeShareLinkAction } from "@/actions/share-links";
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
 type Props = {
   projectId: string;
   slug: string;
   initialLinks: ShareLinkRow[];
 };
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";
@@ -38,8 +34,6 @@ function linkStatus(link: ShareLinkRow): "active" | "revoked" | "expired" {
   if (isExpired(link)) return "expired";
   return "active";
 }
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export function ShareLinksPanel({ projectId, slug, initialLinks }: Props) {
   const [links, setLinks] = useState<ShareLinkRow[]>(initialLinks);

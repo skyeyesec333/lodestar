@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 export type UpcomingMilestone = {
@@ -17,7 +18,6 @@ export async function getUpcomingMilestones(
   daysAhead: number = 30
 ): Promise<Result<UpcomingMilestone[]>> {
   try {
-    // First, get all projects accessible to the user
     const projects = await db.project.findMany({
       where: {
         OR: [
@@ -38,7 +38,6 @@ export async function getUpcomingMilestones(
       return { ok: true, value: [] };
     }
 
-    // Get milestones due in the next 30 days or overdue
     const now = new Date();
     const futureDate = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
 
@@ -74,10 +73,8 @@ export async function getUpcomingMilestones(
       },
     });
 
-    // Create a project map for quick lookups
     const projectMap = new Map(projects.map((p) => [p.id, p]));
 
-    // Transform and filter milestones
     const upcoming: UpcomingMilestone[] = milestones
       .filter((milestone) => milestone.targetDate !== null)
       .map((milestone) => {
@@ -116,7 +113,6 @@ export async function getUpcomingMilestones(
 
     return { ok: true, value: upcoming };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

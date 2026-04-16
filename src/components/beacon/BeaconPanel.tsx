@@ -11,8 +11,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useBeacon, type BeaconTab } from "./BeaconProvider";
-import type { ChatCitation, ChatRuntimeContext, BeaconSignal, BeaconDocumentCoverage, WalkthroughData } from "@/types";
-import type { ChatPresetQuestion } from "@/components/chat/ChatWidget";
+import type { ChatCitation, ChatRuntimeContext, BeaconSignal, BeaconDocumentCoverage, WalkthroughData, ChatPresetQuestion } from "@/types";
 import { getWorkspaceChatPresets } from "@/lib/ai/chat-presets";
 import { WalkthroughController } from "./WalkthroughController";
 

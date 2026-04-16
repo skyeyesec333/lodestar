@@ -62,13 +62,15 @@ export function VersionHistoryDrawer({
     setDownloadingId(versionId);
     try {
       const res = await fetch(`/api/documents/${versionId}/signed-url`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
       const { url } = (await res.json()) as { url: string };
       const a = document.createElement("a");
       a.href = url;
       a.download = versionFilename;
       a.target = "_blank";
       a.click();
+    } catch {
+      setError("Failed to download version.");
     } finally {
       setDownloadingId(null);
     }

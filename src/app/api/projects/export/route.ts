@@ -1,21 +1,25 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import type { ProjectListQuery, ProjectListSort } from "@/types";
+import type { ProjectListQuery } from "@/types";
 import { getProjectsByUser } from "@/lib/db/projects";
 import { checkRateLimit } from "@/lib/rate-limit";
 
+const sectorValues = ["all", "power", "transport", "water", "telecom", "mining", "other"] as const;
+const readinessValues = ["all", "not_started", "at_risk", "progressing", "ready"] as const;
+const sortValues = ["created_desc", "name_asc", "readiness_desc", "loi_asc", "last_activity_desc"] as const;
+
 const exportSchema = z.object({
   q: z.string().optional().default(""),
-  sector: z.string().optional().default("all"),
-  readiness: z.string().optional().default("all"),
-  sort: z.string().optional().default("created_desc"),
+  sector: z.enum(sectorValues).optional().default("all"),
+  readiness: z.enum(readinessValues).optional().default("all"),
+  sort: z.enum(sortValues).optional().default("created_desc"),
 });
 
 const EXPORT_MAX_REQUESTS = 10;
 const EXPORT_WINDOW_MS = 60_000;
 
-function escapeCSVValue(value: unknown): string {
+function escapeCSVValue(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) {
     return "";
   }
@@ -75,9 +79,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const query: ProjectListQuery = {
     q: parsed.data.q,
-    sector: parsed.data.sector as ProjectListQuery["sector"],
-    readiness: parsed.data.readiness as ProjectListQuery["readiness"],
-    sort: parsed.data.sort as ProjectListSort,
+    sector: parsed.data.sector,
+    readiness: parsed.data.readiness,
+    sort: parsed.data.sort,
   };
 
   const result = await getProjectsByUser(userId, query);

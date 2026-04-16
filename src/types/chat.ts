@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-export const CHAT_ROLE_VALUES = ["user", "assistant"] as const;
+const CHAT_ROLE_VALUES = ["user", "assistant"] as const;
 export type ChatRole = (typeof CHAT_ROLE_VALUES)[number];
 
-export const chatMessageSchema = z.object({
+const chatMessageSchema = z.object({
   role: z.enum(CHAT_ROLE_VALUES),
   content: z.string().trim().min(1).max(8000),
 });

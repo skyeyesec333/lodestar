@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NewProjectPage } from "@/components/projects/NewProjectPage";
 import { getProjectsByUser } from "@/lib/db/projects";
-import type { ExistingProjectOption } from "@/components/projects/OnboardingWizard";
+import type { ExistingProjectOption } from "@/types";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 

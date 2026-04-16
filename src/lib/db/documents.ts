@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 export type DocumentRow = {
@@ -35,7 +36,7 @@ const documentSelect = {
   createdAt: true,
 } as const;
 
-export type DocumentPage = {
+type DocumentPage = {
   items: DocumentRow[];
   nextCursor: string | null;
 };
@@ -68,8 +69,7 @@ export async function getProjectDocuments(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -94,8 +94,7 @@ export async function getRequirementDocuments(
       value: rows.map((r) => ({ ...r, sizeBytes: Number(r.sizeBytes) })),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -122,8 +121,7 @@ export async function createDocumentRecord(input: {
     });
     return { ok: true, value: { ...row, sizeBytes: Number(row.sizeBytes) } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -150,8 +148,7 @@ export async function updateDocumentExpiry(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -170,34 +167,7 @@ export async function getDocumentVersionHistory(
       value: rows.map((r) => ({ ...r, sizeBytes: Number(r.sizeBytes) })),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
-  }
-}
-
-export async function getExpiringDocuments(
-  projectId: string,
-  withinDays: number
-): Promise<Result<DocumentRow[]>> {
-  try {
-    const now = new Date();
-    const cutoff = new Date(now.getTime() + withinDays * 86400_000);
-    const rows = await db.document.findMany({
-      where: {
-        projectId,
-        state: "current",
-        expiresAt: { gte: now, lte: cutoff },
-      },
-      select: documentSelect,
-      orderBy: { expiresAt: "asc" },
-    });
-    return {
-      ok: true,
-      value: rows.map((r) => ({ ...r, sizeBytes: Number(r.sizeBytes) })),
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -215,7 +185,6 @@ export async function deleteDocumentRecord(
     await db.document.delete({ where: { id: documentId } });
     return { ok: true, value: { storagePath: row.storagePath } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

@@ -1,19 +1,10 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { ApprovalStatus, ApprovalTargetType } from "@prisma/client";
 import type { Result } from "@/types";
+import type { ApprovalRow, ApprovalHistoryEntry } from "@/types/collaboration";
 
-export type ApprovalRow = {
-  id: string;
-  projectId: string;
-  reviewerId: string;
-  status: ApprovalStatus;
-  note: string | null;
-  targetType: ApprovalTargetType;
-  projectRequirementId: string | null;
-  documentId: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
+export type { ApprovalRow, ApprovalHistoryEntry } from "@/types/collaboration";
 
 const approvalSelect = {
   id: true,
@@ -41,7 +32,7 @@ export async function getApproval(
     const row = await db.approval.findFirst({ where, select: approvalSelect });
     return { ok: true, value: row };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -84,18 +75,9 @@ export async function upsertApproval(
     });
     return { ok: true, value: row };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
-
-export type ApprovalHistoryEntry = {
-  id: string;
-  actorClerkId: string;
-  fromStatus: string | null;
-  toStatus: string;
-  note: string | null;
-  createdAt: Date;
-};
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -139,10 +121,7 @@ export async function getApprovalHistory(
 
     return { ok: true, value: entries };
   } catch (err) {
-    return {
-      ok: false,
-      error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" },
-    };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -157,6 +136,6 @@ export async function getApprovalsByProject(
     });
     return { ok: true, value: rows };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: err instanceof Error ? err.message : "Unknown error" } };
+    return { ok: false, error: toDbError(err) };
   }
 }

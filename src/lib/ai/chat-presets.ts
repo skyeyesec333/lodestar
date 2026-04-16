@@ -1,4 +1,4 @@
-import type { ChatPresetQuestion } from "@/components/chat/ChatWidget";
+import type { ChatPresetQuestion } from "@/types";
 
 export function getProjectDetailChatPresets(args: {
   projectName: string;

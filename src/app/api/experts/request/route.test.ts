@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   authMock: vi.fn(),
@@ -39,9 +40,9 @@ describe("POST /api/experts/request", () => {
 
     const { POST } = await loadRoute();
     const response = await POST(
-      new Request("http://localhost/api/experts/request", {
+      new NextRequest("http://localhost/api/experts/request", {
         method: "POST",
-      }) as never
+      })
     );
 
     expect(response.status).toBe(401);
@@ -54,7 +55,7 @@ describe("POST /api/experts/request", () => {
 
     const { POST } = await loadRoute();
     const response = await POST(
-      new Request("http://localhost/api/experts/request", {
+      new NextRequest("http://localhost/api/experts/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,7 +63,7 @@ describe("POST /api/experts/request", () => {
           context: "short",
           timing: "soon",
         }),
-      }) as never
+      })
     );
 
     expect(response.status).toBe(400);
@@ -78,7 +79,7 @@ describe("POST /api/experts/request", () => {
 
     const { POST } = await loadRoute();
     const response = await POST(
-      new Request("http://localhost/api/experts/request", {
+      new NextRequest("http://localhost/api/experts/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -86,7 +87,7 @@ describe("POST /api/experts/request", () => {
           context: "We need help with LOI readiness planning.",
           timing: "this week",
         }),
-      }) as never
+      })
     );
 
     expect(response.status).toBe(200);

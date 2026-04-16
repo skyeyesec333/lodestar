@@ -14,9 +14,11 @@ export function DownloadButton({ token, documentId }: DownloadButtonProps) {
     setLoading(true);
     try {
       const res = await fetch(`/api/share/${token}/documents/${documentId}`);
-      if (!res.ok) return;
-      const { url } = await res.json();
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      const { url } = (await res.json()) as { url: string };
       window.open(url, "_blank");
+    } catch {
+      // fetch or response parsing failed -- nothing actionable for the user in this context
     } finally {
       setLoading(false);
     }

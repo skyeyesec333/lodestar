@@ -64,7 +64,7 @@ describe("GET /api/projects/[slug]/export", () => {
 
     const { GET } = await loadRoute();
     const response = await GET(
-      new Request("http://localhost/api/projects/kivu-hydro/export") as never,
+      new Request("http://localhost/api/projects/kivu-hydro/export"),
       { params: Promise.resolve({ slug: "kivu-hydro" }) }
     );
 
@@ -82,7 +82,7 @@ describe("GET /api/projects/[slug]/export", () => {
 
     const { GET } = await loadRoute();
     const response = await GET(
-      new Request("http://localhost/api/projects/kivu-hydro/export") as never,
+      new Request("http://localhost/api/projects/kivu-hydro/export"),
       { params: Promise.resolve({ slug: "kivu-hydro" }) }
     );
 
@@ -180,7 +180,7 @@ describe("GET /api/projects/[slug]/export", () => {
 
     const { GET } = await loadRoute();
     const response = await GET(
-      new Request("http://localhost/api/projects/kivu-hydro/export") as never,
+      new Request("http://localhost/api/projects/kivu-hydro/export"),
       { params: Promise.resolve({ slug: "kivu-hydro" }) }
     );
 

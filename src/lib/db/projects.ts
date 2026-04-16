@@ -1,4 +1,5 @@
 import type {
+  Prisma,
   ProjectSector,
   EximCoverType,
   DealType,
@@ -8,6 +9,7 @@ import type {
 } from "@prisma/client";
 import { db } from "./index";
 import { getProjectAccessById } from "./project-access";
+import { toDbError } from "@/lib/utils";
 import type {
   Project,
   ProjectListItem,
@@ -16,8 +18,6 @@ import type {
   Result,
 } from "@/types";
 import { dedupeDemoPortfolioProjects } from "@/lib/projects/demo-portfolio";
-
-// ── Select shapes ─────────────────────────────────────────────────────────────
 
 const projectSummarySelect = {
   id: true,
@@ -69,22 +69,37 @@ const projectFullSelect = {
   updatedAt: true,
 } as const;
 
-// ── Row mapper ────────────────────────────────────────────────────────────────
-
-type ProjectFullRow = {
-  [K in keyof typeof projectFullSelect]: K extends "capexUsdCents"
-    ? bigint | null
-    : unknown;
-} & Record<string, unknown>;
+type ProjectFullRow = Prisma.ProjectGetPayload<{ select: typeof projectFullSelect }>;
 
 function toProject(row: ProjectFullRow): Project {
   return {
-    ...(row as unknown as Project),
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    description: row.description,
+    countryCode: row.countryCode,
+    sector: row.sector,
     capexUsdCents: row.capexUsdCents != null ? Number(row.capexUsdCents) : null,
+    dealType: row.dealType,
+    eximCoverType: row.eximCoverType,
+    stage: row.stage,
+    targetLoiDate: row.targetLoiDate,
+    targetCloseDate: row.targetCloseDate,
+    actualLoiSubmittedDate: row.actualLoiSubmittedDate,
+    actualLoiApprovedDate: row.actualLoiApprovedDate,
+    actualCommitmentDate: row.actualCommitmentDate,
+    actualCloseDate: row.actualCloseDate,
+    ownerClerkId: row.ownerClerkId,
+    environmentalCategory: row.environmentalCategory,
+    programPath: row.programPath,
+    userRole: row.userRole,
+    subNationalLocation: row.subNationalLocation,
+    cachedReadinessScore: row.cachedReadinessScore,
+    cachedScoreUpdatedAt: row.cachedScoreUpdatedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
-
-// ── Query helpers ─────────────────────────────────────────────────────────────
 
 export async function getProjectsByUser(
   clerkUserId: string,
@@ -153,9 +168,7 @@ export async function getProjectsByUser(
       ),
     };
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -216,10 +229,9 @@ export async function getProjectBySlug(
       select: projectFullSelect,
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-    return { ok: true, value: toProject(row as ProjectFullRow) };
+    return { ok: true, value: toProject(row) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -239,10 +251,9 @@ export async function getProjectById(
       select: projectFullSelect,
     });
     if (!row) return { ok: false, error: { code: "NOT_FOUND", message: "Project not found." } };
-    return { ok: true, value: toProject(row as ProjectFullRow) };
+    return { ok: true, value: toProject(row) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -267,7 +278,6 @@ export async function updateProjectRecord(
     actualCloseDate?: Date | null;
   }
 ): Promise<Result<Project>> {
-  // Verify the caller has at least editor access (owners and editors may update)
   const access = await getProjectAccessById(id, clerkUserId);
   if (!access) {
     return { ok: false, error: { code: "NOT_FOUND", message: "Project not found or access denied." } };
@@ -282,14 +292,11 @@ export async function updateProjectRecord(
       data,
       select: projectFullSelect,
     });
-    return { ok: true, value: toProject(row as ProjectFullRow) };
+    return { ok: true, value: toProject(row) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
-
-// ── Overdue LOI query ─────────────────────────────────────────────────────────
 
 export type OverdueLoiProject = {
   id: string;
@@ -337,12 +344,9 @@ export async function getOverdueLoiProjects(
       ),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
-
-// ── Public (unauthenticated) helpers ──────────────────────────────────────────
 
 export type PublicProjectSummary = {
   id: string;
@@ -382,12 +386,9 @@ export async function getProjectByIdPublic(
       value: { ...row, capexUsdCents: row.capexUsdCents != null ? Number(row.capexUsdCents) : null },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
-
-// ── Write helpers ─────────────────────────────────────────────────────────────
 
 export type CreateProjectInput = {
   name: string;
@@ -416,11 +417,10 @@ export async function createProjectRecord(
       data: input,
       select: projectFullSelect,
     });
-    return { ok: true, value: toProject(row as ProjectFullRow) };
+    return { ok: true, value: toProject(row) };
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Unknown database error";
-    if (message.toLowerCase().includes("unique")) {
+    const dbErr = toDbError(err);
+    if (dbErr.message.toLowerCase().includes("unique")) {
       return {
         ok: false,
         error: {
@@ -429,6 +429,6 @@ export async function createProjectRecord(
         },
       };
     }
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: dbErr };
   }
 }

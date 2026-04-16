@@ -1,19 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import type { DealTypeValue, DealTypeResult } from "@/types";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type DealTypeValue =
-  | "exim_project_finance"
-  | "commercial_finance"
-  | "development_finance"
-  | "private_equity"
-  | "other";
-
-export interface DealTypeResult {
-  dealType: DealTypeValue;
-}
+export type { DealTypeValue, DealTypeResult } from "@/types";
 
 interface Props {
   onSelect: (result: DealTypeResult) => void;

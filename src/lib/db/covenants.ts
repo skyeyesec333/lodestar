@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { CovenantType, CovenantFrequency, CovenantStatus } from "@prisma/client";
 import type { Result } from "@/types";
 
@@ -113,26 +114,7 @@ export async function getProjectCovenants(
     });
     return { ok: true, value: rows.map(mapRow) };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
-  }
-}
-
-export async function getOverdueCovenants(
-  projectId: string
-): Promise<Result<CovenantRow[]>> {
-  try {
-    const rows = await db.covenant.findMany({
-      where: {
-        projectId,
-        status: "active",
-        nextDueAt: { lt: new Date() },
-      },
-      orderBy: { nextDueAt: "asc" },
-      select: covenantSelect,
-    });
-    return { ok: true, value: rows.map(mapRow) };
-  } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -161,7 +143,7 @@ export async function addCovenant(data: {
     });
     return { ok: true, value: { id: row.id } };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -209,7 +191,7 @@ export async function updateCovenant(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -238,7 +220,7 @@ export async function markCovenantSatisfied(
 
     return { ok: true, value: mapRow(updated) };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -247,6 +229,6 @@ export async function removeCovenant(id: string): Promise<Result<void>> {
     await db.covenant.delete({ where: { id } });
     return { ok: true, value: undefined };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }

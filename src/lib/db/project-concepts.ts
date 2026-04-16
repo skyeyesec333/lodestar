@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 export type ProjectConceptRow = {
@@ -47,8 +48,7 @@ export async function getProjectConcept(
 
     return { ok: true, value: rows[0] ? shapeConceptRow(rows[0]) : null };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -121,7 +121,6 @@ export async function upsertProjectConcept(data: {
 
     return { ok: true, value: shapeConceptRow(row) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

@@ -3,7 +3,7 @@
  */
 import type { DocumentRow } from "@/lib/db/documents";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
-import { REQUIREMENT_CATEGORIES } from "@/lib/exim/requirements";
+import { REQUIREMENT_CATEGORIES } from "@/lib/requirements/types";
 import { getCategoryLabel } from "@/lib/requirements/index";
 
 export type CoverageBucket = {

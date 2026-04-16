@@ -9,7 +9,7 @@ if (!url || !key) {
 
 export const supabase = createClient(url, key);
 
-export const DOCUMENTS_BUCKET = "lodestar-documents";
+const DOCUMENTS_BUCKET = "lodestar-documents";
 
 /**
  * Upload a file to Supabase Storage.

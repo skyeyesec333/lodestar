@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 export const EXTERNAL_EVIDENCE_PROVIDERS = [
@@ -60,8 +61,7 @@ export async function getProjectExternalEvidence(
 
     return { ok: true, value: rows.map(shapeRow) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -118,8 +118,7 @@ export async function createExternalEvidenceSource(data: {
     if (!row) throw new Error("External evidence insert returned no row.");
     return { ok: true, value: shapeRow(row) };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -140,7 +139,6 @@ export async function deleteExternalEvidenceSource(data: {
     }
     return { ok: true, value: row };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

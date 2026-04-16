@@ -14,6 +14,7 @@ import {
 } from "@/components/projects/EximEligibilityScreen";
 import { getWorkspaceTemplate, type WorkspaceTemplate } from "@/lib/templates/directory";
 import { COUNTRY_OPTIONS, countryLabel } from "@/lib/projects/country-label";
+import type { ExistingProjectOption } from "@/types";
 
 const SECTOR_OPTIONS = [
   { value: "power", label: "Power / Energy" },
@@ -150,11 +151,7 @@ function buildInitialState(template: WorkspaceTemplate | null): WizardState {
   };
 }
 
-export type ExistingProjectOption = {
-  id: string;
-  name: string;
-  slug: string;
-};
+export type { ExistingProjectOption } from "@/types";
 
 interface OnboardingWizardProps {
   onComplete: (projectSlug: string) => void;

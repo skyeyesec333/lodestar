@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 import type { DealPartyType } from "@/lib/exim/deal-parties";
 import { DEAL_PARTY_REQUIREMENT_MAP } from "@/lib/exim/deal-parties";
@@ -101,8 +102,7 @@ export async function getProjectDealParties(projectId: string): Promise<Result<D
       value: rows,
     };
   } catch (err) {
-    console.error("[getProjectDealParties]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to load deal parties" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -212,8 +212,7 @@ export async function addDealParty(
       value: party,
     };
   } catch (err) {
-    console.error("[addDealParty]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to add deal party" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -236,7 +235,6 @@ export async function removeDealParty(dealPartyId: string): Promise<Result<void>
     `);
     return { ok: true, value: undefined };
   } catch (err) {
-    console.error("[removeDealParty]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to remove deal party" } };
+    return { ok: false, error: toDbError(err) };
   }
 }

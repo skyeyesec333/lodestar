@@ -1,5 +1,4 @@
 import { db } from "@/lib/db";
-import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
 import { getRequirementsForDealType } from "@/lib/requirements/index";
 import type { RequirementDef } from "@/lib/requirements/types";
 import type { Result } from "@/types";
@@ -36,8 +35,6 @@ export type ReadinessTrendline = {
   isStalled: boolean;
 };
 
-// ── Internal types ────────────────────────────────────────────────────────────
-
 type RawNoteRow = {
   requirementId: string;
   statusSnapshot: string;
@@ -48,12 +45,9 @@ type RawActivityRow = {
   createdAt: Date;
 };
 
-// ── Score computation helper ──────────────────────────────────────────────────
-
 /**
- * Computes a readiness score in basis points from a map of requirement statuses.
- * Requirements absent from the map are treated as not_started.
- * Requirements with status not_applicable are excluded from the denominator.
+ * Computes a readiness score in basis points from a status map.
+ * not_applicable requirements are excluded from the denominator.
  */
 function scoreFromStatusMap(
   requirements: readonly RequirementDef[],
@@ -74,55 +68,24 @@ function scoreFromStatusMap(
   return Math.round((weightedSum / applicableWeight) * 10000);
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
-
 /**
- * Computes a readiness trendline for a project.
- *
- * Historical scores are reconstructed from RequirementNote rows, which carry
- * a statusSnapshot field recording the requirement's status at note creation time.
- * By walking backwards through these snapshots we can approximate what the score
- * looked like at a given point in the past.
- *
- * If there are not enough note rows to reconstruct a historical score, the
- * sevenDayAvgBps and thirtyDayAvgBps fields are returned as null.
- * isStalled and projectedGateDateISO are always computed.
- *
- * @param projectId - The project UUID.
- * @param currentScoreBps - The project's current cached readiness score in basis points.
- * @param dealType - The project's deal type string (defaults to EXIM).
- * @param daysBack - How far back to look for history (default 30).
+ * Computes a readiness trendline by reconstructing historical scores from
+ * RequirementNote snapshots. Returns null for historical scores when
+ * insufficient note data exists.
  */
 export async function computeReadinessTrendline(
   projectId: string,
   currentScoreBps: number,
-  dealType?: string,
+  dealType: string = "exim_project_finance",
   daysBack: number = 30
 ): Promise<Result<ReadinessTrendline>> {
   try {
-    // ── 1. Resolve taxonomy ──────────────────────────────────────────────────
-    const requirements: readonly RequirementDef[] =
-      dealType && dealType !== "exim_project_finance"
-        ? getRequirementsForDealType(dealType)
-        : EXIM_REQUIREMENTS.map((r) => ({
-            id: r.id,
-            category: r.category,
-            name: r.name,
-            description: r.description,
-            phaseRequired: r.phaseRequired,
-            isPrimaryGate: r.isLoiCritical,
-            weight: r.weight,
-            sortOrder: r.sortOrder,
-            phaseLabel: r.phaseRequired === "loi" ? "LOI" : "Final Commitment",
-            defaultOwner: "Sponsor",
-            applicableSectors: r.applicableSectors,
-          }));
+    const requirements: readonly RequirementDef[] = getRequirementsForDealType(dealType);
 
     const now = new Date();
     const windowStart = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    // ── 2. Fetch current statuses ────────────────────────────────────────────
     const currentRows = await db.projectRequirement.findMany({
       where: { projectId },
       select: { requirementId: true, status: true },
@@ -132,9 +95,6 @@ export async function computeReadinessTrendline(
       currentRows.map((r) => [r.requirementId, r.status as RequirementStatusValue])
     );
 
-    // ── 3. Fetch requirement notes (status-snapshot history) ─────────────────
-    // RequirementNote.statusSnapshot records the requirement's status at note time.
-    // We fetch all notes since the beginning of our window so we can revert changes.
     const noteRows = await db.$queryRaw<RawNoteRow[]>`
       SELECT "requirementId", "statusSnapshot", "createdAt"
       FROM requirement_notes
@@ -143,7 +103,6 @@ export async function computeReadinessTrendline(
       ORDER BY "createdAt" DESC
     `;
 
-    // ── 4. Determine isStalled via ActivityEvent ─────────────────────────────
     const thirtyDaysAgo = windowStart;
     const recentActivity = await db.$queryRaw<RawActivityRow[]>`
       SELECT "createdAt"
@@ -154,21 +113,13 @@ export async function computeReadinessTrendline(
       LIMIT 1
     `;
 
-    // Also check requirement notes as a secondary signal for activity
     const hasRecentActivity =
       recentActivity.length > 0 || noteRows.length > 0;
     const isStalled = !hasRecentActivity;
 
-    // ── 5. Reconstruct historical scores ─────────────────────────────────────
-    // Strategy: start from currentStatusMap and walk backwards through notes.
-    // For each note, the statusSnapshot tells us what status that requirement
-    // had *at that moment*. We can use notes older than a cutoff to reconstruct
-    // the approximate state at that cutoff.
-    //
-    // Limitation: notes are only created when a user explicitly comments, so
-    // gaps in notes mean gaps in history. We degrade to null if insufficient data.
-
-    // Group notes by requirementId, keeping all within window
+    // Reconstruct historical scores by walking backwards through notes.
+    // Each note's statusSnapshot tells us a requirement's status at that moment.
+    // Degrades to null if insufficient note data (notes are only created on user comments).
     const notesByReq = new Map<string, RawNoteRow[]>();
     for (const note of noteRows) {
       const existing = notesByReq.get(note.requirementId);
@@ -179,10 +130,6 @@ export async function computeReadinessTrendline(
       }
     }
 
-    // Helper: reconstruct status map as it was at a given cutoff date.
-    // For requirements that have notes before the cutoff, use the most recent
-    // note before the cutoff as the status proxy. For requirements with no notes
-    // in the window at all, assume the current status was unchanged (conservative).
     function reconstructStatusAtCutoff(
       cutoff: Date
     ): { map: Map<string, RequirementStatusValue>; hasSufficientData: boolean } {
@@ -190,23 +137,18 @@ export async function computeReadinessTrendline(
       let changedRequirementCount = 0;
 
       for (const [reqId, notes] of notesByReq.entries()) {
-        // Notes are sorted desc by createdAt; find the most recent one BEFORE cutoff
         const beforeCutoff = notes.filter(
           (n) => n.createdAt.getTime() <= cutoff.getTime()
         );
 
         if (beforeCutoff.length > 0) {
-          // The most recent note before the cutoff gives us the status at that time
           const snapshot = beforeCutoff[0]?.statusSnapshot;
           if (snapshot && isValidStatus(snapshot)) {
             reconstructed.set(reqId, snapshot as RequirementStatusValue);
             changedRequirementCount++;
           }
         } else {
-          // Notes exist in the window but all are after the cutoff — means this
-          // requirement changed *after* the cutoff. Revert to the oldest snapshot
-          // we have (the one just before the period started, which is the last entry
-          // in the desc-sorted array for this req).
+          // All notes are after the cutoff -- revert to oldest snapshot
           const oldestNote = notes[notes.length - 1];
           if (oldestNote && isValidStatus(oldestNote.statusSnapshot)) {
             reconstructed.set(reqId, oldestNote.statusSnapshot as RequirementStatusValue);
@@ -215,14 +157,12 @@ export async function computeReadinessTrendline(
         }
       }
 
-      // We consider data "sufficient" if at least one requirement changed in the window
       return {
         map: reconstructed,
         hasSufficientData: changedRequirementCount > 0,
       };
     }
 
-    // ── 6. Compute approximate historical scores ─────────────────────────────
     let sevenDayAvgBps: number | null = null;
     let thirtyDayAvgBps: number | null = null;
     let velocityBpsPerDay: number | null = null;
@@ -238,20 +178,17 @@ export async function computeReadinessTrendline(
       thirtyDayAvgBps = scoreFromStatusMap(requirements, thirtyDayRecon.map);
     }
 
-    // Velocity: use the longest window with sufficient data for best accuracy
     if (thirtyDayAvgBps !== null) {
       velocityBpsPerDay = (currentScoreBps - thirtyDayAvgBps) / daysBack;
     } else if (sevenDayAvgBps !== null) {
       velocityBpsPerDay = (currentScoreBps - sevenDayAvgBps) / 7;
     }
 
-    // ── 7. Project gate-crossing date ────────────────────────────────────────
     let projectedGateDateISO: string | null = null;
 
     if (velocityBpsPerDay !== null && velocityBpsPerDay > 0) {
       const bpsRemaining = GATE_THRESHOLD_BPS - currentScoreBps;
       if (bpsRemaining <= 0) {
-        // Already past the threshold
         projectedGateDateISO = now.toISOString().slice(0, 10);
       } else {
         const daysToGate = bpsRemaining / velocityBpsPerDay;
@@ -279,8 +216,6 @@ export async function computeReadinessTrendline(
     return { ok: false, error: { code: "DATABASE_ERROR", message } };
   }
 }
-
-// ── Utility ───────────────────────────────────────────────────────────────────
 
 const VALID_STATUSES = new Set<string>([
   "not_started",

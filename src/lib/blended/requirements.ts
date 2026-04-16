@@ -369,17 +369,3 @@ export const BLENDED_REQUIREMENTS: readonly RequirementDef[] = [
   ...corporate,
 ] as const;
 
-/** Lookup by requirement ID. */
-export const BLENDED_REQUIREMENTS_BY_ID: ReadonlyMap<string, RequirementDef> =
-  new Map(BLENDED_REQUIREMENTS.map((r) => [r.id, r]));
-
-/** IDs that are hard gates for concessional window approval. */
-export const BLENDED_PRIMARY_GATE_IDS: readonly string[] = BLENDED_REQUIREMENTS.filter(
-  (r) => r.isPrimaryGate,
-).map((r) => r.id);
-
-/** Total weight pool — denominator for readiness score. */
-export const BLENDED_TOTAL_WEIGHT: number = BLENDED_REQUIREMENTS.reduce(
-  (sum, r) => sum + r.weight,
-  0,
-);

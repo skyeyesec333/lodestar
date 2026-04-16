@@ -5,29 +5,16 @@
  * requirements are to completion. Computed at application layer,
  * cached on `projects.cachedReadinessScore` as basis points (0–10000).
  *
- * `computeReadiness` now accepts any requirements taxonomy via the
- * `requirements` parameter, enabling all four deal types (EXIM, DFI,
- * Commercial Bank, PE) to share the same scoring logic.
- *
- * For backwards compatibility, `computeReadiness` without a `requirements`
- * argument still operates on the EXIM taxonomy.
+ * `computeReadiness` accepts a `dealType` and routes to the appropriate
+ * taxonomy, enabling all deal types (EXIM, DFI, Commercial Bank, PE,
+ * Blended) to share the same scoring logic.
  */
 
-import {
-  LOI_CRITICAL_IDS,
-} from "../exim/requirements";
 import { getRequirementsForDealType } from "../requirements/index";
 import type { RequirementDef } from "../requirements/types";
 import type { RequirementStatusValue } from "../../types/requirements";
+import type { ReadinessResult, RequirementInput } from "@/types";
 
-/**
- * Maps each requirement status to a completion fraction (0.0–1.0).
- * These fractions are multiplied by the requirement's weight to
- * produce the weighted score contribution.
- *
- * not_applicable is handled separately: the requirement is excluded from
- * both numerator and denominator, so it does not affect the score at all.
- */
 const STATUS_FRACTIONS: Record<RequirementStatusValue, number> = {
   not_started: 0.0,
   in_progress: 0.2,
@@ -35,27 +22,8 @@ const STATUS_FRACTIONS: Record<RequirementStatusValue, number> = {
   substantially_final: 0.9,
   executed: 1.0,
   waived: 1.0,
-  not_applicable: 0.0, // sentinel — filtered out before scoring (see below)
+  not_applicable: 0.0,
 };
-
-interface RequirementInput {
-  requirementId: string;
-  status: RequirementStatusValue;
-}
-
-interface ReadinessResult {
-  /** Readiness score in basis points (0–10000). e.g. 7543 = 75.43% */
-  scoreBps: number;
-
-  /** Whether all primary-gate items are at substantially_final or better. */
-  loiReady: boolean;
-
-  /** IDs of primary-gate requirements that are NOT yet at substantially_final or better. */
-  loiBlockers: string[];
-
-  /** Per-category breakdown: category → basis points. */
-  categoryScores: Record<string, number>;
-}
 
 /**
  * Core scoring logic — operates on any RequirementDef array.
@@ -119,8 +87,7 @@ function scoreRequirements(
 
 /**
  * Computes the readiness score for a project given its current requirement
- * statuses. When `dealType` is provided, routes to the appropriate taxonomy.
- * Defaults to EXIM for backwards compatibility.
+ * statuses and deal type.
  *
  * Requirements not present in `statuses` are treated as `not_started`.
  * Requirements with status `not_applicable` are excluded from both the
@@ -128,14 +95,23 @@ function scoreRequirements(
  */
 export function computeReadiness(
   statuses: RequirementInput[],
-  dealType?: string
+  dealType: string = "exim_project_finance"
 ): ReadinessResult {
-  const requirements = getRequirementsForDealType(dealType ?? "exim_project_finance");
+  const requirements = getRequirementsForDealType(dealType);
   return scoreRequirements(requirements, statuses);
 }
 
-// Re-export for code that imports these directly from scoring/index
-export { LOI_CRITICAL_IDS };
+export function mapRequirementStatuses(
+  rows: ReadonlyArray<{ requirementId: string; status: string; isApplicable: boolean | null }>
+): RequirementInput[] {
+  return rows.map((r) => ({
+    requirementId: r.requirementId,
+    status: r.isApplicable === false
+      ? ("not_applicable" as RequirementStatusValue)
+      : (r.status as RequirementStatusValue),
+  }));
+}
+
 export type { ReadinessResult };
 
 export { computeReadinessTrendline } from "./trendline";

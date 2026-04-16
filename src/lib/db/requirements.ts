@@ -1,5 +1,6 @@
 import { db } from "./index";
-import { getRequirementsForDealType, getCategoryLabel } from "@/lib/requirements/index";
+import { toDbError } from "@/lib/utils";
+import { getRequirementsForDealType } from "@/lib/requirements/index";
 import type { RequirementDef } from "@/lib/requirements/types";
 import type { RequirementStatusValue } from "@/types/requirements";
 import type { AppError, Result } from "@/types";
@@ -214,8 +215,7 @@ export async function getProjectRequirements(
       ),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -245,8 +245,7 @@ export async function addRequirementNote(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -272,8 +271,7 @@ export async function getRequirementNotes(
       })),
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -295,8 +293,7 @@ export async function updateRequirementStatusInDb(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -313,8 +310,7 @@ export async function updateRequirementNotesInDb(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -337,8 +333,7 @@ export async function updateRequirementResponsibility(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -354,8 +349,7 @@ export async function updateProjectCachedScore(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -375,8 +369,6 @@ export type CategoryBreakdown = {
   blockingRequirements: BlockingRequirement[];
 };
 
-
-// ── Stale assignments ─────────────────────────────────────────────────────────
 
 export type StaleAssignment = {
   requirementId: string;
@@ -439,72 +431,7 @@ export async function getStaleAssignments(
 
     return { ok: true, value };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
-export async function getRequirementCategoryBreakdown(
-  projectId: string
-): Promise<Result<CategoryBreakdown[]>> {
-  try {
-    const rows = await db.projectRequirement.findMany({
-      where: { projectId },
-      select: {
-        requirementId: true,
-        status: true,
-        isApplicable: true,
-        requirement: { select: { category: true, name: true } },
-      },
-    });
-
-    const groups: Record<
-      string,
-      {
-        total: number;
-        completed: number;
-        inProgress: number;
-        blockingRequirements: BlockingRequirement[];
-      }
-    > = {};
-
-    for (const row of rows) {
-      if (!row.isApplicable) continue;
-      const cat = row.requirement.category;
-      if (!groups[cat]) {
-        groups[cat] = { total: 0, completed: 0, inProgress: 0, blockingRequirements: [] };
-      }
-      groups[cat].total++;
-      if (["substantially_final", "executed", "waived"].includes(row.status)) {
-        groups[cat].completed++;
-      } else if (["in_progress", "draft"].includes(row.status)) {
-        groups[cat].inProgress++;
-      }
-
-      // Collect blocking requirements (not yet in final state)
-      if (!["substantially_final", "executed", "waived"].includes(row.status)) {
-        groups[cat].blockingRequirements.push({
-          id: row.requirementId,
-          label: row.requirement.name,
-          status: row.status,
-        });
-      }
-    }
-
-    const breakdown: CategoryBreakdown[] = Object.entries(groups).map(([cat, counts]) => ({
-      category: cat,
-      label: getCategoryLabel(cat),
-      total: counts.total,
-      completed: counts.completed,
-      inProgress: counts.inProgress,
-      scorePct: counts.total > 0 ? Math.round((counts.completed / counts.total) * 100) : 0,
-      blockingRequirements: counts.blockingRequirements,
-    }));
-
-    breakdown.sort((a, b) => a.scorePct - b.scorePct);
-    return { ok: true, value: breakdown };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
-  }
-}

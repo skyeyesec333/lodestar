@@ -2,23 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { updateProject, advanceProjectStage } from "@/actions/projects";
-import type { ProjectSector, EximCoverType, ProjectPhase, DealType } from "@prisma/client";
+import type { SerializableProject } from "@/types";
 import type { GateReview } from "@/lib/projects/gate-review";
 
-// Serializable version of Project — capexUsdCents as number (BigInt can't cross server/client boundary)
-export type SerializableProject = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  countryCode: string;
-  sector: ProjectSector;
-  dealType: DealType;
-  capexUsdCents: number | null;
-  eximCoverType: EximCoverType | null;
-  stage: ProjectPhase;
-  targetLoiDate: string | null; // ISO string
-};
+export type { SerializableProject } from "@/types";
 
 const SECTORS = ["power", "transport", "water", "telecom", "mining", "other"] as const;
 const COVER_TYPES = ["comprehensive", "political_only"] as const;

@@ -41,9 +41,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     timing,
   }).catch(console.error);
 
-  console.log(
-    `[Expert Request] expertId: ${expertId}, userId: ${userId}, timing: ${timing}, contextLength: ${context.length}`
-  );
-
   return NextResponse.json({ ok: true });
 }

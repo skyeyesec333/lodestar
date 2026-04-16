@@ -13,7 +13,7 @@ function loadReadIds(): Set<string> {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return new Set();
     const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed as string[]);
+    if (Array.isArray(parsed)) return new Set(parsed.filter((v): v is string => typeof v === "string"));
   } catch {
     // ignore parse errors
   }

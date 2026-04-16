@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { ProjectMemberRole } from "@prisma/client";
 import type { Result } from "@/types";
 
@@ -31,8 +32,7 @@ export async function getProjectMembers(
     });
     return { ok: true, value: rows };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -60,8 +60,7 @@ export async function addProjectMember(data: {
     });
     return { ok: true, value: row };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -77,8 +76,7 @@ export async function updateProjectMemberRole(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -89,7 +87,6 @@ export async function removeProjectMember(id: string): Promise<Result<void>> {
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

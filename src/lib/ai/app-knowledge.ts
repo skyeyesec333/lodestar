@@ -190,7 +190,6 @@ export const APP_KNOWLEDGE_BASE: readonly AppKnowledgeEntry[] = [
   })),
 ];
 
-// lastVerifiedAt: 2026-04-05
 export const EXIM_OFFICIAL_KNOWLEDGE: readonly AppKnowledgeEntry[] = [
   {
     id: "exim-official-eligibility",

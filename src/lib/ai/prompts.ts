@@ -1,6 +1,6 @@
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
-import type { SerializableProject } from "@/components/projects/ProjectEditForm";
+import type { SerializableProject } from "@/types";
 import { getProgramConfig } from "@/lib/requirements/index";
 
 function formatDate(iso: string): string {

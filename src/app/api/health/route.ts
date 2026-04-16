@@ -16,7 +16,6 @@ interface HealthResponse {
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   const checks: Record<string, CheckResult> = {};
 
-  // DB check
   const dbStart = Date.now();
   try {
     await db.$queryRaw`SELECT 1`;

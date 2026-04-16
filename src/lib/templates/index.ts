@@ -1,6 +1,6 @@
-export type ProjectTemplateDealType = "EXIM" | "DFI" | "PE";
+type ProjectTemplateDealType = "EXIM" | "DFI" | "PE";
 
-export type ProjectTemplateMilestone = {
+type ProjectTemplateMilestone = {
   name: string;
   phaseTarget: string;
   daysFromStart: number;

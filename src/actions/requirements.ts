@@ -13,9 +13,10 @@ import {
 } from "@/lib/db/requirements";
 import type { RequirementNoteRow } from "@/lib/db/requirements";
 import { recordActivity } from "@/lib/db/activity";
-import { computeReadiness } from "@/lib/scoring/index";
+import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import { getRequirementById } from "@/lib/requirements/index";
 import { REQUIREMENT_STATUS_LABELS } from "@/types/requirements";
+import { toDbError } from "@/lib/utils";
 import type { Result, AppError } from "@/types";
 import type { RequirementStatusValue } from "@/types/requirements";
 import { assertProjectAccess } from "@/lib/db/project-access";
@@ -118,12 +119,7 @@ export async function updateRequirementStatus(
 
   const dealType = access.value.dealType;
   const { scoreBps } = computeReadiness(
-    allStatuses.map((r) => ({
-      requirementId: r.requirementId,
-      status: r.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : (r.status as RequirementStatusValue),
-    })),
+    mapRequirementStatuses(allStatuses),
     dealType
   );
 
@@ -295,8 +291,7 @@ export async function bulkUpdateRequirementStatus(
       data: { status },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 
   recordActivity(projectId, userId, "requirement_status_updated",
@@ -352,8 +347,7 @@ export async function copyRequirementsFromProject(
       select: { requirementId: true },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 
   if (sourceRequirements.length === 0) {
@@ -376,8 +370,7 @@ export async function copyRequirementsFromProject(
       skipDuplicates: true,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 
   recordActivity(targetProjectId, userId, "requirements_copied",
@@ -532,7 +525,6 @@ export async function bulkAssignResponsibility(
 
     return { ok: true, value: { updated: result.count } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

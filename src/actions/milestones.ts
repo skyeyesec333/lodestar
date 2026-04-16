@@ -13,6 +13,7 @@ import {
   deleteMilestone,
   bulkCreateFromTemplate,
 } from "@/lib/db/milestones";
+import { parseDateOrNull } from "@/lib/utils";
 import type { Result } from "@/types";
 import type { DealMilestoneRow } from "@/lib/db/milestones";
 import { MILESTONE_TEMPLATES } from "@/lib/exim/milestone-templates";
@@ -54,12 +55,6 @@ const applyTemplateSchema = z.object({
   templateSlug: z.enum(TEMPLATE_SLUGS),
   anchorDate: z.string().min(1), // ISO date string
 });
-
-function parseDateOrNull(s: string | null | undefined): Date | null {
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
 
 export async function createMilestoneAction(
   input: z.infer<typeof createMilestoneSchema>

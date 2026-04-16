@@ -1,7 +1,6 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ShareLinkRow = {
   id: string;
@@ -22,8 +21,6 @@ export type ResolvedShareToken = {
   isValid: boolean;
 };
 
-// ── Select shape ──────────────────────────────────────────────────────────────
-
 const shareLinkSelect = {
   id: true,
   token: true,
@@ -35,8 +32,6 @@ const shareLinkSelect = {
   revokedAt: true,
   createdAt: true,
 } as const;
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 export async function createShareLink(data: {
   projectId: string;
@@ -56,8 +51,7 @@ export async function createShareLink(data: {
     });
     return { ok: true, value: row };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -72,8 +66,7 @@ export async function getShareLinksForProject(
     });
     return { ok: true, value: rows };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -88,8 +81,7 @@ export async function revokeShareLink(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -125,8 +117,7 @@ export async function resolveShareToken(
     const isExpired = link.expiresAt !== null && link.expiresAt < now;
     const isValid = !isRevoked && !isExpired;
 
-    // Increment view count and update lastViewedAt regardless of validity
-    // (so revoked/expired views are still logged for audit purposes)
+    // Log view even for revoked/expired links (audit trail)
     await db.projectShareLink.update({
       where: { id: link.id },
       data: {
@@ -145,7 +136,6 @@ export async function resolveShareToken(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

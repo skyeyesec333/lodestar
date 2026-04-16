@@ -79,8 +79,6 @@ Example format:
 If no requirements are clearly inapplicable, return an empty array: []`;
 }
 
-// ── Heuristic fallback (no LLM needed) ──────────────────────────────────────
-
 const EXIM_CATEGORIES = new Set([
   "exim_eligibility",
   "us_content",
@@ -129,8 +127,6 @@ export function suggestRequirementApplicabilityHeuristic(
   return suggestions;
 }
 
-// ── LLM-powered suggestion (requires API key) ───────────────────────────────
-
 export async function suggestRequirementApplicability(
   project: ProjectInput,
   requirements: RequirementInput[]
@@ -139,47 +135,43 @@ export async function suggestRequirementApplicability(
 
   const prompt = buildPrompt(project, requirements);
 
-  let rawText = "";
-  try {
-    const message = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
-    });
+  const message = await anthropic.messages.create({
+    model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+    max_tokens: 2048,
+    messages: [{ role: "user", content: prompt }],
+  });
 
-    const firstBlock = message.content[0];
-    if (!firstBlock || firstBlock.type !== "text") return [];
-    rawText = firstBlock.text.trim();
-  } catch {
-    return [];
-  }
+  const firstBlock = message.content[0];
+  if (!firstBlock || firstBlock.type !== "text") return [];
+  const rawText = firstBlock.text.trim();
 
   try {
     // Strip markdown code fences if Claude wrapped the JSON
     const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const parsed: unknown = JSON.parse(jsonText);
+    const raw: unknown = JSON.parse(jsonText);
 
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(raw)) return [];
 
+    const items: unknown[] = raw;
     const suggestions: ApplicabilitySuggestion[] = [];
-    for (const item of parsed) {
+    for (const entry of items) {
+      if (entry === null || typeof entry !== "object") continue;
+      const item = entry as Record<string, unknown>;
       if (
-        item !== null &&
-        typeof item === "object" &&
-        typeof (item as Record<string, unknown>).requirementId === "string" &&
-        typeof (item as Record<string, unknown>).requirementLabel === "string" &&
-        typeof (item as Record<string, unknown>).suggestedApplicable === "boolean" &&
-        ((item as Record<string, unknown>).confidence === "high" ||
-          (item as Record<string, unknown>).confidence === "medium" ||
-          (item as Record<string, unknown>).confidence === "low") &&
-        typeof (item as Record<string, unknown>).reasoning === "string"
+        typeof item.requirementId === "string" &&
+        typeof item.requirementLabel === "string" &&
+        typeof item.suggestedApplicable === "boolean" &&
+        (item.confidence === "high" ||
+          item.confidence === "medium" ||
+          item.confidence === "low") &&
+        typeof item.reasoning === "string"
       ) {
         suggestions.push({
-          requirementId: (item as Record<string, unknown>).requirementId as string,
-          requirementLabel: (item as Record<string, unknown>).requirementLabel as string,
-          suggestedApplicable: (item as Record<string, unknown>).suggestedApplicable as boolean,
-          confidence: (item as Record<string, unknown>).confidence as "high" | "medium" | "low",
-          reasoning: (item as Record<string, unknown>).reasoning as string,
+          requirementId: item.requirementId,
+          requirementLabel: item.requirementLabel,
+          suggestedApplicable: item.suggestedApplicable,
+          confidence: item.confidence,
+          reasoning: item.reasoning,
         });
       }
     }

@@ -7,7 +7,6 @@ export const logger = pino({
     : {}),
 });
 
-// Helper to create a child logger with request context
 export function requestLogger(context: {
   requestId?: string | null;
   userId?: string | null;

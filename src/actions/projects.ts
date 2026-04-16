@@ -11,32 +11,15 @@ import type {
   EnvironmentalCategory,
   ProgramPath,
 } from "@prisma/client";
-import { createProjectRecord, updateProjectRecord } from "@/lib/db/projects";
-import { getProjectById } from "@/lib/db/projects";
+import { createProjectRecord, updateProjectRecord, getProjectById } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
-import { upsertProjectConcept } from "@/lib/db/project-concepts";
-import { getProjectConcept } from "@/lib/db/project-concepts";
+import { upsertProjectConcept, getProjectConcept } from "@/lib/db/project-concepts";
 import { recordActivity } from "@/lib/db/activity";
 import { createDemoPortfolioForUser, createDemoProjectForUser } from "@/lib/db/demo";
-import { computeReadiness } from "@/lib/scoring/index";
+import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import { buildGateReview } from "@/lib/projects/gate-review";
+import { generateSlug } from "@/lib/utils";
 import type { ProjectSummary, AppError, Result } from "@/types";
-import type { RequirementStatusValue } from "@/types/requirements";
-
-// ── Slug utility ──────────────────────────────────────────────────────────────
-
-function generateSlug(name: string): string {
-  const base = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const suffix = Math.random().toString(36).slice(2, 7);
-  return `${base}-${suffix}`;
-}
-
-// ── Validation schema ─────────────────────────────────────────────────────────
 
 const SECTOR_VALUES = [
   "power",
@@ -120,8 +103,6 @@ const updateProjectSchema = z.object({
   eximCoverType: z.enum(COVER_VALUES).nullable().optional(),
   targetLoiDate: z.coerce.date().nullable().optional(),
 });
-
-// ── Server action ─────────────────────────────────────────────────────────────
 
 /**
  * Creates a new project for the authenticated user.
@@ -317,12 +298,7 @@ export async function advanceProjectStage(
   if (!conceptResult.ok) return conceptResult;
 
   const { scoreBps } = computeReadiness(
-    requirementsResult.value.map((row) => ({
-      requirementId: row.requirementId,
-      status: row.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : (row.status as RequirementStatusValue),
-    })),
+    mapRequirementStatuses(requirementsResult.value),
     projectResult.value.dealType
   );
   const gateReview = buildGateReview({
@@ -447,12 +423,7 @@ export async function recalculateReadiness(
   if (!requirementsResult.ok) return requirementsResult;
 
   const { scoreBps } = computeReadiness(
-    requirementsResult.value.map((row) => ({
-      requirementId: row.requirementId,
-      status: row.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : (row.status as RequirementStatusValue),
-    })),
+    mapRequirementStatuses(requirementsResult.value),
     projectResult.value.dealType
   );
 

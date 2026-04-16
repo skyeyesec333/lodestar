@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildGapAnalysisPrompt } from "@/lib/ai/prompts";
-import type { SerializableProject } from "@/components/projects/ProjectEditForm";
+import type { SerializableProject } from "@/types";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 
 function makeProject(overrides: Partial<SerializableProject> = {}): SerializableProject {

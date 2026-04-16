@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Prisma, ProjectPhase } from "@prisma/client";
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 import { MILESTONE_TEMPLATES } from "@/lib/exim/milestone-templates";
 
@@ -125,8 +126,7 @@ export async function getProjectMilestones(projectId: string): Promise<Result<De
           `);
     return { ok: true, value: rows.map(shapeRow) };
   } catch (err) {
-    console.error("[getProjectMilestones]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to load milestones" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -237,8 +237,7 @@ export async function createMilestone(
 
     return { ok: true, value: shapeRow(row) };
   } catch (err) {
-    console.error("[createMilestone]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to create milestone" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -297,8 +296,7 @@ export async function updateMilestone(
 
     return { ok: true, value: shapeRow(row) };
   } catch (err) {
-    console.error("[updateMilestone]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to update milestone" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -340,8 +338,7 @@ export async function completeMilestone(id: string, clerkUserId: string): Promis
 
     return { ok: true, value: shapeRow(row) };
   } catch (err) {
-    console.error("[completeMilestone]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to complete milestone" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -383,8 +380,7 @@ export async function uncompleteMilestone(id: string): Promise<Result<DealMilest
 
     return { ok: true, value: shapeRow(row) };
   } catch (err) {
-    console.error("[uncompleteMilestone]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to uncomplete milestone" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -404,8 +400,7 @@ export async function deleteMilestone(id: string): Promise<Result<void>> {
     `;
     return { ok: true, value: undefined };
   } catch (err) {
-    console.error("[deleteMilestone]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to delete milestone" } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -493,7 +488,6 @@ export async function bulkCreateFromTemplate(
 
     return { ok: true, value: template.milestones.length };
   } catch (err) {
-    console.error("[bulkCreateFromTemplate]", err);
-    return { ok: false, error: { code: "DATABASE_ERROR", message: "Failed to apply template" } };
+    return { ok: false, error: toDbError(err) };
   }
 }

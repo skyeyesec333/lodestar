@@ -12,7 +12,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -63,7 +62,6 @@ function docTypeIcon(contentType: string): string {
   return "FILE";
 }
 
-// ── Invalid / expired state ───────────────────────────────────────────────────
 
 function InvalidLinkPage() {
   return (
@@ -130,7 +128,6 @@ function InvalidLinkPage() {
   );
 }
 
-// ── Radial readiness gauge (SVG) ─────────────────────────────────────────────
 
 function ReadinessRing({ pct }: { pct: number }) {
   const r = 54;
@@ -186,7 +183,6 @@ function ReadinessRing({ pct }: { pct: number }) {
   );
 }
 
-// ── KPI tile ──────────────────────────────────────────────────────────────────
 
 function KpiTile({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
@@ -226,7 +222,6 @@ function KpiTile({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function SharedDataRoomPage({
   params,

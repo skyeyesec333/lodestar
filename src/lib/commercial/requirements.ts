@@ -879,17 +879,3 @@ export const COMMERCIAL_REQUIREMENTS: readonly RequirementDef[] = [
   ...corporate,
 ] as const;
 
-/** Lookup by requirement ID. */
-export const COMMERCIAL_REQUIREMENTS_BY_ID: ReadonlyMap<string, RequirementDef> =
-  new Map(COMMERCIAL_REQUIREMENTS.map((r) => [r.id, r]));
-
-/** IDs that are hard gates for credit committee approval. */
-export const COMMERCIAL_PRIMARY_GATE_IDS: readonly string[] = COMMERCIAL_REQUIREMENTS.filter(
-  (r) => r.isPrimaryGate,
-).map((r) => r.id);
-
-/** Total weight pool — denominator for readiness score. */
-export const COMMERCIAL_TOTAL_WEIGHT: number = COMMERCIAL_REQUIREMENTS.reduce(
-  (sum, r) => sum + r.weight,
-  0,
-);

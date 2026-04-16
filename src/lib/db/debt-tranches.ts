@@ -1,5 +1,6 @@
 import { db } from "./index";
-import type { DebtTrancheType, DebtTrancheStatus } from "@prisma/client";
+import { toDbError } from "@/lib/utils";
+import type { DebtTrancheType, DebtTrancheStatus, Prisma } from "@prisma/client";
 import type { Result } from "@/types";
 
 export type DebtTrancheRow = {
@@ -12,7 +13,7 @@ export type DebtTrancheRow = {
   amountUsdCents: number;
   tenorYears: number | null;
   interestRateBps: number | null;
-  drawSchedule: unknown;
+  drawSchedule: Prisma.JsonValue | null;
   status: string;
   createdAt: Date;
   updatedAt: Date;
@@ -63,7 +64,7 @@ export async function getProjectDebtTranches(
       })),
     };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -75,7 +76,7 @@ export async function addDebtTranche(data: {
   amountUsdCents: number;
   tenorYears?: number | null;
   interestRateBps?: number | null;
-  drawSchedule?: unknown;
+  drawSchedule?: Prisma.JsonValue | null;
   status?: string;
 }): Promise<Result<{ id: string }>> {
   try {
@@ -95,7 +96,7 @@ export async function addDebtTranche(data: {
     });
     return { ok: true, value: { id: row.id } };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -107,7 +108,7 @@ export async function updateDebtTranche(
     amountUsdCents: number;
     tenorYears: number | null;
     interestRateBps: number | null;
-    drawSchedule: unknown;
+    drawSchedule: Prisma.JsonValue | null;
     status: string;
     funderId: string | null;
   }>
@@ -132,7 +133,7 @@ export async function updateDebtTranche(
     });
     return { ok: true, value: undefined };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -141,6 +142,6 @@ export async function removeDebtTranche(id: string): Promise<Result<void>> {
     await db.debtTranche.delete({ where: { id } });
     return { ok: true, value: undefined };
   } catch (err) {
-    return { ok: false, error: { code: "DATABASE_ERROR", message: String(err) } };
+    return { ok: false, error: toDbError(err) };
   }
 }

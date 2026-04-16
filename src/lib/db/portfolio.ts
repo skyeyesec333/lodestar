@@ -1,4 +1,5 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import { dedupeDemoPortfolioProjects } from "@/lib/projects/demo-portfolio";
 import { buildProjectOperatingMetrics } from "@/lib/projects/operating-metrics";
 import { getRequirementsForDealType } from "@/lib/requirements";
@@ -270,8 +271,7 @@ export async function getPortfolioStats(
 
     return { ok: true, value: rows };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -303,7 +303,6 @@ export async function getPortfolioVelocity(
     }
     return { ok: true, value: map };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

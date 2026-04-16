@@ -163,6 +163,170 @@ function GanttTourGuide({ onClose, containerRef }: { onClose: () => void; contai
   );
 }
 
+// ─── Beacon guide ─────────────────────────────────────────────────────────────
+// Bubble callout that points at a flagged row — same visual language as the
+// tour, but used to surface at-risk items rather than onboarding steps.
+
+function BeaconGuide({
+  flags,
+  activeIndex,
+  onStep,
+  onClose,
+  containerRef,
+  onGoToRequirement,
+}: {
+  flags: BeaconFlag[];
+  activeIndex: number;
+  onStep: (next: number) => void;
+  onClose: () => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  onGoToRequirement: (requirementId: string) => void;
+}) {
+  const [rect, setRect] = useState<TourRect | null>(null);
+  const current = flags[activeIndex] ?? null;
+
+  const measure = useCallback((requirementId: string) => {
+    const scope = containerRef.current ?? document;
+    const el = scope.querySelector(`[data-beacon-id='${requirementId}']`);
+    if (!el) { setRect(null); return; }
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+  }, [containerRef]);
+
+  useEffect(() => {
+    if (!current) return;
+    const t = setTimeout(() => measure(current.requirementId), 60);
+    return () => clearTimeout(t);
+  }, [activeIndex, current, measure]);
+
+  if (!current) return null;
+
+  const PAD = 12;
+  const W = 320;
+  const vpW = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vpH = typeof window !== "undefined" ? window.innerHeight : 800;
+  const calloutStyle: React.CSSProperties = rect
+    ? {
+        top: Math.min(Math.max(rect.top - 20, 16), vpH - 260),
+        left: Math.min(rect.left + rect.width + PAD, vpW - W - 16),
+        width: W,
+      }
+    : { top: "50%", left: "50%", width: W, transform: "translate(-50%,-50%)" };
+
+  const severityColor = current.severity === "critical" ? "var(--danger, #c73e3a)" : "var(--gold)";
+  const severityLabel = current.severity === "critical" ? "Critical" : "Warning";
+
+  return (
+    <>
+      {/* Spotlight ring around the flagged indicator */}
+      <AnimatePresence>
+        {rect && (
+          <motion.div
+            key={`beacon-spot-${activeIndex}`}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: "spring", stiffness: 340, damping: 28 }}
+            style={{
+              position: "fixed",
+              zIndex: 1101,
+              top: rect.top - 8,
+              left: rect.left - 8,
+              width: rect.width + 16,
+              height: rect.height + 16,
+              borderRadius: "50%",
+              boxShadow: `0 0 0 2px ${severityColor}, 0 0 24px ${severityColor}`,
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`beacon-callout-${activeIndex}`}
+          initial={{ opacity: 0, x: -8, scale: 0.97 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: 8, scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 380, damping: 32 }}
+          style={{
+            position: "fixed",
+            zIndex: 1102,
+            ...calloutStyle,
+            backgroundColor: "var(--bg-card)",
+            border: `1px solid ${severityColor}`,
+            borderRadius: "8px",
+            padding: "18px",
+            boxShadow: "0 12px 40px rgba(0,0,0,0.28), 0 2px 8px rgba(0,0,0,0.12)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: "6px",
+              fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.14em",
+              textTransform: "uppercase", color: severityColor,
+              border: `1px solid ${severityColor}`, borderRadius: "3px", padding: "2px 8px",
+            }}>
+              <svg width="8" height="8" viewBox="0 0 10 10"><circle cx="5" cy="5" r="3" fill={severityColor} /></svg>
+              Beacon · {severityLabel}
+            </span>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.10em", color: "var(--ink-muted)", marginLeft: "auto" }}>
+              {activeIndex + 1} / {flags.length}
+            </span>
+          </div>
+          <p style={{ fontFamily: "'DM Serif Display', Georgia, serif", fontSize: "16px", color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.25 }}>
+            {current.title}
+          </p>
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink-mid)", lineHeight: 1.6, margin: "0 0 10px" }}>
+            {current.reason}
+          </p>
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink)", lineHeight: 1.6, margin: "0 0 16px", fontWeight: 500 }}>
+            → {current.suggestion}
+          </p>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={() => onGoToRequirement(current.requirementId)}
+              style={{
+                fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 600,
+                letterSpacing: "0.10em", textTransform: "uppercase",
+                color: "var(--text-inverse)", backgroundColor: severityColor, border: "none",
+                borderRadius: "4px", padding: "8px 14px", cursor: "pointer", flex: 1,
+              }}
+            >
+              Open Requirement
+            </button>
+            <button
+              onClick={() => onStep(activeIndex + 1)}
+              disabled={activeIndex >= flags.length - 1}
+              style={{
+                fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: 600,
+                letterSpacing: "0.10em", textTransform: "uppercase",
+                color: "var(--ink-mid)", backgroundColor: "transparent",
+                border: "1px solid var(--border-strong)",
+                borderRadius: "4px", padding: "8px 14px",
+                cursor: activeIndex >= flags.length - 1 ? "default" : "pointer",
+                opacity: activeIndex >= flags.length - 1 ? 0.4 : 1,
+              }}
+            >
+              Next →
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                fontFamily: "'DM Mono', monospace", fontSize: "9px", letterSpacing: "0.10em",
+                textTransform: "uppercase", color: "var(--ink-muted)",
+                backgroundColor: "transparent", border: "none", cursor: "pointer", padding: "8px",
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </>
+  );
+}
+
 // ─── Domain constants ─────────────────────────────────────────────────────────
 
 const CATEGORY_ORDER = [
@@ -250,10 +414,68 @@ type Tooltip = { svgX: number; rowY: number; lines: string[] };
 type Controls = {
   density:      DensityKey;
   showPredicted: boolean;
+  showBeacon:   boolean;
   filterPhase:  "all" | string;
   hideDone:     boolean;
   collapsedCats: Set<string>;
 };
+
+type BeaconSeverity = "critical" | "warning";
+type BeaconFlag = {
+  requirementId: string;
+  severity: BeaconSeverity;
+  title: string;
+  reason: string;
+  suggestion: string;
+};
+
+function computeBeaconFlags(
+  rows: ProjectRequirementRow[],
+  today: Date,
+  loiDate: Date | null,
+  primaryGateLabel: string,
+): BeaconFlag[] {
+  const msPerDay = 864e5;
+  const daysToLoi = loiDate
+    ? Math.round((loiDate.getTime() - today.getTime()) / msPerDay)
+    : null;
+  const flags: BeaconFlag[] = [];
+  for (const r of rows) {
+    const s = r.status as RequirementStatusValue;
+    if (s === "executed" || s === "waived" || s === "not_applicable") continue;
+    if (r.isPrimaryGate) {
+      if (s === "not_started") {
+        flags.push({
+          requirementId: r.requirementId,
+          severity: "critical",
+          title: `${r.name} — ${primaryGateLabel} blocker, not started`,
+          reason: daysToLoi != null
+            ? `Primary-gate item with ${daysToLoi} day${daysToLoi === 1 ? "" : "s"} to ${primaryGateLabel}. Every idle day compounds schedule risk.`
+            : `Primary-gate item still at "Not Started". This blocks the ${primaryGateLabel} package.`,
+          suggestion: `Assign an owner today. Book a kickoff this week. Target "Substantially Final" in 2 weeks.`,
+        });
+      } else if (daysToLoi != null && daysToLoi <= 45 && s !== "substantially_final") {
+        flags.push({
+          requirementId: r.requirementId,
+          severity: "critical",
+          title: `${r.name} — behind ${primaryGateLabel} runway`,
+          reason: `${daysToLoi} day${daysToLoi === 1 ? "" : "s"} to ${primaryGateLabel} and this primary-gate item is at "${STATUS_LABELS[s]}". Substantially-final form required for the gate package.`,
+          suggestion: `Push the counterparty for redlines this week. Escalate to the sponsor lead if no response by Friday.`,
+        });
+      }
+    } else if (daysToLoi != null && daysToLoi <= 30 && s === "not_started" && r.phaseRequired === "loi") {
+      flags.push({
+        requirementId: r.requirementId,
+        severity: "warning",
+        title: `${r.name} — ${primaryGateLabel} window closing`,
+        reason: `${daysToLoi} day${daysToLoi === 1 ? "" : "s"} to ${primaryGateLabel}. This supporting item is still "Not Started".`,
+        suggestion: `Queue kickoff next week. Won't block the gate today, but the path is narrowing.`,
+      });
+    }
+  }
+  flags.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "critical" ? -1 : 1));
+  return flags;
+}
 
 // ─── Prediction ───────────────────────────────────────────────────────────────
 
@@ -406,6 +628,18 @@ function ControlBar({
       >
         Predictions
       </button>
+      <button
+        data-tour="gantt-beacon"
+        title="Highlight items Beacon flags as at-risk"
+        style={{ ...btnBase, ...(ctrl.showBeacon ? active : inactive), display: "flex", alignItems: "center", gap: "5px" }}
+        onClick={() => setCtrl((c) => ({ ...c, showBeacon: !c.showBeacon }))}
+      >
+        <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <circle cx="5" cy="5" r="2.2" fill="currentColor" />
+          <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+        </svg>
+        Beacon
+      </button>
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
@@ -540,7 +774,11 @@ function GanttSVG({
   hoveredId,
   onHover,
   onCatClick,
+  onLabelClick,
   phaseLabels,
+  beaconFlagsById,
+  activeBeaconId,
+  onBeaconClick,
 }: {
   ganttRows: GanttRow[];
   ctrl: Controls;
@@ -556,7 +794,11 @@ function GanttSVG({
   hoveredId: string | null;
   onHover: (id: string | null) => void;
   onCatClick: (cat: string) => void;
+  onLabelClick: (requirementId: string) => void;
   phaseLabels: Record<string, string>;
+  beaconFlagsById: Map<string, BeaconFlag>;
+  activeBeaconId: string | null;
+  onBeaconClick: (requirementId: string) => void;
 }) {
   const d = DENSITY[ctrl.density];
   const areaW = width - LABEL_W - RIGHT_PAD;
@@ -788,20 +1030,27 @@ function GanttSVG({
               strokeOpacity={0.5}
             />
 
-            {/* Requirement label */}
-            <text
-              x={LABEL_W - 10}
-              y={y + d.rowH / 2 + d.labelSize * 0.38}
-              textAnchor="end"
-              fontFamily="'Inter', sans-serif"
-              fontSize={d.labelSize}
-              fill={isHov ? "var(--accent)" : "var(--ink-mid)"}
-              style={{ userSelect: "none" }}
+            {/* Requirement label — clickable, navigates to requirement detail */}
+            <g
+              onClick={() => onLabelClick(rid)}
+              style={{ cursor: "pointer" }}
             >
-              {row.name.length > (ctrl.density === "tight" ? 18 : 24)
-                ? row.name.slice(0, ctrl.density === "tight" ? 16 : 22) + "…"
-                : row.name}
-            </text>
+              {/* Invisible hit-target so the full label column is clickable */}
+              <rect x={0} y={y} width={LABEL_W} height={d.rowH} fill="transparent" />
+              <text
+                x={LABEL_W - 10}
+                y={y + d.rowH / 2 + d.labelSize * 0.38}
+                textAnchor="end"
+                fontFamily="'Inter', sans-serif"
+                fontSize={d.labelSize}
+                fill={isHov ? "var(--accent)" : "var(--ink-mid)"}
+                style={{ userSelect: "none", textDecoration: isHov ? "underline" : "none" }}
+              >
+                {row.name.length > (ctrl.density === "tight" ? 18 : 24)
+                  ? row.name.slice(0, ctrl.density === "tight" ? 16 : 22) + "…"
+                  : row.name}
+              </text>
+            </g>
 
             {/* LOI-critical dot */}
             {row.isPrimaryGate && (
@@ -813,6 +1062,29 @@ function GanttSVG({
                 fillOpacity={0.75}
               />
             )}
+
+            {/* Beacon flag — pulsing indicator on rows Beacon has flagged */}
+            {ctrl.showBeacon && beaconFlagsById.has(rid) && (() => {
+              const flag = beaconFlagsById.get(rid)!;
+              const isActive = activeBeaconId === rid;
+              const flagColor = flag.severity === "critical" ? "var(--danger, #c73e3a)" : "var(--gold)";
+              const cx = 10;
+              const cy = y + d.rowH / 2;
+              return (
+                <g
+                  data-beacon-id={rid}
+                  onClick={(e) => { e.stopPropagation(); onBeaconClick(rid); }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect x={0} y={y} width={20} height={d.rowH} fill="transparent" />
+                  <circle cx={cx} cy={cy} r={6} fill={flagColor} fillOpacity={0.18}>
+                    <animate attributeName="r" values="4;8;4" dur="1.8s" repeatCount="indefinite" />
+                    <animate attributeName="fill-opacity" values="0.35;0.08;0.35" dur="1.8s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx={cx} cy={cy} r={isActive ? 3.2 : 2.6} fill={flagColor} />
+                </g>
+              );
+            })()}
 
             {/* Baseline track for not-started — thin rail showing elapsed time */}
             {!confirmedBar && (
@@ -1055,6 +1327,7 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
   const [ctrl, setCtrl] = useState<Controls>({
     density:        "normal",
     showPredicted:  true,
+    showBeacon:     false,
     filterPhase:    "all",
     hideDone:       false,
     collapsedCats:  defaultCollapsedCats,
@@ -1063,9 +1336,11 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
   const [ganttTour, setGanttTour]     = useState(false);
   const [hoveredId, setHoveredId]     = useState<string | null>(null);
   const [tooltip, setTooltip]         = useState<Tooltip | null>(null);
+  const [beaconIndex, setBeaconIndex] = useState<number>(-1);
   const [inlineW, setInlineW]       = useState(0);
   const [fsW, setFsW]               = useState(0);
   const inlineRef                   = useRef<HTMLDivElement>(null);
+  const inlineContainerRef          = useRef<HTMLDivElement>(null);
   const fsRef                       = useRef<HTMLDivElement>(null);
   const fsContainerRef              = useRef<HTMLDivElement>(null);
 
@@ -1197,6 +1472,44 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
     );
   }
 
+  const beaconFlags = computeBeaconFlags(rows, today, loiDate, programConfig.primaryGateLabel);
+  const beaconFlagsById = new Map(beaconFlags.map((f) => [f.requirementId, f]));
+  const activeBeaconId = beaconIndex >= 0 && beaconIndex < beaconFlags.length
+    ? beaconFlags[beaconIndex].requirementId
+    : null;
+
+  // Auto-open the first flag when Beacon turns on; close when turned off.
+  useEffect(() => {
+    if (ctrl.showBeacon && beaconFlags.length > 0 && beaconIndex < 0) {
+      setBeaconIndex(0);
+    } else if (!ctrl.showBeacon) {
+      setBeaconIndex(-1);
+    }
+  }, [ctrl.showBeacon, beaconFlags.length, beaconIndex]);
+
+  function handleBeaconClick(requirementId: string) {
+    const idx = beaconFlags.findIndex((f) => f.requirementId === requirementId);
+    if (idx >= 0) setBeaconIndex(idx);
+  }
+
+  function handleLabelClick(requirementId: string) {
+    const scrollToTarget = () => {
+      const el = document.getElementById(`req-${requirementId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.style.transition = "background-color 0.8s";
+      el.style.backgroundColor = "color-mix(in srgb, var(--accent) 18%, transparent)";
+      window.setTimeout(() => { el.style.backgroundColor = ""; }, 1400);
+    };
+    if (fullscreen) {
+      setFullscreen(false);
+      // Wait two frames for the overlay to unmount before measuring the target.
+      requestAnimationFrame(() => requestAnimationFrame(scrollToTarget));
+    } else {
+      scrollToTarget();
+    }
+  }
+
   const svgProps = {
     ganttRows,
     ctrl,
@@ -1211,7 +1524,11 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
     hoveredId,
     onHover: setHoveredId,
     onCatClick: toggleCat,
+    onLabelClick: handleLabelClick,
     phaseLabels: programConfig.phaseLabels,
+    beaconFlagsById,
+    activeBeaconId,
+    onBeaconClick: handleBeaconClick,
   };
 
   // Always render inline container so ResizeObserver keeps measuring width.
@@ -1219,13 +1536,24 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
   return (
     <>
       {/* ── Inline (always mounted) ─────────────────────────────────────────── */}
-      <div style={{ visibility: fullscreen ? "hidden" : "visible" }}>
+      <div ref={inlineContainerRef} style={{ visibility: fullscreen ? "hidden" : "visible" }}>
         <ControlBar ctrl={ctrl} setCtrl={setCtrl} fullscreen={false} onToggleFullscreen={() => { setTooltip(null); setFullscreen(true); }} phaseFilterOptions={phaseFilterOptions} />
         <Legend showPredicted={ctrl.showPredicted} primaryGateLabel={programConfig.primaryGateLabel} />
         <div ref={inlineRef} style={{ position: "relative", width: "100%", overflowX: "auto" }}>
           <GanttSVG {...svgProps} width={inlineW} />
           {!fullscreen && tooltip && <TooltipEl t={tooltip} w={inlineW} />}
         </div>
+        {/* Beacon guide (inline) */}
+        {!fullscreen && ctrl.showBeacon && beaconIndex >= 0 && (
+          <BeaconGuide
+            flags={beaconFlags}
+            activeIndex={beaconIndex}
+            onStep={(n) => setBeaconIndex(Math.min(Math.max(n, 0), beaconFlags.length - 1))}
+            onClose={() => setCtrl((c) => ({ ...c, showBeacon: false }))}
+            containerRef={inlineContainerRef}
+            onGoToRequirement={(rid) => handleLabelClick(rid)}
+          />
+        )}
       </div>
 
       {/* ── Fullscreen overlay ──────────────────────────────────────────────── */}
@@ -1284,9 +1612,25 @@ export function GanttChart({ rows, projectCreatedAt, targetLoiDate, targetCloseD
           {/* Gantt tour overlay */}
           {ganttTour && <GanttTourGuide onClose={() => setGanttTour(false)} containerRef={fsContainerRef} />}
 
+          {/* Beacon guide (fullscreen) */}
+          {ctrl.showBeacon && beaconIndex >= 0 && (
+            <BeaconGuide
+              flags={beaconFlags}
+              activeIndex={beaconIndex}
+              onStep={(n) => setBeaconIndex(Math.min(Math.max(n, 0), beaconFlags.length - 1))}
+              onClose={() => setCtrl((c) => ({ ...c, showBeacon: false }))}
+              containerRef={fsContainerRef}
+              onGoToRequirement={(rid) => handleLabelClick(rid)}
+            />
+          )}
+
+          {/* Pinned legend — stays visible while the chart body scrolls */}
+          <div style={{ padding: "14px 28px 0", flexShrink: 0, backgroundColor: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
+            <Legend showPredicted={ctrl.showPredicted} primaryGateLabel={programConfig.primaryGateLabel} />
+          </div>
+
           {/* Scrollable body */}
           <div style={{ flex: 1, overflow: "auto", padding: "20px 28px" }}>
-            <Legend showPredicted={ctrl.showPredicted} primaryGateLabel={programConfig.primaryGateLabel} />
             <div ref={fsRef} style={{ position: "relative", minWidth: "640px" }}>
               <GanttSVG {...svgProps} width={fsW || CHART_REF_W} />
               {tooltip && <TooltipEl t={tooltip} w={fsW || CHART_REF_W} />}

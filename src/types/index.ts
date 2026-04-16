@@ -6,11 +6,9 @@ import type {
   EnvironmentalCategory,
   ProgramPath,
 } from "@prisma/client";
+import type { RequirementStatusValue } from "@/types/requirements";
 
-// Re-export Prisma enums — the rest of the app imports enums from here, not @prisma/client
 export type { ProjectSector, EximCoverType, ProjectPhase, DealType, EnvironmentalCategory, ProgramPath };
-
-// ── Result / error types ──────────────────────────────────────────────────────
 
 export type AppError = {
   code: "UNAUTHORIZED" | "NOT_FOUND" | "VALIDATION_ERROR" | "DATABASE_ERROR" | "INVALID_TRANSITION";
@@ -21,7 +19,6 @@ export type Result<T, E = AppError> =
   | { ok: true; value: T }
   | { ok: false; error: E };
 
-// ── Project domain types ──────────────────────────────────────────────────────
 
 export type Project = {
   id: string;
@@ -103,9 +100,13 @@ export type {
 
 export type {
   TeamMember,
+  CommentRow,
+  CommentMentionRow,
+  WatcherRow,
+  ApprovalRow,
+  ApprovalHistoryEntry,
 } from "@/types/collaboration";
 
-// ── Stakeholder domain types ──────────────────────────────────────────────────
 
 export type Stakeholder = {
   id: string;
@@ -121,7 +122,6 @@ export type Stakeholder = {
   deletedBy?: string | null;
 };
 
-// ── Funder domain types ───────────────────────────────────────────────────────
 
 export type FunderRelationship = {
   id: string;
@@ -138,18 +138,6 @@ export type FunderRelationship = {
   deletedAt?: Date | null;
   deletedBy?: string | null;
 };
-
-// ── Deal configuration types ──────────────────────────────────────────────────
-
-export type DealConfig = {
-  id: string;
-  projectId: string;
-  readinessThresholdBps: number;
-  requireConcept: boolean;
-  requireMilestoneDate: boolean;
-};
-
-// ── Covenant domain types ────────────────────────────────────────────────────
 
 // ── Beacon AI panel types ─────────────────────────────────────────────────────
 
@@ -169,7 +157,6 @@ export type BeaconDocumentCoverage = {
   gap: string[];
 };
 
-// ── Beacon walkthrough types ─────────────────────────────────────────────────
 
 export type WalkthroughData = {
   projectName: string;
@@ -216,22 +203,65 @@ export type WalkthroughData = {
   actualCloseDate: string | null;
 };
 
-export type Covenant = {
+
+
+export type RequirementInput = {
+  requirementId: string;
+  status: RequirementStatusValue;
+};
+
+export type ReadinessResult = {
+  scoreBps: number;
+  loiReady: boolean;
+  loiBlockers: string[];
+  categoryScores: Record<string, number>;
+};
+
+
+export type DealTypeValue =
+  | "exim_project_finance"
+  | "development_finance"
+  | "commercial_finance"
+  | "private_equity"
+  | "blended_finance"
+  | "other";
+
+export type DealTypeResult = {
+  dealType: DealTypeValue;
+};
+
+export type ProgramConfig = {
+  label: string;
+  primaryGateLabel: string;
+  phaseLabels: Record<string, string>;
+  hasBlockerColumn: boolean;
+};
+
+/** Subset safe to pass across the server/client boundary (no BigInt, no Date). */
+export type SerializableProject = {
   id: string;
-  projectId: string;
-  funderId: string | null;
-  funderName: string | null;
-  title: string;
-  covenantType: string;
-  frequency: string;
-  nextDueAt: Date | null;
-  lastSatisfiedAt: Date | null;
-  status: string;
-  waiverGrantedAt: Date | null;
-  waiverGrantedBy: string | null;
-  waiverReason: string | null;
-  waiverExpiresAt: Date | null;
-  notes: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  name: string;
+  slug: string;
+  description: string | null;
+  countryCode: string;
+  sector: ProjectSector;
+  dealType: DealType;
+  capexUsdCents: number | null;
+  eximCoverType: EximCoverType | null;
+  stage: ProjectPhase;
+  targetLoiDate: string | null;
+};
+
+
+export type ExistingProjectOption = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+
+export type ChatPresetQuestion = {
+  id: string;
+  label: string;
+  question: string;
 };

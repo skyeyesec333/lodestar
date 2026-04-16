@@ -68,7 +68,6 @@ export async function POST(req: Request) {
     });
   }
 
-  // Validate file
   if (file.size > MAX_SIZE_BYTES) {
     return new Response("File too large (max 50 MB)", { status: 413 });
   }
@@ -76,18 +75,14 @@ export async function POST(req: Request) {
     return new Response("File type not allowed", { status: 415 });
   }
 
-  // Read file buffer for magic byte validation and hash computation
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // Validate magic bytes
   if (!validateMagicBytes(buffer, file.type)) {
     return new Response("File content does not match declared type.", { status: 400 });
   }
 
-  // Compute SHA-256 hash
   const documentHash = createHash("sha256").update(buffer).digest("hex");
 
-  // Check for duplicate in this project
   const existing = await db.document.findFirst({
     where: { projectId, documentHash },
     select: { id: true, filename: true },
@@ -101,7 +96,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Resolve projectRequirementId if a requirementId was provided
   let projectRequirementId: string | null = null;
   if (typeof requirementId === "string" && requirementId.length > 0) {
     const pr = await db.projectRequirement.findUnique({
@@ -111,7 +105,6 @@ export async function POST(req: Request) {
     projectRequirementId = pr?.id ?? null;
   }
 
-  // Build a unique storage path: {projectId}/{groupId}/{filename}
   const documentGroupId = randomUUID();
   const ext = file.name.split(".").pop() ?? "";
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
 import { DEMO_PROJECT_SLUG_PREFIX, isDemoProjectSlug } from "@/lib/projects/demo-portfolio";
 import { computeReadiness } from "@/lib/scoring/index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
 function buildDemoSlug(): string {
@@ -78,7 +79,8 @@ export async function createDemoProjectForUser(
           | "substantially_final"
           | "executed"
           | "waived",
-      }))
+      })),
+      "exim_project_finance"
     );
 
     const project = await db.$transaction(async (tx) => {
@@ -304,8 +306,7 @@ export async function createDemoProjectForUser(
 
     return { ok: true, value: { projectId: project.id, slug: project.slug } };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }
 
@@ -436,7 +437,6 @@ export async function createDemoPortfolioForUser(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

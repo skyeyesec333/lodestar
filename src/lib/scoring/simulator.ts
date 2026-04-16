@@ -1,13 +1,13 @@
-import { computeReadiness } from "./index";
+import { computeReadiness, mapRequirementStatuses } from "./index";
 import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import type { RequirementStatusValue } from "@/types/requirements";
 
-export type RequirementChange = {
+type RequirementChange = {
   requirementId: string;
   newStatus: RequirementStatusValue;
 };
 
-export type SimulationResult = {
+type SimulationResult = {
   currentScoreBps: number;
   simulatedScoreBps: number;
   deltaScoreBps: number;
@@ -20,17 +20,6 @@ export type SimulationResult = {
     scoreDeltaBps: number;
   }>;
 };
-
-function rowsToStatuses(
-  rows: ProjectRequirementRow[]
-): Array<{ requirementId: string; status: RequirementStatusValue }> {
-  return rows.map((r) => ({
-    requirementId: r.requirementId,
-    status: r.isApplicable === false
-      ? ("not_applicable" as RequirementStatusValue)
-      : r.status,
-  }));
-}
 
 export function simulateRequirementChanges(
   currentRows: ProjectRequirementRow[],
@@ -50,7 +39,7 @@ export function simulateRequirementChanges(
 
   const simulatedResult = computeReadiness(simulatedStatuses, dealType);
 
-  const baselineStatuses = rowsToStatuses(currentRows);
+  const baselineStatuses = mapRequirementStatuses(currentRows);
 
   const changedRequirements = changes.map((change) => {
     const row = currentRows.find((r) => r.requirementId === change.requirementId);

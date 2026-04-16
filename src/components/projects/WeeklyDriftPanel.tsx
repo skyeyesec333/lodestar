@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { WeeklyDriftEvent } from "./WeeklyDriftPanel.logic";
 import {
   detailMicroMonoStyle,
   detailMonoLabelStyle,
@@ -6,12 +7,7 @@ import {
   detailSurfaceCardStyle,
 } from "./projectDetailStyles";
 
-export type WeeklyDriftEvent = {
-  id: string;
-  eventType: string;
-  summary: string;
-  createdAt: Date | string;
-};
+export type { WeeklyDriftEvent } from "./WeeklyDriftPanel.logic";
 
 export type WeeklyDriftPanelProps = {
   events: WeeklyDriftEvent[];

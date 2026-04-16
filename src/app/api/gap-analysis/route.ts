@@ -3,10 +3,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getProjectAccessById } from "@/lib/db/project-access";
 import { getProjectRequirements } from "@/lib/db/requirements";
-import { computeReadiness } from "@/lib/scoring/index";
+import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import { anthropic } from "@/lib/ai/client";
 import { buildGapAnalysisPrompt } from "@/lib/ai/prompts";
-import type { RequirementStatusValue } from "@/types/requirements";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { requestLogger } from "@/lib/logger";
 
@@ -71,12 +70,7 @@ export async function POST(req: Request) {
 
   const rows = reqResult.value;
   const { scoreBps } = computeReadiness(
-    rows.map((r) => ({
-      requirementId: r.requirementId,
-      status: r.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : (r.status as RequirementStatusValue),
-    })),
+    mapRequirementStatuses(rows),
     projectRow.dealType
   );
 

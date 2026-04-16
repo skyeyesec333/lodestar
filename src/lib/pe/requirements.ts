@@ -848,17 +848,3 @@ export const PE_REQUIREMENTS: readonly RequirementDef[] = [
   ...construction,
 ] as const;
 
-/** Lookup by requirement ID. */
-export const PE_REQUIREMENTS_BY_ID: ReadonlyMap<string, RequirementDef> =
-  new Map(PE_REQUIREMENTS.map((r) => [r.id, r]));
-
-/** IDs that are hard gates for IC approval. */
-export const PE_PRIMARY_GATE_IDS: readonly string[] = PE_REQUIREMENTS.filter(
-  (r) => r.isPrimaryGate,
-).map((r) => r.id);
-
-/** Total weight pool — denominator for readiness score. */
-export const PE_TOTAL_WEIGHT: number = PE_REQUIREMENTS.reduce(
-  (sum, r) => sum + r.weight,
-  0,
-);

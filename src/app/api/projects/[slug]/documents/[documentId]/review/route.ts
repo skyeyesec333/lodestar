@@ -3,7 +3,7 @@ import { z } from "zod";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { db } from "@/lib/db";
 import { reviewDocument } from "@/lib/ai/document-review";
-import { REQUIREMENTS_BY_ID } from "@/lib/exim/requirements";
+import { getRequirementById } from "@/lib/requirements/index";
 import { getProjectAccessBySlug, hasMinimumProjectRole } from "@/lib/db/project-access";
 
 const bodySchema = z.object({
@@ -32,12 +32,7 @@ export async function POST(
 
   const { slug, documentId } = await context.params;
 
-  let body: unknown;
-  try {
-    body = await req.json().catch(() => ({}));
-  } catch {
-    body = {};
-  }
+  const body: unknown = await req.json().catch(() => ({}));
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
@@ -62,7 +57,7 @@ export async function POST(
   // Fetch the project fields needed for context
   const project = await db.project.findFirst({
     where: { id: access.projectId },
-    select: { sector: true, countryCode: true, stage: true },
+    select: { sector: true, countryCode: true, stage: true, dealType: true },
   });
   if (!project) {
     return Response.json({ error: "Project not found." }, { status: 404 });
@@ -95,7 +90,7 @@ export async function POST(
   const requirementCategory = doc.projectRequirement?.requirement.category ?? null;
   const requirementId = doc.projectRequirement?.requirement.id ?? null;
   const taxonomyEntry =
-    requirementId !== null ? (REQUIREMENTS_BY_ID.get(requirementId) ?? null) : null;
+    requirementId !== null ? (getRequirementById(project.dealType, requirementId) ?? null) : null;
   const requirementDescription = taxonomyEntry?.description ?? null;
 
   try {

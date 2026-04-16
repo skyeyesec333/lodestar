@@ -1,14 +1,15 @@
 import { db } from "./index";
+import { toDbError } from "@/lib/utils";
 import type { Result } from "@/types";
 
-export type SearchProjectRow = {
+type SearchProjectRow = {
   id: string;
   name: string;
   slug: string;
   stage: string;
 };
 
-export type SearchStakeholderRow = {
+type SearchStakeholderRow = {
   id: string;
   name: string;
   title: string | null;
@@ -16,7 +17,7 @@ export type SearchStakeholderRow = {
   projectSlug: string | null;
 };
 
-export type SearchRequirementRow = {
+type SearchRequirementRow = {
   id: string;
   name: string;
   projectName: string;
@@ -24,14 +25,14 @@ export type SearchRequirementRow = {
   status: string;
 };
 
-export type SearchDocumentRow = {
+type SearchDocumentRow = {
   id: string;
   filename: string;
   projectName: string;
   projectSlug: string;
 };
 
-export type SearchFunderRow = {
+type SearchFunderRow = {
   id: string;
   organizationName: string;
   projectName: string;
@@ -39,7 +40,7 @@ export type SearchFunderRow = {
   engagementStage: string;
 };
 
-export type SearchResults = {
+type SearchResults = {
   projects: SearchProjectRow[];
   stakeholders: SearchStakeholderRow[];
   requirements: SearchRequirementRow[];
@@ -161,7 +162,6 @@ export async function searchDealsAndStakeholders(
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown database error";
-    return { ok: false, error: { code: "DATABASE_ERROR", message } };
+    return { ok: false, error: toDbError(err) };
   }
 }

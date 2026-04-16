@@ -10,13 +10,9 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { ChatCitation, ChatRuntimeContext } from "@/types";
+import type { ChatCitation, ChatRuntimeContext, ChatPresetQuestion } from "@/types";
 
-export interface ChatPresetQuestion {
-  id: string;
-  label: string;
-  question: string;
-}
+export type { ChatPresetQuestion } from "@/types";
 
 type ChatRole = "user" | "assistant";
 

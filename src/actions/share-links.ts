@@ -8,8 +8,6 @@ import { assertProjectAccess } from "@/lib/db/project-access";
 import type { ShareLinkRow } from "@/lib/db/share-links";
 import type { Result } from "@/types";
 
-// ── Create ─────────────────────────────────────────────────────────────────────
-
 const createShareLinkSchema = z.object({
   projectId: z.string().min(1),
   slug: z.string().min(1),
@@ -62,8 +60,6 @@ export async function createShareLinkAction(
 
   return result;
 }
-
-// ── Revoke ─────────────────────────────────────────────────────────────────────
 
 const revokeShareLinkSchema = z.object({
   linkId: z.string().min(1),

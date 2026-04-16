@@ -3,10 +3,9 @@ import { getProjectMeetings } from "@/lib/db/meetings";
 import { getProjectById } from "@/lib/db/projects";
 import { getProjectRequirements } from "@/lib/db/requirements";
 import { getProjectStakeholders } from "@/lib/db/stakeholders";
-import { computeReadiness } from "@/lib/scoring/index";
+import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import type { Result } from "@/types";
 import type { ChatContextDocument } from "@/types/chat";
-import type { RequirementStatusValue } from "@/types/requirements";
 
 export async function getProjectChatContext(
   projectId: string,
@@ -31,12 +30,8 @@ export async function getProjectChatContext(
   const meetings = meetingsResult.value;
 
   const readiness = computeReadiness(
-    requirements.map((row) => ({
-      requirementId: row.requirementId,
-      status: row.isApplicable === false
-        ? ("not_applicable" as RequirementStatusValue)
-        : (row.status as RequirementStatusValue),
-    }))
+    mapRequirementStatuses(requirements),
+    project.dealType
   );
 
   const topBlockers = requirements

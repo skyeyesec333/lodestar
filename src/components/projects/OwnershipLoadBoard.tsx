@@ -1,6 +1,11 @@
 import type { CSSProperties } from "react";
-import type { ProjectRequirementRow } from "@/lib/db/requirements";
-import type { StakeholderRow } from "@/lib/db/stakeholders";
+import type {
+  OwnershipLoadBoardRequirement,
+  OwnershipLoadBoardStakeholder,
+  PressureLevel,
+  RequirementSignal,
+  StakeholderSignal,
+} from "./OwnershipLoadBoard.logic";
 import {
   detailMicroMonoStyle,
   detailMonoLabelStyle,
@@ -8,61 +13,13 @@ import {
   detailSerifTitleStyle,
 } from "./projectDetailStyles";
 
-export type OwnershipLoadBoardRequirement = Pick<
-  ProjectRequirementRow,
-  | "projectRequirementId"
-  | "requirementId"
-  | "name"
-  | "category"
-  | "phaseRequired"
-  | "isPrimaryGate"
-  | "status"
-  | "isApplicable"
-  | "responsibleOrganizationId"
-  | "responsibleOrganizationName"
-  | "responsibleStakeholderId"
-  | "responsibleStakeholderName"
-  | "targetDate"
-  | "applicabilityReason"
->;
-
-export type OwnershipLoadBoardStakeholder = Pick<
-  StakeholderRow,
-  | "id"
-  | "name"
-  | "title"
-  | "organizationName"
-  | "roleType"
-  | "openActionItemCount"
-  | "documentsOwedCount"
-  | "needsFollowUp"
-  | "followUpReason"
-  | "lastContactAt"
->;
+export type { OwnershipLoadBoardRequirement, OwnershipLoadBoardStakeholder } from "./OwnershipLoadBoard.logic";
 
 export type OwnershipLoadBoardProps = {
   requirements: readonly OwnershipLoadBoardRequirement[];
   stakeholders: readonly OwnershipLoadBoardStakeholder[];
   title?: string;
   subtitle?: string;
-};
-
-type PressureLevel = "critical" | "warning" | "info" | "quiet";
-
-type RequirementSignal = {
-  requirement: OwnershipLoadBoardRequirement;
-  score: number;
-  level: PressureLevel;
-  label: string;
-  detail: string;
-};
-
-type StakeholderSignal = {
-  stakeholder: OwnershipLoadBoardStakeholder;
-  score: number;
-  level: PressureLevel;
-  label: string;
-  detail: string;
 };
 
 const msPerDay = 86_400_000;
