@@ -42,8 +42,6 @@ export default async function DashboardLayout({
         <div
           className="ls-header-inner"
           style={{
-            maxWidth: "1200px",
-            margin: "0 auto",
             padding: "0 24px",
             height: "52px",
             display: "flex",
