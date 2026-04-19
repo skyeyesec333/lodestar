@@ -11,7 +11,7 @@ type Props = {
 
 type Action = {
   text: string;
-  anchor: string;
+  segment: string;
 };
 
 function getActions(dealType: string): Action[] {
@@ -19,23 +19,23 @@ function getActions(dealType: string): Action[] {
     return [
       {
         text: "Add your EPC contractor as a stakeholder — they must be US-based with >51% US content",
-        anchor: "#section-stakeholders",
+        segment: "parties",
       },
       {
         text: "Set a target LOI date to activate urgency tracking and velocity alerts",
-        anchor: "#section-overview",
+        segment: "overview",
       },
       {
         text: "Identify your off-taker and add them to the Parties workspace",
-        anchor: "#section-stakeholders",
+        segment: "parties",
       },
       {
         text: "Upload or link your feasibility study — EXIM requires one for all projects",
-        anchor: "#section-documents",
+        segment: "evidence",
       },
       {
         text: "Write a one-paragraph deal thesis in the Concept workspace",
-        anchor: "#section-concept",
+        segment: "concept",
       },
     ];
   }
@@ -44,23 +44,23 @@ function getActions(dealType: string): Action[] {
     return [
       {
         text: "Add the borrowing entity and co-lenders to the Parties workspace",
-        anchor: "#section-stakeholders",
+        segment: "parties",
       },
       {
         text: "Set a target financial close date",
-        anchor: "#section-overview",
+        segment: "overview",
       },
       {
         text: "Upload your project information memorandum or feasibility study",
-        anchor: "#section-documents",
+        segment: "evidence",
       },
       {
         text: "Define the debt structure in the Capital workspace",
-        anchor: "#section-capital",
+        segment: "capital",
       },
       {
         text: "Write a deal thesis in the Concept workspace",
-        anchor: "#section-concept",
+        segment: "concept",
       },
     ];
   }
@@ -69,23 +69,23 @@ function getActions(dealType: string): Action[] {
     return [
       {
         text: "Add the borrower, arranger, and any co-lenders to the Parties workspace",
-        anchor: "#section-stakeholders",
+        segment: "parties",
       },
       {
         text: "Set a target financial close date to activate urgency tracking",
-        anchor: "#section-overview",
+        segment: "overview",
       },
       {
         text: "Upload the credit memo or information memorandum in the Evidence workspace",
-        anchor: "#section-documents",
+        segment: "evidence",
       },
       {
         text: "Define the loan structure, tenor, and pricing in the Capital workspace",
-        anchor: "#section-capital",
+        segment: "capital",
       },
       {
         text: "Write a deal thesis summarising the credit case in the Concept workspace",
-        anchor: "#section-concept",
+        segment: "concept",
       },
     ];
   }
@@ -94,23 +94,23 @@ function getActions(dealType: string): Action[] {
     return [
       {
         text: "Add the management team and key advisors to the Parties workspace",
-        anchor: "#section-stakeholders",
+        segment: "parties",
       },
       {
         text: "Set a target close date for the equity raise",
-        anchor: "#section-overview",
+        segment: "overview",
       },
       {
         text: "Upload your investor deck or information memorandum",
-        anchor: "#section-documents",
+        segment: "evidence",
       },
       {
         text: "Define the equity structure and target raise amount in the Capital workspace",
-        anchor: "#section-capital",
+        segment: "capital",
       },
       {
         text: "Write a deal thesis in the Concept workspace",
-        anchor: "#section-concept",
+        segment: "concept",
       },
     ];
   }
@@ -118,23 +118,23 @@ function getActions(dealType: string): Action[] {
   return [
     {
       text: "Add key counterparties to the Parties workspace",
-      anchor: "#section-stakeholders",
+      segment: "parties",
     },
     {
       text: "Set a target close date",
-      anchor: "#section-overview",
+      segment: "overview",
     },
     {
       text: "Upload your core project documents",
-      anchor: "#section-documents",
+      segment: "evidence",
     },
     {
       text: "Define the financing structure in the Capital workspace",
-      anchor: "#section-capital",
+      segment: "capital",
     },
     {
       text: "Write a deal thesis in the Concept workspace",
-      anchor: "#section-concept",
+      segment: "concept",
     },
   ];
 }
@@ -292,7 +292,7 @@ export function FirstRunOverlay({ dealType, projectSlug, projectName }: Props) {
                 {action.text}
               </span>
               <a
-                href={action.anchor}
+                href={`/projects/${projectSlug}/${action.segment}`}
                 onClick={dismiss}
                 style={{
                   flexShrink: 0,

@@ -74,7 +74,7 @@ function computeActions(projects: Array<DailyPriorityWidgetProject>): PriorityAc
             headline: `LOI target passed — ${p.name}`,
             body: `Your LOI target date has passed with ${readinessPct}% readiness. Review blockers immediately.`,
             ctaLabel: "View Blockers",
-            ctaHref: `/projects/${p.slug}#section-readiness`,
+            ctaHref: `/projects/${p.slug}/workplan#section-readiness`,
           },
         });
         continue;
@@ -91,7 +91,7 @@ function computeActions(projects: Array<DailyPriorityWidgetProject>): PriorityAc
             headline: `${p.name} LOI in ${days} day${days === 1 ? "" : "s"}`,
             body: `EXIM LOI-critical items are still pending. Focus on requirements now.`,
             ctaLabel: "View Requirements",
-            ctaHref: `/projects/${p.slug}#section-requirements`,
+            ctaHref: `/projects/${p.slug}/workplan#section-requirements`,
           },
         });
         continue;
@@ -108,7 +108,7 @@ function computeActions(projects: Array<DailyPriorityWidgetProject>): PriorityAc
             headline: `${p.name} LOI in ${days} days`,
             body: `LOI is approaching with ${readinessPct}% readiness. Advance open requirements before the window closes.`,
             ctaLabel: "View Requirements",
-            ctaHref: `/projects/${p.slug}#section-requirements`,
+            ctaHref: `/projects/${p.slug}/workplan#section-requirements`,
           },
         });
         continue;
@@ -126,7 +126,7 @@ function computeActions(projects: Array<DailyPriorityWidgetProject>): PriorityAc
           headline: `${p.name} readiness stalled at ${readinessPct}%`,
           body: `This deal hasn't advanced recently. Review open workplan items.`,
           ctaLabel: "View Workplan",
-          ctaHref: `/projects/${p.slug}#section-workplan`,
+          ctaHref: `/projects/${p.slug}/workplan`,
         },
       });
       continue;
@@ -143,7 +143,7 @@ function computeActions(projects: Array<DailyPriorityWidgetProject>): PriorityAc
           headline: `Set an LOI target for ${p.name}`,
           body: `You're at ${readinessPct}% readiness but have no LOI target date. Setting one activates countdown alerts.`,
           ctaLabel: "Set LOI Date",
-          ctaHref: `/projects/${p.slug}#section-overview`,
+          ctaHref: `/projects/${p.slug}/overview`,
         },
       });
     }

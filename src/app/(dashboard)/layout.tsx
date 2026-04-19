@@ -10,6 +10,8 @@ import { NavLinks } from "@/components/layout/NavLinks";
 import { getOverdueLoiProjects } from "@/lib/db/projects";
 import { LoiOverdueBanner } from "@/components/projects/LoiOverdueBanner";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { ToasterMount } from "@/components/ui/ToasterMount";
+import { CommandPalette } from "@/components/command/CommandPalette";
 
 const VALID_THEMES = ["parchment", "minimal", "navy", "forest", "slate", "obsidian", "midnight", "ember", "sky_blue"] as const;
 type ThemeId = (typeof VALID_THEMES)[number];
@@ -36,7 +38,7 @@ export default async function DashboardLayout({
       {overdueProjects.length > 0 && (
         <LoiOverdueBanner projects={overdueProjects} />
       )}
-      <header style={{ backgroundColor: "var(--nav-bg)", borderBottom: "1px solid color-mix(in srgb, var(--nav-text) 12%, transparent)" }}>
+      <header style={{ position: "sticky", top: 0, zIndex: 50, backgroundColor: "var(--nav-bg)", borderBottom: "1px solid color-mix(in srgb, var(--nav-text) 12%, transparent)" }}>
         <div
           className="ls-header-inner"
           style={{
@@ -108,6 +110,8 @@ export default async function DashboardLayout({
         <Breadcrumbs />
         {children}
       </main>
+      <CommandPalette />
+      <ToasterMount />
     </div>
   );
 }

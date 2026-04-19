@@ -1,53 +1,40 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { useBeacon } from "./BeaconProvider";
 
-// Section IDs mapped to their workspace name for Beacon context.
-// Order matters — must match the visual order on the page.
-const WORKSPACE_SECTIONS: Array<{ id: string; workspace: string }> = [
-  { id: "section-collaborators", workspace: "utilities" },
-  { id: "section-overview",      workspace: "overview" },
-  { id: "section-concept",       workspace: "concept" },
-  { id: "section-stakeholders",  workspace: "parties" },
-  { id: "section-capital",       workspace: "capital" },
-  { id: "section-workplan",      workspace: "workplan" },
-  { id: "section-documents",     workspace: "documents" },
-  { id: "section-execution",     workspace: "execution" },
-];
+// Each per-section route maps to a Beacon "workspace" label used for AI
+// context routing. Kept in sync with `src/components/projects/projectSections.ts`.
+const SEGMENT_TO_WORKSPACE: Record<string, string> = {
+  overview: "overview",
+  concept: "concept",
+  team: "utilities",
+  parties: "parties",
+  capital: "capital",
+  workplan: "workplan",
+  evidence: "documents",
+  execution: "execution",
+};
 
 export function WorkspaceBeaconSync() {
   const { setActiveWorkspace } = useBeacon();
-  const ticking = useRef(false);
+  const pathname = usePathname() ?? "";
 
   useEffect(() => {
-    function onScroll() {
-      if (ticking.current) return;
-      ticking.current = true;
-      requestAnimationFrame(() => {
-        const threshold = window.innerHeight * 0.35;
-        let current: string | null = null;
-
-        for (const { id, workspace } of WORKSPACE_SECTIONS) {
-          const el = document.getElementById(id);
-          if (!el) continue;
-          const rect = el.getBoundingClientRect();
-          if (rect.top <= threshold) {
-            current = workspace;
-          } else {
-            break;
-          }
-        }
-
-        setActiveWorkspace(current);
-        ticking.current = false;
-      });
+    // Expected shape: /projects/[slug] or /projects/[slug]/<segment>
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments[0] !== "projects" || segments.length < 2) {
+      setActiveWorkspace(null);
+      return;
     }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [setActiveWorkspace]);
+    const segment = segments[2];
+    if (!segment) {
+      setActiveWorkspace("summary");
+      return;
+    }
+    setActiveWorkspace(SEGMENT_TO_WORKSPACE[segment] ?? null);
+  }, [pathname, setActiveWorkspace]);
 
   return null;
 }

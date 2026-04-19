@@ -102,6 +102,7 @@ function getActivityLeadLabel(event: ActivityEventRow): string {
 
 type ActivityFeedProps = {
   projectId?: string;
+  projectSlug?: string;
   events?: ActivityEventRow[];
   teamMemberNamesById?: Record<string, string>;
 };
@@ -243,7 +244,7 @@ function ActivityRow({
   );
 }
 
-export async function ActivityFeed({ projectId, events, teamMemberNamesById = {} }: ActivityFeedProps) {
+export async function ActivityFeed({ projectId, projectSlug, events, teamMemberNamesById = {} }: ActivityFeedProps) {
   let resolvedEvents = events ?? [];
   let errorMessage: string | null = null;
 
@@ -353,7 +354,7 @@ export async function ActivityFeed({ projectId, events, teamMemberNamesById = {}
           </div>
         </div>
       ) : (
-        <ActivityFeedClient events={resolvedEvents} teamMemberNamesById={teamMemberNamesById} />
+        <ActivityFeedClient events={resolvedEvents} teamMemberNamesById={teamMemberNamesById} projectSlug={projectSlug} />
       )}
     </div>
   );

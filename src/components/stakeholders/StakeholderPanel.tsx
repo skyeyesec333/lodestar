@@ -3,7 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 import { addStakeholder, removeStakeholder, updateStakeholder, markStakeholderContacted } from "@/actions/stakeholders";
 import type { StakeholderRow } from "@/lib/db/stakeholders";
-import { StakeholderGraph } from "@/components/stakeholders/StakeholderGraph";
+import { StakeholderGraph } from "@/components/projects/StakeholderGraph";
+import type { FunderRelationshipRow } from "@/lib/db/funders";
+import type { ProjectRequirementRow } from "@/lib/db/requirements";
 import { DealPartyChecklist } from "@/components/stakeholders/DealPartyChecklist";
 import type { DealPartyRow } from "@/lib/db/deal-parties";
 
@@ -194,6 +196,11 @@ type Props = {
   slug: string;
   initialStakeholders: StakeholderRow[];
   initialDealParties?: DealPartyRow[];
+  projectName: string;
+  readinessBps: number | null;
+  funderRelationships: FunderRelationshipRow[];
+  requirements: ProjectRequirementRow[];
+  graphLayout: Record<string, { x: number; y: number }> | null;
 };
 
 type StakeholderEditDraft = {
@@ -216,7 +223,17 @@ function buildEditDraft(stakeholder: StakeholderRow): StakeholderEditDraft {
   };
 }
 
-export function StakeholderPanel({ projectId, slug, initialStakeholders, initialDealParties = [] }: Props) {
+export function StakeholderPanel({
+  projectId,
+  slug,
+  initialStakeholders,
+  initialDealParties = [],
+  projectName,
+  readinessBps,
+  funderRelationships,
+  requirements,
+  graphLayout,
+}: Props) {
   const [stakeholders, setStakeholders] = useState(initialStakeholders);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -646,7 +663,16 @@ export function StakeholderPanel({ projectId, slug, initialStakeholders, initial
 
       {view === "graph" && (
         <div>
-          <StakeholderGraph stakeholders={stakeholders} projectName="Project" />
+          <StakeholderGraph
+            projectId={projectId}
+            projectSlug={slug}
+            projectName={projectName}
+            readinessBps={readinessBps}
+            stakeholders={stakeholders}
+            funderRelationships={funderRelationships}
+            requirements={requirements}
+            graphLayout={graphLayout}
+          />
         </div>
       )}
 

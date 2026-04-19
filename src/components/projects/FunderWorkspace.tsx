@@ -15,8 +15,27 @@ import {
 import type { FunderRelationshipRow, FunderConditionRow } from "@/lib/db/funders";
 import { CapitalStackBar } from "@/components/projects/CapitalStackBar";
 import { FunderKanban } from "@/components/projects/FunderKanban";
+import { FunderPipelineFunnel } from "@/components/projects/FunderPipelineFunnel";
 import { DebtTranchePanel } from "@/components/projects/DebtTranchePanel";
 import type { DebtTrancheRow } from "@/lib/db/debt-tranches";
+import { toast } from "@/lib/ui/toast";
+
+type EngagementStage =
+  | "identified"
+  | "initial_contact"
+  | "due_diligence"
+  | "term_sheet"
+  | "committed"
+  | "declined";
+
+const STAGE_LABELS_SHORT: Record<EngagementStage, string> = {
+  identified:      "Identified",
+  initial_contact: "In Contact",
+  due_diligence:   "Due Diligence",
+  term_sheet:      "Term Sheet",
+  committed:       "Committed",
+  declined:        "Declined",
+};
 
 // ── Label / style constants ───────────────────────────────────────────────────
 
@@ -291,6 +310,7 @@ export function FunderWorkspace({
   debtTranches?: DebtTrancheRow[];
 }) {
   const [funders, setFunders] = useState<FunderRelationshipRow[]>(initialFunders);
+  const [pipelineView, setPipelineView] = useState<"kanban" | "funnel">("kanban");
   const [showAddForm, setShowAddForm] = useState(false);
   const [addForm, setAddForm] = useState<AddFunderForm>(BLANK_ADD_FORM);
   const [addError, setAddError] = useState<string | null>(null);
@@ -365,6 +385,35 @@ export function FunderWorkspace({
       setAddForm(BLANK_ADD_FORM);
       setShowAddForm(false);
       window.location.reload();
+    });
+  }
+
+  // ── Drag-to-change stage (from Kanban) ────────────────────────────────────
+
+  function handleStageDrop(funderId: string, newStage: EngagementStage) {
+    const current = funders.find((f) => f.id === funderId);
+    if (!current) return;
+    const previousStage = current.engagementStage;
+    if (previousStage === newStage) return;
+
+    setFunders((prev) =>
+      prev.map((f) => (f.id === funderId ? { ...f, engagementStage: newStage } : f))
+    );
+
+    startTransition(async () => {
+      const result = await setFunderStage({
+        relationshipId: funderId,
+        slug,
+        engagementStage: newStage,
+      });
+      if (!result.ok) {
+        setFunders((prev) =>
+          prev.map((f) => (f.id === funderId ? { ...f, engagementStage: previousStage } : f))
+        );
+        toast.error(result.error.message);
+        return;
+      }
+      toast.success(`Moved to ${STAGE_LABELS_SHORT[newStage] ?? newStage}`);
     });
   }
 
@@ -746,20 +795,70 @@ export function FunderWorkspace({
             marginBottom: "20px",
           }}
         >
-          <p className="eyebrow" style={{ marginBottom: "8px" }}>
-            Counterparty pipeline
-          </p>
-          <p
-            style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: "13px",
-              color: "var(--ink-mid)",
-              margin: "0 0 12px",
-              lineHeight: 1.55,
-            }}
-          >
-            Use the lane view to see where counterparties are clustering and which ones need movement now.
-          </p>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "8px" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="eyebrow" style={{ marginBottom: "4px" }}>
+                Counterparty pipeline
+              </p>
+              <p
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: "13px",
+                  color: "var(--ink-mid)",
+                  margin: 0,
+                  lineHeight: 1.55,
+                }}
+              >
+                {pipelineView === "kanban"
+                  ? "Use the lane view to see where counterparties are clustering and which ones need movement now."
+                  : "Funnel view highlights stage-to-stage drop-off across the pipeline."}
+              </p>
+            </div>
+            <div
+              role="tablist"
+              aria-label="Pipeline view"
+              style={{
+                display: "flex",
+                border: "1px solid var(--border)",
+                borderRadius: "999px",
+                padding: "2px",
+                backgroundColor: "var(--bg-card)",
+                flexShrink: 0,
+              }}
+            >
+              {(["kanban", "funnel"] as const).map((view) => {
+                const active = pipelineView === view;
+                return (
+                  <button
+                    key={view}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setPipelineView(view)}
+                    style={{
+                      fontFamily: "'DM Mono', monospace",
+                      fontSize: "9px",
+                      fontWeight: 500,
+                      letterSpacing: "0.10em",
+                      textTransform: "uppercase",
+                      padding: "5px 12px",
+                      borderRadius: "999px",
+                      border: "none",
+                      cursor: "pointer",
+                      color: active ? "var(--text-inverse)" : "var(--ink-muted)",
+                      backgroundColor: active ? "var(--teal)" : "transparent",
+                      transition: "background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1)",
+                    }}
+                  >
+                    {view === "kanban" ? "Kanban" : "Funnel"}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {pipelineView === "funnel" ? (
+            <FunderPipelineFunnel funders={funders} />
+          ) : (
           <FunderKanban
             funders={funders}
             onSelectFunder={(funderId) => {
@@ -783,7 +882,9 @@ export function FunderWorkspace({
                 });
               });
             }}
+            onStageChange={handleStageDrop}
           />
+          )}
         </div>
       )}
 

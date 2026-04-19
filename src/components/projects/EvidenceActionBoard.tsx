@@ -78,7 +78,7 @@ export function EvidenceActionBoard({
             topGaps.map((item) => (
               <Link
                 key={item.requirementId}
-                href={`/projects/${projectSlug}#section-workplan`}
+                href={`/projects/${projectSlug}/workplan`}
                 style={{
                   display: "grid",
                   gap: "4px",

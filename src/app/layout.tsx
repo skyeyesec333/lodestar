@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { cookies } from "next/headers";
 import "./globals.css";
+import "@xyflow/react/dist/style.css";
 
 export const metadata: Metadata = {
   title: "Lodestar",

@@ -95,9 +95,18 @@ function SearchGlyph({ active }: { active: boolean }) {
   );
 }
 
+function getShortcutLabel(): string {
+  if (typeof navigator === "undefined") return "⌘K";
+  return /Mac|iPhone|iPod|iPad/i.test(navigator.platform) ? "⌘K" : "Ctrl K";
+}
+
 export function SearchBar() {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [shortcut, setShortcut] = useState("⌘K");
+  useEffect(() => {
+    setShortcut(getShortcutLabel());
+  }, []);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResponse>({
     projects: [],
@@ -205,7 +214,7 @@ export function SearchBar() {
           key: `stakeholder-${stakeholder.id}`,
           label: stakeholder.name,
           href: stakeholder.projectSlug
-            ? `/projects/${stakeholder.projectSlug}#section-stakeholders`
+            ? `/projects/${stakeholder.projectSlug}/parties`
             : "#",
           subtitle: stakeholder.title ?? stakeholder.organizationName ?? "Stakeholder",
         });
@@ -219,7 +228,7 @@ export function SearchBar() {
           kind: "result",
           key: `req-${req.id}`,
           label: req.name,
-          href: `/projects/${req.projectSlug}#section-workplan`,
+          href: `/projects/${req.projectSlug}/workplan`,
           subtitle: req.projectName,
         });
       }
@@ -232,7 +241,7 @@ export function SearchBar() {
           kind: "result",
           key: `doc-${doc.id}`,
           label: doc.filename,
-          href: `/projects/${doc.projectSlug}#section-documents`,
+          href: `/projects/${doc.projectSlug}/evidence`,
           subtitle: doc.projectName,
         });
       }
@@ -245,7 +254,7 @@ export function SearchBar() {
           kind: "result",
           key: `funder-${funder.id}`,
           label: funder.organizationName,
-          href: `/projects/${funder.projectSlug}#section-capital`,
+          href: `/projects/${funder.projectSlug}/capital`,
           subtitle: `${funder.projectName} · ${formatStage(funder.engagementStage)}`,
         });
       }
@@ -364,7 +373,7 @@ export function SearchBar() {
           }}
         />
 
-        {(isLoading || query.trim().length >= 2) && (
+        {(isLoading || query.trim().length >= 2) ? (
           <span
             style={{
               position: "absolute",
@@ -378,6 +387,25 @@ export function SearchBar() {
             }}
           >
             {isLoading ? "..." : query.trim().length}
+          </span>
+        ) : (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              right: "8px",
+              fontFamily: "'DM Mono', monospace",
+              fontSize: "8px",
+              letterSpacing: "0.08em",
+              color: "var(--ink-muted)",
+              border: "1px solid var(--border)",
+              borderRadius: "3px",
+              padding: "2px 5px",
+              pointerEvents: "none",
+              backgroundColor: "color-mix(in srgb, var(--bg) 50%, var(--bg-card))",
+            }}
+          >
+            {shortcut}
           </span>
         )}
       </div>

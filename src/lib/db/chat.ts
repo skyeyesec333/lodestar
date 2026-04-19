@@ -64,7 +64,7 @@ export async function getProjectChatContext(
           ? `Current LOI blockers: ${topBlockers.join(", ")}.`
           : "There are no current LOI blockers recorded in the requirement set.",
       sourceType: "app",
-      url: `/projects/${project.slug}#section-requirements`,
+      url: `/projects/${project.slug}/workplan#section-requirements`,
     },
     {
       id: `project-${project.id}-stakeholders`,
@@ -76,7 +76,7 @@ export async function getProjectChatContext(
               .join(", ")}.`
           : "No primary stakeholders are recorded yet for this project.",
       sourceType: "app",
-      url: `/projects/${project.slug}#section-stakeholders`,
+      url: `/projects/${project.slug}/parties`,
     },
     {
       id: `project-${project.id}-meetings`,
@@ -86,7 +86,7 @@ export async function getProjectChatContext(
           ? `Recent meetings: ${recentMeetings.map((meeting) => meeting.title).join(", ")}. Open action items in those meetings: ${openActionItems.length}.`
           : "No meetings are recorded yet for this project.",
       sourceType: "app",
-      url: `/projects/${project.slug}#section-meetings`,
+      url: `/projects/${project.slug}/execution#section-meetings`,
     },
   ];
 

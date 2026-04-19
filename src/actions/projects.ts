@@ -16,9 +16,13 @@ import { getProjectRequirements } from "@/lib/db/requirements";
 import { upsertProjectConcept, getProjectConcept } from "@/lib/db/project-concepts";
 import { recordActivity } from "@/lib/db/activity";
 import { createDemoPortfolioForUser, createDemoProjectForUser } from "@/lib/db/demo";
+import { DEMO_PROJECT_SLUG_PREFIX } from "@/lib/projects/demo-portfolio";
 import { computeReadiness, mapRequirementStatuses } from "@/lib/scoring/index";
 import { buildGateReview } from "@/lib/projects/gate-review";
 import { generateSlug } from "@/lib/utils";
+import { assertProjectAccess } from "@/lib/db/project-access";
+import { db } from "@/lib/db";
+import { toDbError } from "@/lib/utils";
 import type { ProjectSummary, AppError, Result } from "@/types";
 
 const SECTOR_VALUES = [
@@ -397,6 +401,108 @@ export async function createDemoPortfolio(): Promise<Result<{ slug: string }>> {
   return { ok: true, value: { slug: result.value.leadSlug } };
 }
 
+/**
+ * Deletes every demo project owned by the current user (slug-prefix match) and
+ * reseeds a fresh portfolio via `createDemoPortfolioForUser`. Cascades clean up
+ * stakeholder roles, requirement statuses, funder relationships, meetings,
+ * activity events, etc. Stakeholder + Organization rows are not tied to the
+ * project via cascade, so we delete them afterward if they were exclusive to
+ * the demo projects being wiped (i.e. no remaining roles / funder relationships
+ * / sponsor records / action-item assignments).
+ */
+export async function resetDemoPortfolio(): Promise<Result<{ slug: string }>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "You must be signed in to reset the demo portfolio.",
+      },
+    };
+  }
+
+  try {
+    const demoProjects = await db.project.findMany({
+      where: {
+        ownerClerkId: userId,
+        slug: { startsWith: DEMO_PROJECT_SLUG_PREFIX },
+      },
+      select: {
+        id: true,
+        slug: true,
+        stakeholderRoles: { select: { stakeholder: { select: { id: true, organizationId: true } } } },
+        funderRelationships: { select: { organizationId: true } },
+        sponsors: { select: { organizationId: true } },
+      },
+    });
+
+    const stakeholderIds = new Set<string>();
+    const organizationIds = new Set<string>();
+    for (const project of demoProjects) {
+      for (const role of project.stakeholderRoles) {
+        stakeholderIds.add(role.stakeholder.id);
+        if (role.stakeholder.organizationId) organizationIds.add(role.stakeholder.organizationId);
+      }
+      for (const funder of project.funderRelationships) {
+        organizationIds.add(funder.organizationId);
+      }
+      for (const sponsor of project.sponsors) {
+        organizationIds.add(sponsor.organizationId);
+      }
+    }
+
+    // Cascade-delete projects first. StakeholderRole, FunderRelationship,
+    // ProjectSponsor, ProjectRequirement, ActivityEvent, Meeting, etc. are all
+    // marked `onDelete: Cascade` on the project relation.
+    if (demoProjects.length > 0) {
+      await db.project.deleteMany({
+        where: { id: { in: demoProjects.map((p) => p.id) } },
+      });
+    }
+
+    // Drop stakeholders that no longer have any roles / action items / attendances.
+    if (stakeholderIds.size > 0) {
+      await db.stakeholder.deleteMany({
+        where: {
+          id: { in: Array.from(stakeholderIds) },
+          roles: { none: {} },
+          actionItems: { none: {} },
+          attendances: { none: {} },
+          responsibleRequirements: { none: {} },
+          secondaryResponsibilities: { none: {} },
+          documentRequests: { none: {} },
+        },
+      });
+    }
+
+    // Drop organizations that no longer have any references.
+    if (organizationIds.size > 0) {
+      await db.organization.deleteMany({
+        where: {
+          id: { in: Array.from(organizationIds) },
+          stakeholders: { none: {} },
+          funderRelationships: { none: {} },
+          projectSponsors: { none: {} },
+          dealParties: { none: {} },
+          epcBids: { none: {} },
+          responsibleRequirements: { none: {} },
+        },
+      });
+    }
+
+    const result = await createDemoPortfolioForUser(userId);
+    if (!result.ok) return result;
+
+    revalidatePath("/projects");
+    revalidatePath(`/projects/${result.value.leadSlug}`);
+
+    return { ok: true, value: { slug: result.value.leadSlug } };
+  } catch (err) {
+    return { ok: false, error: toDbError(err) };
+  }
+}
+
 export async function recalculateReadiness(
   projectId: string,
   slug: string
@@ -439,4 +545,41 @@ export async function recalculateReadiness(
   revalidatePath(`/projects/${slug}`);
 
   return { ok: true, value: scoreBps };
+}
+
+const graphLayoutSchema = z.object({
+  projectId: z.string().min(1),
+  layout: z
+    .record(
+      z.string().min(1),
+      z.object({
+        x: z.number().finite(),
+        y: z.number().finite(),
+      })
+    )
+    .refine((r) => Object.keys(r).length <= 100, { message: "Too many nodes in layout." }),
+});
+
+export async function saveStakeholderGraphLayout(raw: unknown): Promise<Result<void>> {
+  const { userId } = await auth();
+  if (!userId) return { ok: false, error: { code: "UNAUTHORIZED", message: "Not signed in" } };
+
+  const parsed = graphLayoutSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } };
+  }
+
+  const access = await assertProjectAccess(parsed.data.projectId, userId, "editor");
+  if (!access.ok) return access;
+
+  try {
+    await db.project.update({
+      where: { id: parsed.data.projectId },
+      data: { graphLayout: parsed.data.layout },
+      select: { id: true },
+    });
+    return { ok: true, value: undefined };
+  } catch (err) {
+    return { ok: false, error: toDbError(err) };
+  }
 }

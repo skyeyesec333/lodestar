@@ -1,6 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { useChartTheme } from "@/components/charts/theme";
 
 type TrendlineData = {
   currentScoreBps: number;
@@ -11,74 +22,137 @@ type TrendlineData = {
   isStalled: boolean;
 };
 
-type DataPoint = {
+type ChartRow = {
   label: string;
-  scorePct: number;
-  isProjected?: boolean;
-  isLoiThreshold?: boolean;
+  historical: number | null;
+  projected: number | null;
 };
 
-type Props = {
-  projectSlug: string;
-};
+type Props = { projectSlug: string };
 
-const LOI_THRESHOLD_BPS = 6500;
+const LOI_THRESHOLD_PCT = 65;
 
 function formatDateLabel(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function buildDataPoints(data: TrendlineData): DataPoint[] {
+function buildRows(data: TrendlineData): ChartRow[] {
   const now = new Date();
-  const points: DataPoint[] = [];
+  const rows: ChartRow[] = [];
 
   if (data.thirtyDayAvgBps !== null) {
-    const d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    points.push({ label: formatDateLabel(d), scorePct: data.thirtyDayAvgBps / 100 });
+    rows.push({
+      label: formatDateLabel(new Date(now.getTime() - 30 * 86400000)),
+      historical: data.thirtyDayAvgBps / 100,
+      projected: null,
+    });
   }
-
   if (data.sevenDayAvgBps !== null) {
-    const d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    points.push({ label: formatDateLabel(d), scorePct: data.sevenDayAvgBps / 100 });
+    rows.push({
+      label: formatDateLabel(new Date(now.getTime() - 7 * 86400000)),
+      historical: data.sevenDayAvgBps / 100,
+      projected: null,
+    });
   }
 
-  points.push({ label: formatDateLabel(now), scorePct: data.currentScoreBps / 100 });
+  const currentPct = data.currentScoreBps / 100;
+  rows.push({
+    label: formatDateLabel(now),
+    historical: currentPct,
+    projected: data.projectedGateDateISO ? currentPct : null,
+  });
 
   if (data.projectedGateDateISO) {
     const projected = new Date(data.projectedGateDateISO + "T00:00:00");
     if (projected > now) {
-      points.push({
-        label: formatDateLabel(projected),
-        scorePct: LOI_THRESHOLD_BPS / 100,
-        isProjected: true,
+      rows.push({
+        label: `~${formatDateLabel(projected)}`,
+        historical: null,
+        projected: LOI_THRESHOLD_PCT,
       });
     }
   }
-
-  return points;
+  return rows;
 }
 
-const CHART_WIDTH = 520;
-const CHART_HEIGHT = 160;
-const PAD_LEFT = 44;
-const PAD_RIGHT = 16;
-const PAD_TOP = 16;
-const PAD_BOTTOM = 36;
+const containerStyle: React.CSSProperties = {
+  border: "1px solid var(--border)",
+  borderRadius: "8px",
+  backgroundColor: "var(--bg-card)",
+  padding: "20px 20px 16px",
+  marginBottom: "32px",
+};
 
-const PLOT_W = CHART_WIDTH - PAD_LEFT - PAD_RIGHT;
-const PLOT_H = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+const eyebrowStyle: React.CSSProperties = {
+  fontFamily: "'DM Mono', monospace",
+  fontSize: "10px",
+  fontWeight: 500,
+  letterSpacing: "0.10em",
+  textTransform: "uppercase",
+  color: "var(--ink-muted)",
+  marginBottom: "4px",
+};
 
-function toX(index: number, total: number): number {
-  if (total <= 1) return PAD_LEFT + PLOT_W / 2;
-  return PAD_LEFT + (index / (total - 1)) * PLOT_W;
+const titleStyle: React.CSSProperties = {
+  fontFamily: "'Inter', sans-serif",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "var(--ink)",
+  margin: "0 0 14px",
+};
+
+type TooltipPayloadItem = { value?: number | null; dataKey?: string | number };
+
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadItem[]; label?: string }) {
+  if (!active || !payload?.length) return null;
+  const value = payload.find((p) => typeof p.value === "number")?.value;
+  if (typeof value !== "number") return null;
+  return (
+    <div
+      style={{
+        fontFamily: "'DM Mono', monospace",
+        fontSize: "10px",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
+        borderRadius: "4px",
+        padding: "6px 8px",
+        color: "var(--ink)",
+      }}
+    >
+      <div style={{ color: "var(--ink-muted)", marginBottom: "2px" }}>{label}</div>
+      <div>{value.toFixed(0)}%</div>
+    </div>
+  );
 }
 
-function toY(scorePct: number): number {
-  const clamped = Math.min(100, Math.max(0, scorePct));
-  return PAD_TOP + PLOT_H - (clamped / 100) * PLOT_H;
+function Frame({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={containerStyle}>
+      <p style={eyebrowStyle}>Readiness over time</p>
+      {children}
+    </div>
+  );
+}
+
+function Message({ text }: { text: string }) {
+  return (
+    <Frame>
+      <p
+        style={{
+          fontFamily: "'Inter', sans-serif",
+          fontSize: "13px",
+          color: "var(--ink-muted)",
+          margin: 0,
+        }}
+      >
+        {text}
+      </p>
+    </Frame>
+  );
 }
 
 export function ReadinessTrendlineChart({ projectSlug }: Props) {
+  const theme = useChartTheme();
   const [data, setData] = useState<TrendlineData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,10 +164,7 @@ export function ReadinessTrendlineChart({ projectSlug }: Props) {
 
     fetch(`/api/projects/${projectSlug}/trendline`)
       .then(async (res) => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `Request failed (${res.status})`);
-        }
+        if (!res.ok) throw new Error(await res.text());
         return res.json() as Promise<TrendlineData>;
       })
       .then((json) => {
@@ -111,282 +182,106 @@ export function ReadinessTrendlineChart({ projectSlug }: Props) {
     };
   }, [projectSlug]);
 
-  const containerStyle: React.CSSProperties = {
-    border: "1px solid var(--border)",
-    borderRadius: "8px",
-    backgroundColor: "var(--bg-card)",
-    padding: "20px 20px 16px",
-    marginBottom: "32px",
-  };
+  const rows = useMemo(() => (data ? buildRows(data) : []), [data]);
 
-  const eyebrowStyle: React.CSSProperties = {
-    fontFamily: "'DM Mono', monospace",
-    fontSize: "10px",
-    fontWeight: 500,
-    letterSpacing: "0.10em",
-    textTransform: "uppercase",
-    color: "var(--ink-muted)",
-    marginBottom: "4px",
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontFamily: "'Inter', sans-serif",
-    fontSize: "13px",
-    fontWeight: 600,
-    color: "var(--ink)",
-    margin: "0 0 14px",
-  };
-
-  if (loading) {
-    return (
-      <div style={containerStyle}>
-        <p style={eyebrowStyle}>Readiness over time</p>
-        <p
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "13px",
-            color: "var(--ink-muted)",
-            margin: 0,
-          }}
-        >
-          Loading…
-        </p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={containerStyle}>
-        <p style={eyebrowStyle}>Readiness over time</p>
-        <p
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "13px",
-            color: "var(--ink-muted)",
-            margin: 0,
-          }}
-        >
-          Could not load trendline data.
-        </p>
-      </div>
-    );
-  }
-
+  if (loading) return <Message text="Loading…" />;
+  if (error) return <Message text="Could not load trendline data." />;
   if (!data) return null;
+  if (rows.length < 2) return <Message text="No history yet — score changes will appear here." />;
 
-  const points = buildDataPoints(data);
+  const currentPct = data.currentScoreBps / 100;
+  const loiCrossed = currentPct >= LOI_THRESHOLD_PCT;
 
-  if (points.length < 2) {
-    return (
-      <div style={containerStyle}>
-        <p style={eyebrowStyle}>Readiness over time</p>
-        <p
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "13px",
-            color: "var(--ink-muted)",
-            margin: 0,
-          }}
-        >
-          No history yet — score changes will appear here.
-        </p>
-      </div>
-    );
-  }
-
-  const solidPoints = points.filter((p) => !p.isProjected);
-  const projectedPoint = points.find((p) => p.isProjected);
-
-  const solidPolyline = solidPoints
-    .map((p, i) => `${toX(i, points.length)},${toY(p.scorePct)}`)
-    .join(" ");
-
-  const projectedPolyline =
-    projectedPoint && solidPoints.length > 0
-      ? [
-          `${toX(solidPoints.length - 1, points.length)},${toY(solidPoints[solidPoints.length - 1].scorePct)}`,
-          `${toX(points.length - 1, points.length)},${toY(projectedPoint.scorePct)}`,
-        ].join(" ")
-      : null;
-
-  const loiY = toY(LOI_THRESHOLD_BPS / 100);
-  const loiIsVisible = loiY >= PAD_TOP && loiY <= PAD_TOP + PLOT_H;
-
-  const loiCrossedAt = data.currentScoreBps >= LOI_THRESHOLD_BPS;
-  const loiCrossX = loiCrossedAt
-    ? (() => {
-        const todayIdx = solidPoints.length - 1;
-        return toX(todayIdx, points.length);
-      })()
+  const velocityLabel = data.isStalled
+    ? "Stalled — no changes in 30 days"
+    : data.velocityBpsPerDay !== null
+    ? `${data.velocityBpsPerDay > 0 ? "+" : ""}${(data.velocityBpsPerDay / 100).toFixed(1)}% / day`
     : null;
-
-  const velocityLabel = (() => {
-    if (data.isStalled) return "Stalled — no changes in 30 days";
-    if (data.velocityBpsPerDay === null) return null;
-    const sign = data.velocityBpsPerDay > 0 ? "+" : "";
-    return `${sign}${(data.velocityBpsPerDay / 100).toFixed(1)}% / day`;
-  })();
 
   return (
     <div style={containerStyle}>
       <p style={eyebrowStyle}>Readiness over time</p>
       <p style={titleStyle}>Score trendline</p>
 
-      <div style={{ overflowX: "auto" }}>
-        <svg
-          width={CHART_WIDTH}
-          height={CHART_HEIGHT}
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-          aria-label="Readiness score trendline chart"
-          style={{ display: "block", maxWidth: "100%" }}
-        >
-          {/* Y-axis gridlines at 0%, 25%, 50%, 75%, 100% */}
-          {[0, 25, 50, 75, 100].map((pct) => {
-            const y = toY(pct);
-            return (
-              <g key={pct}>
-                <line
-                  x1={PAD_LEFT}
-                  y1={y}
-                  x2={PAD_LEFT + PLOT_W}
-                  y2={y}
-                  stroke="var(--border)"
-                  strokeWidth={1}
-                  strokeDasharray="3 4"
-                />
-                <text
-                  x={PAD_LEFT - 6}
-                  y={y + 4}
-                  textAnchor="end"
-                  fontSize={9}
-                  fontFamily="'DM Mono', monospace"
-                  fill="var(--ink-muted)"
-                >
-                  {pct}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* LOI threshold line at 65% */}
-          {loiIsVisible && (
-            <g>
-              <line
-                x1={PAD_LEFT}
-                y1={loiY}
-                x2={PAD_LEFT + PLOT_W}
-                y2={loiY}
-                stroke="var(--gold)"
-                strokeWidth={1}
-                strokeDasharray="6 3"
-                opacity={0.7}
-              />
-              <text
-                x={PAD_LEFT + PLOT_W - 2}
-                y={loiY - 4}
-                textAnchor="end"
-                fontSize={8}
-                fontFamily="'DM Mono', monospace"
-                fill="var(--gold)"
-              >
-                LOI gate
-              </text>
-            </g>
-          )}
-
-          {/* LOI crossed marker — vertical line at today if score is past threshold */}
-          {loiCrossedAt && loiCrossX !== null && (
-            <line
-              x1={loiCrossX}
-              y1={PAD_TOP}
-              x2={loiCrossX}
-              y2={PAD_TOP + PLOT_H}
-              stroke="var(--teal)"
-              strokeWidth={1.5}
-              strokeDasharray="4 3"
-              opacity={0.6}
+      <div style={{ width: "100%", height: 180 }}>
+        <ResponsiveContainer>
+          <LineChart
+            data={rows}
+            margin={{ top: 8, right: 24, bottom: 8, left: 0 }}
+            aria-label="Readiness score trendline chart"
+          >
+            <CartesianGrid stroke={theme.border} strokeDasharray="3 4" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: theme.fontSizeTick, fontFamily: theme.fontMono, fill: theme.textMuted }}
+              tickLine={false}
+              axisLine={{ stroke: theme.border }}
+              padding={{ left: 8, right: 8 }}
             />
-          )}
+            <YAxis
+              domain={[0, 100]}
+              ticks={[0, 25, 50, 75, 100]}
+              tick={{ fontSize: theme.fontSizeTick, fontFamily: theme.fontMono, fill: theme.textMuted }}
+              tickLine={false}
+              axisLine={false}
+              width={32}
+            />
+            <Tooltip content={<ChartTooltip />} cursor={{ stroke: theme.border, strokeDasharray: "3 3" }} />
 
-          {/* Solid line: historical data */}
-          <polyline
-            points={solidPolyline}
-            fill="none"
-            stroke="var(--accent)"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
+            <ReferenceLine
+              y={LOI_THRESHOLD_PCT}
+              stroke={theme.gold}
+              strokeDasharray="6 3"
+              strokeOpacity={0.7}
+              label={{
+                value: "LOI gate",
+                position: "insideTopRight",
+                fontSize: 8,
+                fontFamily: theme.fontMono,
+                fill: theme.gold,
+              }}
+            />
+            {loiCrossed && (
+              <ReferenceLine
+                x={rows.at(-1)?.projected != null ? rows[rows.length - 2]?.label : rows.at(-1)?.label}
+                stroke={theme.teal}
+                strokeDasharray="4 3"
+                strokeOpacity={0.6}
+                strokeWidth={1.5}
+              />
+            )}
 
-          {/* Dashed projected line to gate */}
-          {projectedPolyline && (
-            <polyline
-              points={projectedPolyline}
-              fill="none"
-              stroke="var(--accent)"
+            <Line
+              type="monotone"
+              dataKey="historical"
+              stroke={theme.accent}
+              strokeWidth={2}
+              dot={{ r: 3.5, strokeWidth: 2, fill: theme.bgCard, stroke: theme.accent }}
+              activeDot={{ r: 5 }}
+              isAnimationActive={false}
+              connectNulls={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="projected"
+              stroke={theme.accent}
               strokeWidth={1.5}
               strokeDasharray="5 4"
-              opacity={0.5}
-              strokeLinecap="round"
+              strokeOpacity={0.5}
+              dot={{ r: 3, strokeWidth: 1.5, fill: theme.bgCard, stroke: theme.accent, fillOpacity: 0.5 }}
+              isAnimationActive={false}
+              connectNulls={false}
             />
-          )}
-
-          {/* Data point dots (solid only) */}
-          {solidPoints.map((p, i) => (
-            <circle
-              key={i}
-              cx={toX(i, points.length)}
-              cy={toY(p.scorePct)}
-              r={3.5}
-              fill="var(--bg-card, var(--bg))"
-              stroke="var(--accent)"
-              strokeWidth={2}
-            >
-              <title>{p.label}: {p.scorePct.toFixed(0)}%</title>
-            </circle>
-          ))}
-
-          {/* Projected endpoint dot */}
-          {projectedPoint && (
-            <circle
-              cx={toX(points.length - 1, points.length)}
-              cy={toY(projectedPoint.scorePct)}
-              r={3}
-              fill="var(--bg-card, var(--bg))"
-              stroke="var(--accent)"
-              strokeWidth={1.5}
-              opacity={0.5}
-            >
-              <title>~{projectedPoint.label}: {projectedPoint.scorePct.toFixed(0)}% (projected)</title>
-            </circle>
-          )}
-
-          {/* X-axis labels */}
-          {points.map((p, i) => (
-            <text
-              key={i}
-              x={toX(i, points.length)}
-              y={PAD_TOP + PLOT_H + 20}
-              textAnchor="middle"
-              fontSize={9}
-              fontFamily="'DM Mono', monospace"
-              fill="var(--ink-muted)"
-              opacity={p.isProjected ? 0.6 : 1}
-            >
-              {p.isProjected ? `~${p.label}` : p.label}
-            </text>
-          ))}
-        </svg>
+          </LineChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* Footer row: velocity + projected gate */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: "20px",
-          marginTop: "8px",
+          marginTop: "4px",
           flexWrap: "wrap",
         }}
       >
@@ -415,7 +310,7 @@ export function ReadinessTrendlineChart({ projectSlug }: Props) {
             {formatDateLabel(new Date(data.projectedGateDateISO + "T00:00:00"))}
           </span>
         )}
-        {data.currentScoreBps >= LOI_THRESHOLD_BPS && (
+        {loiCrossed && (
           <span
             style={{
               fontFamily: "'DM Mono', monospace",

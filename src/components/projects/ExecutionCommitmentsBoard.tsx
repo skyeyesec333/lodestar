@@ -170,7 +170,7 @@ export function ExecutionCommitmentsBoard({
 
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <Link
-              href={`/projects/${projectSlug}#section-meetings`}
+              href={`/projects/${projectSlug}/execution#section-meetings`}
               style={{
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "10px",
@@ -186,7 +186,7 @@ export function ExecutionCommitmentsBoard({
               Open meetings
             </Link>
             <Link
-              href={`/projects/${projectSlug}#section-activity`}
+              href={`/projects/${projectSlug}/execution#section-activity`}
               style={{
                 fontFamily: "'DM Mono', monospace",
                 fontSize: "10px",

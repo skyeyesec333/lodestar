@@ -12,6 +12,7 @@ import type { DealType } from "@/types";
 import { CommentThread } from "@/components/collaboration/CommentThread";
 import { WatchButton } from "@/components/collaboration/WatchButton";
 import { ActionItemsPanel } from "@/components/meetings/ActionItemsPanel";
+import { toast } from "@/lib/ui/toast";
 
 // ── Provider Connector Banner ─────────────────────────────────────────────────
 
@@ -440,6 +441,7 @@ function AddMeetingForm({
       });
       if (!result.ok) { setError(result.error.message); return; }
       onCreated(result.value);
+      toast.success("Meeting logged");
     });
   }
 
@@ -613,6 +615,7 @@ function AddActionItemForm({
       });
       if (!result.ok) { setError(result.error.message); return; }
       onCreated(result.value);
+      toast.success("Action item added");
     });
   }
 
@@ -888,7 +891,6 @@ function ExtractInsightsPanel({
 }) {
   const [transcript, setTranscript] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<MeetingExtractionResult | null>(null);
   const [addingIndex, setAddingIndex] = useState<number | null>(null);
   const [addedIndices, setAddedIndices] = useState<Set<number>>(new Set());
@@ -898,11 +900,10 @@ function ExtractInsightsPanel({
 
   async function handleExtract() {
     if (!transcript.trim()) {
-      setError("Paste some meeting notes first.");
+      toast.error("Paste some meeting notes first.");
       return;
     }
     setLoading(true);
-    setError(null);
     setResult(null);
     try {
       const res = await fetch("/api/meetings/extract", {
@@ -913,13 +914,15 @@ function ExtractInsightsPanel({
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as Record<string, unknown>;
         const msg = typeof data.error === "string" ? data.error : `Error ${res.status}`;
-        setError(msg);
+        toast.error(msg);
         return;
       }
       const data = await res.json() as MeetingExtractionResult;
       setResult(data);
+      const count = (data.actionItems?.length ?? 0) + (data.commitments?.length ?? 0);
+      toast.success(count > 0 ? `Extracted ${count} item${count === 1 ? "" : "s"}` : "Extraction complete");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Extraction failed.");
+      toast.error(err instanceof Error ? err.message : "Extraction failed.");
     } finally {
       setLoading(false);
     }
@@ -1004,19 +1007,6 @@ function ExtractInsightsPanel({
           disabled={loading}
         />
       </div>
-
-      {error && (
-        <p
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: "12px",
-            color: "var(--accent)",
-            margin: "0 0 10px",
-          }}
-        >
-          {error}
-        </p>
-      )}
 
       <button
         onClick={handleExtract}

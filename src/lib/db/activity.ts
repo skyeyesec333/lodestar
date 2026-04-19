@@ -38,6 +38,34 @@ export type ActivityPage = {
   nextCursor: string | null;
 };
 
+export type ActivityHeatmapPoint = { day: string; value: number };
+
+export async function getActivityHeatmap(
+  projectIds: string[],
+  days = 365
+): Promise<Result<ActivityHeatmapPoint[]>> {
+  if (projectIds.length === 0) return { ok: true, value: [] };
+  try {
+    const since = new Date(Date.now() - days * 86400000);
+    const rows = await db.activityEvent.findMany({
+      where: { projectId: { in: projectIds }, createdAt: { gte: since } },
+      select: { createdAt: true },
+    });
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      const d = r.createdAt;
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const value = Array.from(counts.entries())
+      .map(([day, v]) => ({ day, value: v }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+    return { ok: true, value };
+  } catch (err) {
+    return { ok: false, error: toDbError(err) };
+  }
+}
+
 export async function getProjectActivity(
   projectId: string,
   limit = 25,

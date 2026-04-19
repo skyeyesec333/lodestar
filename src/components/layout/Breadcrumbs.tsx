@@ -24,6 +24,11 @@ export function Breadcrumbs() {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return null;
 
+  // Project detail routes own their own back-link via the sidebar — hide the
+  // dashboard breadcrumbs there to avoid the left-edge misalignment between the
+  // centered breadcrumbs container and the viewport-wide project shell.
+  if (segments[0] === "projects" && segments.length >= 2) return null;
+
   const crumbs: Array<{ label: string; href: string | null }> = [];
 
   // First segment: top-level route

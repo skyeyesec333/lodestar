@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { animate } from "framer-motion";
 import {
   detailMicroMonoStyle,
   detailMonoLabelStyle,
@@ -49,31 +50,21 @@ function getRelativeTime(date: Date | null): string {
   return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
 }
 
-const DURATION = 900; // ms
-
 export function ReadinessGaugeClient({ scoreBps, loiReady, categoryScores, dealType, projectId, projectSlug, cachedScoreUpdatedAt }: Props) {
   const isExim = !dealType || dealType === "exim_project_finance";
   const [displayed, setDisplayed] = useState(0);
   const [mounted, setMounted] = useState(false);
-  const startTime = useRef<number | null>(null);
-  const raf = useRef<number | null>(null);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     setMounted(true);
-    const animate = (ts: number) => {
-      if (startTime.current === null) startTime.current = ts;
-      const elapsed = ts - startTime.current;
-      const progress = Math.min(elapsed / DURATION, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplayed(Math.round(scoreBps * eased));
-      if (progress < 1) {
-        raf.current = requestAnimationFrame(animate);
-      }
-    };
-    raf.current = requestAnimationFrame(animate);
-    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
+    const controls = animate(displayed, scoreBps, {
+      duration: 0.9,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (value) => setDisplayed(Math.round(value)),
+    });
+    return () => controls.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoreBps]);
 
   const pct = displayed / 100;

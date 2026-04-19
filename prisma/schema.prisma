@@ -50,6 +50,8 @@ model Project {
   /// Null until first calculation.
   cachedReadinessScore  Int?
   cachedScoreUpdatedAt  DateTime?
+  /// Persisted node positions for the stakeholder graph. Shape: Record<organizationId, { x, y }>.
+  graphLayout           Json?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   /// EXIM environmental project category. Determines ESIA scope and disclosure timeline.

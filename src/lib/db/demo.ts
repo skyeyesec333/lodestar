@@ -1,4 +1,9 @@
-import type { RequirementStatus } from "@prisma/client";
+import type {
+  RequirementStatus,
+  StakeholderRoleType,
+  FunderType,
+  FunderEngagementStage,
+} from "@prisma/client";
 import { db } from "@/lib/db";
 import { EXIM_REQUIREMENTS } from "@/lib/exim/requirements";
 import { DEMO_PROJECT_SLUG_PREFIX, isDemoProjectSlug } from "@/lib/projects/demo-portfolio";
@@ -310,6 +315,55 @@ export async function createDemoProjectForUser(
   }
 }
 
+type DemoPartyKind = "sponsor" | "epc" | "offtaker" | "advisor" | "gov_liaison" | "funder";
+
+type DemoPartySeed = {
+  kind: DemoPartyKind;
+  org: { name: string; countryCode: string; isUsEntity?: boolean };
+  /** Optional stakeholder (people). Funders typically have no contact on file yet. */
+  stakeholder?: {
+    name: string;
+    title: string;
+    email?: string;
+    /** Days ago for the last recorded contact. `null` = never contacted. Drives graph "stale" vs "active". */
+    lastContactDaysAgo: number | null;
+  };
+  /** StakeholderRole.roleType for the project, when a stakeholder exists. */
+  roleType?: StakeholderRoleType;
+  isPrimary?: boolean;
+  /** If true, register a ProjectSponsor for this org. */
+  leadSponsorEquityBps?: number;
+  /** If set, register a FunderRelationship. */
+  funder?: {
+    funderType: FunderType;
+    engagementStage: FunderEngagementStage;
+    amountUsdCents?: bigint;
+    lastContactDaysAgo?: number;
+  };
+  /**
+   * If set, override the named requirement so this org is the responsible party
+   * and the target date is in the past — the graph renders this node as "blocked".
+   */
+  ownsOverdueRequirement?: { requirementId: string; daysOverdue: number };
+};
+
+type DemoPortfolioSeed = {
+  name: string;
+  createData: {
+    description: string;
+    countryCode: string;
+    sector: "power" | "water" | "transport" | "telecom" | "mining" | "other";
+    capexUsdCents: bigint;
+    eximCoverType?: "comprehensive" | "political_only";
+    stage: "concept" | "pre_loi" | "loi_submitted" | "loi_approved" | "pre_commitment" | "final_commitment" | "financial_close";
+    targetLoiDate?: Date;
+    targetCloseDate?: Date;
+    cachedReadinessScore: number;
+  };
+  requirementStatus: (req: { id: string; phaseRequired: string; category: string }) => RequirementStatus;
+  parties: DemoPartySeed[];
+};
+
 export async function createDemoPortfolioForUser(
   clerkUserId: string
 ): Promise<Result<{ projectIds: string[]; leadSlug: string }>> {
@@ -317,31 +371,89 @@ export async function createDemoPortfolioForUser(
   if (!primary.ok) return primary;
 
   try {
-    const demoPortfolioSeeds = [
+    const demoPortfolioSeeds: DemoPortfolioSeed[] = [
       {
         name: "Rufiji Water Treatment Expansion",
         createData: {
           description:
             "Municipal water expansion project with advanced environmental work and a slower commercial bank syndication track.",
           countryCode: "TZ",
-          sector: "water" as const,
+          sector: "water",
           capexUsdCents: 148_000_000_00n,
-          eximCoverType: "political_only" as const,
-          stage: "pre_commitment" as const,
+          eximCoverType: "political_only",
+          stage: "pre_commitment",
           targetLoiDate: daysFromNow(35),
           targetCloseDate: daysFromNow(180),
           cachedReadinessScore: 7420,
-          requirementStatuses: EXIM_REQUIREMENTS.map((requirement) => ({
-            requirementId: requirement.id,
-            status:
-              requirement.phaseRequired === "loi"
-                ? ("substantially_final" as const)
-                : requirement.category === "financial"
-                  ? ("draft" as const)
-                  : ("in_progress" as const),
-            statusChangedBy: clerkUserId,
-          })),
         },
+        requirementStatus: (req) =>
+          req.phaseRequired === "loi"
+            ? "substantially_final"
+            : req.category === "financial"
+              ? "draft"
+              : "in_progress",
+        parties: [
+          {
+            kind: "sponsor",
+            org: { name: "Rufiji Water Authority", countryCode: "TZ" },
+            stakeholder: {
+              name: "Noor Abebe",
+              title: "Director of Capital Projects",
+              email: "noor@rufiji-water.example",
+              lastContactDaysAgo: 3,
+            },
+            roleType: "sponsor_team",
+            isPrimary: true,
+            leadSponsorEquityBps: 10000,
+          },
+          {
+            kind: "epc",
+            org: { name: "Atlas Municipal Systems", countryCode: "US", isUsEntity: true },
+            stakeholder: {
+              name: "Priya Natesan",
+              title: "VP Infrastructure Delivery",
+              email: "priya@atlasmunicipal.example",
+              lastContactDaysAgo: 5,
+            },
+            roleType: "epc_contact",
+            isPrimary: true,
+          },
+          {
+            kind: "offtaker",
+            org: { name: "Dar es Salaam Municipality", countryCode: "TZ" },
+            stakeholder: {
+              name: "Joseph Mwenda",
+              title: "Water & Sanitation Commissioner",
+              email: "joseph.mwenda@dar.example",
+              lastContactDaysAgo: 22,
+            },
+            roleType: "offtaker_contact",
+            isPrimary: true,
+            ownsOverdueRequirement: { requirementId: "host_government_approval", daysOverdue: 9 },
+          },
+          {
+            kind: "advisor",
+            org: { name: "Bluepeak Infrastructure Partners", countryCode: "US", isUsEntity: true },
+            stakeholder: {
+              name: "Sara Levitt",
+              title: "Managing Director",
+              email: "sara@bluepeak.example",
+              lastContactDaysAgo: 4,
+            },
+            roleType: "financial_advisor",
+            isPrimary: true,
+          },
+          {
+            kind: "funder",
+            org: { name: "African Development Bank", countryCode: "CI" },
+            funder: {
+              funderType: "dfi",
+              engagementStage: "due_diligence",
+              amountUsdCents: 95_000_000_00n,
+              lastContactDaysAgo: 8,
+            },
+          },
+        ],
       },
       {
         name: "Mwanza Inland Dry Port",
@@ -349,25 +461,73 @@ export async function createDemoPortfolioForUser(
           description:
             "Transport logistics project with early sponsor coordination complete but major LOI-critical documentation still immature.",
           countryCode: "TZ",
-          sector: "transport" as const,
+          sector: "transport",
           capexUsdCents: 210_000_000_00n,
-          stage: "concept" as const,
+          stage: "concept",
           cachedReadinessScore: 1860,
-          requirementStatuses: EXIM_REQUIREMENTS.map((requirement) => ({
-            requirementId: requirement.id,
-            status:
-              requirement.id === "project_company_formation"
-                ? ("executed" as const)
-                : requirement.id === "feasibility_study"
-                  ? ("draft" as const)
-                  : requirement.category === "corporate"
-                    ? ("in_progress" as const)
-                    : ("not_started" as const),
-            statusChangedBy: clerkUserId,
-          })),
         },
+        requirementStatus: (req) =>
+          req.id === "project_company_formation"
+            ? "executed"
+            : req.id === "feasibility_study"
+              ? "draft"
+              : req.category === "corporate"
+                ? "in_progress"
+                : "not_started",
+        parties: [
+          {
+            kind: "sponsor",
+            org: { name: "Mwanza Logistics Holdings", countryCode: "TZ" },
+            stakeholder: {
+              name: "Fatima Ayodele",
+              title: "Chief Development Officer",
+              email: "fatima@mwanzalogistics.example",
+              lastContactDaysAgo: 6,
+            },
+            roleType: "sponsor_team",
+            isPrimary: true,
+            leadSponsorEquityBps: 8500,
+          },
+          {
+            kind: "epc",
+            org: { name: "Pacific Rail & Container Systems", countryCode: "US", isUsEntity: true },
+            stakeholder: {
+              name: "Kenji Hayashi",
+              title: "Head of Global Projects",
+              email: "kenji@pacificrail.example",
+              lastContactDaysAgo: 35,
+            },
+            roleType: "epc_contact",
+            isPrimary: true,
+            ownsOverdueRequirement: { requirementId: "feasibility_study", daysOverdue: 14 },
+          },
+          {
+            kind: "gov_liaison",
+            org: { name: "Tanzania Ports Authority", countryCode: "TZ" },
+            stakeholder: {
+              name: "Ahmed Said",
+              title: "Director of Inland Ports",
+              email: "ahmed.said@tpa.example",
+              lastContactDaysAgo: 2,
+            },
+            roleType: "government_liaison",
+            isPrimary: true,
+          },
+          {
+            kind: "advisor",
+            org: { name: "Horizon Infrastructure Partners", countryCode: "US", isUsEntity: true },
+            stakeholder: {
+              name: "Monica Garrett",
+              title: "Senior Advisor",
+              email: "monica@horizoninfra.example",
+              lastContactDaysAgo: null,
+            },
+            roleType: "financial_advisor",
+            isPrimary: true,
+          },
+        ],
       },
-    ] as const;
+    ];
 
     const existingSecondaryProjects = await db.project.findMany({
       where: {
@@ -399,32 +559,141 @@ export async function createDemoPortfolioForUser(
           return existingProject;
         }
 
-        const { requirementStatuses, ...projectData } = seed.createData;
+        return db.$transaction(async (tx) => {
+          // 1. Create one Organization per party seed (skipped for parties with no org).
+          const orgIdByKind = new Map<DemoPartyKind, string>();
+          for (const party of seed.parties) {
+            const org = await tx.organization.create({
+              data: {
+                name: party.org.name,
+                countryCode: party.org.countryCode,
+                isUsEntity: party.org.isUsEntity ?? false,
+              },
+              select: { id: true },
+            });
+            orgIdByKind.set(party.kind, org.id);
+          }
 
-        return db.project.create({
-          data: {
-            name: seed.name,
-            slug: buildDemoSlug(),
-            ownerClerkId: clerkUserId,
-            cachedScoreUpdatedAt: new Date(),
-            ...projectData,
-            requirementStatuses: {
-              createMany: {
-                data: requirementStatuses,
+          // 2. Create the project first so we have an id for cascading rows. Requirement
+          //    overrides (responsibleOrganizationId + overdue targetDate) drive the graph's
+          //    "blocked" health derivation.
+          const overrides = new Map<
+            string,
+            { responsibleOrganizationId: string; targetDate: Date }
+          >();
+          for (const party of seed.parties) {
+            if (!party.ownsOverdueRequirement) continue;
+            const orgId = orgIdByKind.get(party.kind);
+            if (!orgId) continue;
+            overrides.set(party.ownsOverdueRequirement.requirementId, {
+              responsibleOrganizationId: orgId,
+              targetDate: daysFromNow(-party.ownsOverdueRequirement.daysOverdue),
+            });
+          }
+
+          const project = await tx.project.create({
+            data: {
+              name: seed.name,
+              slug: buildDemoSlug(),
+              ownerClerkId: clerkUserId,
+              cachedScoreUpdatedAt: new Date(),
+              ...seed.createData,
+              requirementStatuses: {
+                createMany: {
+                  data: EXIM_REQUIREMENTS.map((requirement) => {
+                    const override = overrides.get(requirement.id);
+                    return {
+                      requirementId: requirement.id,
+                      status: seed.requirementStatus(requirement),
+                      statusChangedBy: clerkUserId,
+                      responsibleOrganizationId: override?.responsibleOrganizationId ?? null,
+                      targetDate: override?.targetDate ?? null,
+                    };
+                  }),
+                },
+              },
+              activityEvents: {
+                create: [
+                  {
+                    clerkUserId,
+                    eventType: "project_created",
+                    label: "Demo portfolio project created",
+                    metadata: { demo: true },
+                  },
+                ],
               },
             },
-            activityEvents: {
-              create: [
-                {
-                  clerkUserId,
-                  eventType: "project_created",
-                  label: "Demo portfolio project created",
-                  metadata: { demo: true },
+            select: { id: true, slug: true },
+          });
+
+          // 3. Stakeholders + their roles on this project.
+          for (const party of seed.parties) {
+            const orgId = orgIdByKind.get(party.kind);
+            if (!orgId || !party.stakeholder) continue;
+            const lastContactedAt =
+              party.stakeholder.lastContactDaysAgo == null
+                ? null
+                : daysFromNow(-party.stakeholder.lastContactDaysAgo);
+
+            const stakeholder = await tx.stakeholder.create({
+              data: {
+                name: party.stakeholder.name,
+                title: party.stakeholder.title,
+                email: party.stakeholder.email ?? null,
+                organizationId: orgId,
+                lastContactedAt,
+              },
+              select: { id: true },
+            });
+
+            if (party.roleType) {
+              await tx.stakeholderRole.create({
+                data: {
+                  stakeholderId: stakeholder.id,
+                  projectId: project.id,
+                  roleType: party.roleType,
+                  isPrimary: party.isPrimary ?? false,
                 },
-              ],
-            },
-          },
-          select: { id: true, slug: true },
+              });
+            }
+          }
+
+          // 4. Project sponsors (for the capital stack / ownership view).
+          for (const party of seed.parties) {
+            if (party.leadSponsorEquityBps == null) continue;
+            const orgId = orgIdByKind.get(party.kind);
+            if (!orgId) continue;
+            await tx.projectSponsor.create({
+              data: {
+                projectId: project.id,
+                organizationId: orgId,
+                role: "lead_sponsor",
+                equityShareBps: party.leadSponsorEquityBps,
+              },
+            });
+          }
+
+          // 5. Funder relationships — populate the capital pipeline + Parties graph.
+          for (const party of seed.parties) {
+            if (!party.funder) continue;
+            const orgId = orgIdByKind.get(party.kind);
+            if (!orgId) continue;
+            await tx.funderRelationship.create({
+              data: {
+                projectId: project.id,
+                organizationId: orgId,
+                funderType: party.funder.funderType,
+                engagementStage: party.funder.engagementStage,
+                amountUsdCents: party.funder.amountUsdCents ?? null,
+                lastContactDate:
+                  party.funder.lastContactDaysAgo != null
+                    ? daysFromNow(-party.funder.lastContactDaysAgo)
+                    : null,
+              },
+            });
+          }
+
+          return project;
         });
       })
     );

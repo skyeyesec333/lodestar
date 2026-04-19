@@ -243,13 +243,13 @@ export function DecisionDesk({
           <button type="button" onClick={() => setIsGateModalOpen(true)} style={ctaStyle(true)} aria-label="Review gate readiness">
             Review Gate
           </button>
-          <Link href={`/projects/${projectSlug}#section-workplan`} style={ctaStyle()}>
+          <Link href={`/projects/${projectSlug}/workplan`} style={ctaStyle()}>
             Open Workplan
           </Link>
-          <Link href={`/projects/${projectSlug}#section-documents`} style={ctaStyle()}>
+          <Link href={`/projects/${projectSlug}/evidence`} style={ctaStyle()}>
             Open Evidence
           </Link>
-          <Link href={`/projects/${projectSlug}#section-capital`} style={ctaStyle()}>
+          <Link href={`/projects/${projectSlug}/capital`} style={ctaStyle()}>
             Review Capital
           </Link>
         </div>
@@ -290,7 +290,7 @@ export function DecisionDesk({
               blockerPreview.map((blocker) => (
                 <Link
                   key={blocker.requirementId}
-                  href={`/projects/${projectSlug}#section-requirements`}
+                  href={`/projects/${projectSlug}/workplan#section-requirements`}
                   style={{
                     display: "grid",
                     gap: "4px",

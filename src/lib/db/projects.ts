@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type {
   Prisma,
   ProjectSector,
@@ -65,6 +66,7 @@ const projectFullSelect = {
   subNationalLocation: true,
   cachedReadinessScore: true,
   cachedScoreUpdatedAt: true,
+  graphLayout: true,
   createdAt: true,
   updatedAt: true,
 } as const;
@@ -96,9 +98,28 @@ function toProject(row: ProjectFullRow): Project {
     subNationalLocation: row.subNationalLocation,
     cachedReadinessScore: row.cachedReadinessScore,
     cachedScoreUpdatedAt: row.cachedScoreUpdatedAt,
+    graphLayout: parseGraphLayout(row.graphLayout),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function parseGraphLayout(raw: unknown): Record<string, { x: number; y: number }> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const [key, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (
+      val &&
+      typeof val === "object" &&
+      typeof (val as { x?: unknown }).x === "number" &&
+      typeof (val as { y?: unknown }).y === "number" &&
+      Number.isFinite((val as { x: number }).x) &&
+      Number.isFinite((val as { y: number }).y)
+    ) {
+      out[key] = { x: (val as { x: number }).x, y: (val as { y: number }).y };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 export async function getProjectsByUser(
@@ -212,6 +233,47 @@ function getProjectListOrderBy(sort: ProjectListSort) {
       return [{ createdAt: "desc" as const }];
   }
 }
+
+/**
+ * React.cache-wrapped version of getProjectBySlug. Use inside a nested Next.js
+ * layout + page tree so the project record is fetched once per request and
+ * reused by every child route that needs it.
+ */
+export const getCachedProjectBySlug = cache(
+  (slug: string, clerkUserId: string): Promise<Result<Project>> =>
+    getProjectBySlug(slug, clerkUserId),
+);
+
+export type ProjectSidebarSignals = {
+  workplanBlockers: number;
+  evidenceExpiringSoon: number;
+};
+
+/** Cheap indexed counts powering sidebar badges. Two queries, both <50ms. */
+export const getProjectSidebarSignals = cache(
+  async (projectId: string): Promise<ProjectSidebarSignals> => {
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 86400000);
+    const [blockers, expiring] = await Promise.all([
+      db.projectRequirement.count({
+        where: {
+          projectId,
+          isApplicable: true,
+          status: { notIn: ["executed", "waived", "not_applicable"] },
+          targetDate: { lt: now },
+        },
+      }),
+      db.document.count({
+        where: {
+          projectId,
+          state: "current",
+          expiresAt: { not: null, lt: in30Days, gte: now },
+        },
+      }),
+    ]);
+    return { workplanBlockers: blockers, evidenceExpiringSoon: expiring };
+  },
+);
 
 export async function getProjectBySlug(
   slug: string,

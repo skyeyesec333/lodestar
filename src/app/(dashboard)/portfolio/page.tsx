@@ -12,6 +12,7 @@ import { UpcomingDeadlines } from "@/components/portfolio/UpcomingDeadlines";
 import { DealComparisonTable } from "@/components/portfolio/DealComparisonTable";
 import { SectorConcentrationChart } from "@/components/portfolio/SectorConcentrationChart";
 import { GeographyBreakdown } from "@/components/portfolio/GeographyBreakdown";
+import { PortfolioGlobe } from "@/components/portfolio/PortfolioGlobe";
 import { DealTypePipeline } from "@/components/portfolio/DealTypePipeline";
 import { PortfolioRiskSummary } from "@/components/portfolio/PortfolioRiskSummary";
 import { CovenantHealthSummary } from "@/components/portfolio/CovenantHealthSummary";
@@ -21,6 +22,8 @@ import { PrintReportButton } from "@/components/portfolio/PrintReportButton";
 import { ExecutiveDashboard } from "@/components/portfolio/ExecutiveDashboard";
 import { PortfolioFilterBar } from "@/components/portfolio/PortfolioFilterBar";
 import { PortfolioTrendlineChart } from "@/components/portfolio/PortfolioTrendlineChart";
+import { ActivityHeatmap } from "@/components/charts/ActivityHeatmap";
+import { getActivityHeatmap } from "@/lib/db/activity";
 import {
   Card,
   CardContent,
@@ -99,6 +102,9 @@ export default async function PortfolioPage({
     getUpcomingMilestones(userId),
     getPortfolioVelocity(userId),
   ]);
+  const portfolioProjectIds = result.ok ? result.value.map((p) => p.id) : [];
+  const heatmapResult = await getActivityHeatmap(portfolioProjectIds);
+  const portfolioHeatmapData = heatmapResult.ok ? heatmapResult.value : [];
   const velocityMap = velocityResult.ok ? velocityResult.value : new Map<string, number>();
 
   if (!result.ok) {
@@ -421,6 +427,14 @@ export default async function PortfolioPage({
       {/* Portfolio trendline */}
       <PortfolioTrendlineChart />
 
+      {/* Activity heatmap — 12-month calendar across all projects */}
+      <ActivityHeatmap
+        data={portfolioHeatmapData}
+        title="Portfolio activity — last 12 months"
+        description="Daily event volume across every project in your portfolio."
+      />
+
+
       {/* Bento grid: summary stats + distribution */}
       <div
         style={{
@@ -605,6 +619,20 @@ export default async function PortfolioPage({
           </div>
         </div>
       </div>
+
+      {/* Portfolio globe — mounts only with 2+ projects (a single pin is worse than text) */}
+      {projects.length >= 2 && (
+        <PortfolioGlobe
+          projects={projects.map((p) => ({
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            stage: p.stage,
+            countryCode: p.countryCode,
+            readinessScore: p.readinessScore,
+          }))}
+        />
+      )}
 
       {/* Concentration & Pipeline views */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

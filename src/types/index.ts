@@ -44,6 +44,7 @@ export type Project = {
   subNationalLocation: string | null;
   cachedReadinessScore: number | null;
   cachedScoreUpdatedAt: Date | null;
+  graphLayout: Record<string, { x: number; y: number }> | null;
   createdAt: Date;
   updatedAt: Date;
 };

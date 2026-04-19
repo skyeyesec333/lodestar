@@ -88,23 +88,26 @@ function getActivityContextLabel(event: ActivityEventRow): string | null {
   return null;
 }
 
-function getJumpTarget(event: ActivityEventRow): string | null {
+function getJumpTarget(event: ActivityEventRow, projectSlug?: string): string | null {
+  if (!projectSlug) return null;
+  const base = `/projects/${projectSlug}`;
   const meta = event.metadata;
-  if (!isRecord(meta)) return null;
-  const targetType = readString(meta.targetType);
-  switch (targetType) {
-    case "requirement": return "#section-workplan";
-    case "document": return "#section-documents";
-    case "meeting": return "#section-overview";
-    case "stakeholder": return "#section-stakeholders";
-    default: break;
+  if (isRecord(meta)) {
+    const targetType = readString(meta.targetType);
+    switch (targetType) {
+      case "requirement": return `${base}/workplan`;
+      case "document":    return `${base}/evidence`;
+      case "meeting":     return `${base}/execution#section-meetings`;
+      case "stakeholder": return `${base}/parties`;
+      default: break;
+    }
   }
   switch (categorizeEvent(event.eventType)) {
-    case "requirements": return "#section-workplan";
-    case "documents": return "#section-documents";
-    case "meetings": return "#section-overview";
-    case "approvals": return "#section-workplan";
-    case "stage": return "#section-overview";
+    case "requirements": return `${base}/workplan`;
+    case "documents":    return `${base}/evidence`;
+    case "meetings":     return `${base}/execution#section-meetings`;
+    case "approvals":    return `${base}/workplan`;
+    case "stage":        return `${base}/overview`;
     default: return null;
   }
 }
@@ -114,9 +117,10 @@ const PAGE_SIZE = 4;
 type Props = {
   events: ActivityEventRow[];
   teamMemberNamesById?: Record<string, string>;
+  projectSlug?: string;
 };
 
-export function ActivityFeedClient({ events, teamMemberNamesById = {} }: Props) {
+export function ActivityFeedClient({ events, teamMemberNamesById = {}, projectSlug }: Props) {
   const [filter, setFilter] = useState<FilterCategory>("all");
   const [showAll, setShowAll] = useState(false);
 
@@ -174,7 +178,7 @@ export function ActivityFeedClient({ events, teamMemberNamesById = {} }: Props) 
               const actorInitial = leadLabel.charAt(0).toUpperCase();
               const activityTypeLabel = getActivityTypeLabel(event);
               const activityContextLabel = getActivityContextLabel(event);
-              const jumpTarget = getJumpTarget(event);
+              const jumpTarget = getJumpTarget(event, projectSlug);
               const metadata = isRecord(event.metadata) ? event.metadata : null;
               const metadataLine = metadata && [readString(metadata.targetType), readString(metadata.title), readString(metadata.requirementName)].filter(Boolean).join(" · ");
 

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { FinancingRisk } from "@/lib/scoring/financing";
 import { Badge } from "@/components/ui/badge";
 import React from "react";
 
 type Props = {
   risk: FinancingRisk;
+  projectSlug?: string;
 };
 
 type BadgeColors = {
@@ -29,26 +31,26 @@ const BADGE_COLORS: Record<Exclude<FinancingRisk["level"], "none">, BadgeColors>
   },
 };
 
-const FLAG_ACTIONS: Record<string, { action: string; section: string }> = {
+const FLAG_ACTIONS: Record<string, { action: string; segment: string }> = {
   "Active covenant breach": {
     action: "Review covenants in the Capital workspace",
-    section: "#section-capital",
+    segment: "capital",
   },
   "Covenant at risk": {
     action: "Check covenant due dates in the Capital workspace",
-    section: "#section-capital",
+    segment: "capital",
   },
   "Debt coverage below 50%": {
     action: "Add or update debt tranches in the Capital workspace",
-    section: "#section-capital",
+    segment: "capital",
   },
   "Debt not yet committed": {
     action: "Advance tranche status from term sheet to committed",
-    section: "#section-capital",
+    segment: "capital",
   },
 };
 
-export function FinancingRiskBadge({ risk }: Props) {
+export function FinancingRiskBadge({ risk, projectSlug }: Props) {
   const [expanded, setExpanded] = useState(false);
 
   if (risk.level === "none") return null;
@@ -146,16 +148,11 @@ export function FinancingRiskBadge({ risk }: Props) {
                 >
                   {flag}
                 </span>
-                {info && (
+                {info && projectSlug && (
                   <>
                     <span style={{ fontFamily: "'Inter', sans-serif", fontSize: "12px", color: "var(--ink-muted)" }}>→</span>
-                    <a
-                      href={info.section}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        const el = document.getElementById(info.section.replace("#", ""));
-                        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                      }}
+                    <Link
+                      href={`/projects/${projectSlug}/${info.segment}`}
                       style={{
                         fontFamily: "'Inter', sans-serif",
                         fontSize: "12px",
@@ -166,7 +163,7 @@ export function FinancingRiskBadge({ risk }: Props) {
                       }}
                     >
                       {info.action}
-                    </a>
+                    </Link>
                   </>
                 )}
               </div>

@@ -11,6 +11,7 @@ import { getProjectsByUser } from "@/lib/db/projects";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { getProjectsListChatPresets } from "@/lib/ai/chat-presets";
 import { CreateDemoProjectButton } from "@/components/projects/CreateDemoProjectButton";
+import { isDemoProjectSlug } from "@/lib/projects/demo-portfolio";
 import { DailyPriorityWidget } from "@/components/projects/DailyPriorityWidget";
 import { ProjectsStageGridClient } from "@/components/projects/ProjectsStageGridClient";
 import { ExportButton } from "@/components/projects/ExportButton";
@@ -124,6 +125,7 @@ export default async function ProjectsPage({
   }
 
   const projects = result.value;
+  const hasExistingDemo = projects.some((p) => isDemoProjectSlug(p.slug));
   const activeFilterCount = getActiveFilterCount(query);
   const activeFilterCountWithoutStage = getActiveFilterCount(query, { includeStage: false });
   const chatPresets = getProjectsListChatPresets();
@@ -178,7 +180,7 @@ export default async function ProjectsPage({
         </div>
 
         <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-          <CreateDemoProjectButton />
+          <CreateDemoProjectButton hasExistingDemo={hasExistingDemo} />
           <ExportButton params={{ q: query.q, sector: query.sector, readiness: query.readiness, sort: query.sort }} />
           <Link
             href="/templates"

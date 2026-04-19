@@ -14,6 +14,7 @@ import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
 import { WatchButton } from "@/components/collaboration/WatchButton";
 import { BulkStatusBar } from "@/components/requirements/BulkStatusBar";
 import { getProgramConfig, getCategoryLabel } from "@/lib/requirements/index";
+import { toast } from "@/lib/ui/toast";
 
 type StakeholderOption = { id: string; name: string };
 type OrganizationOption = { id: string; name: string };
@@ -870,7 +871,6 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
   });
   const [uploadingReq, setUploadingReq] = useState<string | null>(null);
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
-  const [lastError, setLastError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [compact, setCompact] = useState(false);
@@ -941,7 +941,6 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
     const previous = statuses[requirementId];
     setStatuses((prev) => ({ ...prev, [requirementId]: status }));
     setPendingId(requirementId);
-    setLastError(null);
 
     const autoNote = `Status changed to ${REQUIREMENT_STATUS_LABELS[status]}`;
 
@@ -949,7 +948,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
       const result = await updateRequirementStatus({ projectId, requirementId, status, note: autoNote });
       if (!result.ok) {
         setStatuses((prev) => ({ ...prev, [requirementId]: previous }));
-        setLastError(result.error.message);
+        toast.error(result.error.message);
       } else {
         // Optimistically prepend the auto note
         const newNote: RequirementNoteRow = {
@@ -1436,6 +1435,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                               padding: "5px 8px",
                               cursor: canEdit && !isUpdating ? "pointer" : "default",
                               outline: "none",
+                              transition: "color 150ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1)",
                             }}
                           >
                             {REQUIREMENT_STATUS_ORDER.map((s) => (
@@ -1698,22 +1698,6 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
       {/* EXIM checklist — unchanged behavior */}
       {activeProgram === "exim" && (
       <div>
-      {lastError && (
-        <div
-          style={{
-            backgroundColor: "var(--accent-soft)",
-            border: "1px solid var(--accent)",
-            borderRadius: "4px",
-            padding: "10px 16px",
-            marginBottom: "16px",
-          }}
-        >
-          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: "13px", color: "var(--accent)", margin: 0 }}>
-            {lastError}
-          </p>
-        </div>
-      )}
-
       {allNotStarted && rows.length > 0 && (
         <div
           style={{
@@ -2168,6 +2152,7 @@ export function RequirementsChecklist({ projectId, slug, rows, documents, stakeh
                         borderRadius: "3px",
                         padding: "6px 28px 6px 10px",
                         appearance: "none",
+                        transition: "color 150ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1)",
                         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%236b6b64' d='M5 7L1 3h8z'/%3E%3C/svg%3E")`,
                         backgroundRepeat: "no-repeat",
                         backgroundPosition: "right 8px center",

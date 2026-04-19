@@ -19,6 +19,7 @@ import { CommentThread } from "@/components/collaboration/CommentThread";
 import { ApprovalBadge } from "@/components/collaboration/ApprovalBadge";
 import { WatchButton } from "@/components/collaboration/WatchButton";
 import { DocumentReviewButton } from "@/components/documents/DocumentReviewButton";
+import { toast } from "@/lib/ui/toast";
 
 type Props = {
   projectId: string;
@@ -114,10 +115,8 @@ export function DocumentPanel({
   const expiringWithin30 = documents.filter((d) => getExpiryInfo(d.expiresAt) !== null);
   const [linkedEvidence, setLinkedEvidence] = useState<ExternalEvidenceRow[]>(externalEvidence);
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
   const [linkDraft, setLinkDraft] = useState({
     title: "",
     url: "",
@@ -133,7 +132,6 @@ export function DocumentPanel({
     if (!files || files.length === 0) return;
     const file = files[0];
     setUploading(true);
-    setUploadError(null);
 
     const fd = new FormData();
     fd.append("file", file);
@@ -151,8 +149,9 @@ export function DocumentPanel({
       startTransition(() => {
         setDocuments((prev) => [json.document as DocumentRow, ...prev]);
       });
+      toast.success(`${file.name} uploaded`);
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+      toast.error(err instanceof Error ? err.message : "Upload failed.");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -180,7 +179,6 @@ export function DocumentPanel({
   }
 
   async function handleAddExternalLink() {
-    setLinkError(null);
     const result = await addExternalEvidenceLink({
       projectId,
       slug,
@@ -193,7 +191,7 @@ export function DocumentPanel({
     });
 
     if (!result.ok) {
-      setLinkError(result.error.message);
+      toast.error(result.error.message);
       return;
     }
 
@@ -208,12 +206,13 @@ export function DocumentPanel({
       notes: "",
     });
     setLinkOpen(false);
+    toast.success("External link added");
   }
 
   async function handleRemoveExternalLink(id: string) {
     const result = await removeExternalEvidenceLink({ id, projectId, slug });
     if (!result.ok) {
-      setLinkError(result.error.message);
+      toast.error(result.error.message);
       return;
     }
 
@@ -1020,26 +1019,6 @@ export function DocumentPanel({
         </div>
       )}
 
-      {/* Upload error */}
-      {(uploadError || linkError) && (
-        <div
-          style={{
-            padding: "12px 24px",
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          <p
-            style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: "12px",
-              color: "var(--accent)",
-              margin: 0,
-            }}
-          >
-            {uploadError ?? linkError}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

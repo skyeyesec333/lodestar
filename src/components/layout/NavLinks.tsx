@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import type { MouseEvent } from "react";
 
 const NAV_ITEMS = [
   { href: "/projects", label: "Projects", hideOnSmall: false },
@@ -9,6 +10,10 @@ const NAV_ITEMS = [
   { href: "/experts", label: "Expert Network", hideOnSmall: true },
   { href: "/templates", label: "Templates", hideOnSmall: true },
 ] as const;
+
+type DocWithVT = Document & {
+  startViewTransition?: (cb: () => void | Promise<void>) => unknown;
+};
 
 const baseStyle: React.CSSProperties = {
   fontFamily: "'DM Mono', monospace",
@@ -23,6 +28,16 @@ const baseStyle: React.CSSProperties = {
 
 export function NavLinks() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  function onNavClick(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    const doc = typeof document !== "undefined" ? (document as DocWithVT) : null;
+    if (!doc?.startViewTransition) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    event.preventDefault();
+    doc.startViewTransition(() => router.push(href));
+  }
 
   return (
     <>
@@ -34,6 +49,7 @@ export function NavLinks() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={(e) => onNavClick(e, item.href)}
             className={`ls-nav-link${item.hideOnSmall ? " ls-nav-hide-sm" : ""}`}
             style={{
               ...baseStyle,
