@@ -10,6 +10,7 @@ export type Expert = {
   dealsClosed: number;
   ratePerHour: number;
   availability: "available" | "limited" | "unavailable";
+  avatarUrl: string;
   avatarInitials: string;
   avatarColor: string;
   avatarBg: string;
@@ -28,6 +29,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 23,
     ratePerHour: 450,
     availability: "available",
+    avatarUrl: "https://i.pravatar.cc/160?img=5",
     avatarInitials: "SC",
     avatarColor: "var(--teal)",
     avatarBg: "var(--teal-soft)",
@@ -44,6 +46,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 31,
     ratePerHour: 500,
     availability: "available",
+    avatarUrl: "https://i.pravatar.cc/160?img=60",
     avatarInitials: "MO",
     avatarColor: "var(--gold)",
     avatarBg: "var(--gold-soft)",
@@ -60,6 +63,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 19,
     ratePerHour: 380,
     availability: "limited",
+    avatarUrl: "https://i.pravatar.cc/160?img=44",
     avatarInitials: "PN",
     avatarColor: "var(--teal)",
     avatarBg: "var(--teal-soft)",
@@ -76,6 +80,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 45,
     ratePerHour: 650,
     availability: "limited",
+    avatarUrl: "https://i.pravatar.cc/160?img=68",
     avatarInitials: "JW",
     avatarColor: "var(--ink-mid)",
     avatarBg: "var(--bg)",
@@ -92,6 +97,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 14,
     ratePerHour: 420,
     availability: "available",
+    avatarUrl: "https://i.pravatar.cc/160?img=36",
     avatarInitials: "AD",
     avatarColor: "var(--gold)",
     avatarBg: "var(--gold-soft)",
@@ -108,6 +114,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 17,
     ratePerHour: 350,
     availability: "available",
+    avatarUrl: "https://i.pravatar.cc/160?img=33",
     avatarInitials: "DP",
     avatarColor: "var(--teal)",
     avatarBg: "var(--teal-soft)",
@@ -124,6 +131,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 28,
     ratePerHour: 480,
     availability: "limited",
+    avatarUrl: "https://i.pravatar.cc/160?img=26",
     avatarInitials: "FA",
     avatarColor: "var(--accent)",
     avatarBg: "var(--accent-soft)",
@@ -140,6 +148,7 @@ export const EXPERTS: Expert[] = [
     dealsClosed: 22,
     ratePerHour: 400,
     availability: "available",
+    avatarUrl: "https://i.pravatar.cc/160?img=12",
     avatarInitials: "CM",
     avatarColor: "var(--ink-mid)",
     avatarBg: "var(--bg)",

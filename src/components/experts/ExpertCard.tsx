@@ -108,31 +108,51 @@ export function ExpertCard({ expert }: { expert: Expert }) {
     >
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-        <div
-          style={{
-            width: "48px",
-            height: "48px",
-            borderRadius: "50%",
-            backgroundColor: expert.avatarBg,
-            border: `1px solid ${expert.avatarColor}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <span
+        {expert.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={expert.avatarUrl}
+            alt={expert.name}
+            width={48}
+            height={48}
+            loading="lazy"
             style={{
-              fontFamily: "'DM Mono', monospace",
-              fontSize: "13px",
-              fontWeight: 500,
-              color: expert.avatarColor,
-              letterSpacing: "0.04em",
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              objectFit: "cover",
+              border: `1px solid ${expert.avatarColor}`,
+              flexShrink: 0,
+              backgroundColor: expert.avatarBg,
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              backgroundColor: expert.avatarBg,
+              border: `1px solid ${expert.avatarColor}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
             }}
           >
-            {expert.avatarInitials}
-          </span>
-        </div>
+            <span
+              style={{
+                fontFamily: "'DM Mono', monospace",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: expert.avatarColor,
+                letterSpacing: "0.04em",
+              }}
+            >
+              {expert.avatarInitials}
+            </span>
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p
             style={{

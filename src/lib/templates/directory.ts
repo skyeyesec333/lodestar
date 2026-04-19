@@ -17,7 +17,10 @@ export type WorkspaceTemplate = {
   name: string;
   summary: string;
   publisher: string;
+  /** Short text fallback displayed when no logo loads (printable wordmark). */
   publisherMark: string;
+  /** Logo image URL. Clearbit serves real institutional logos via `logo.clearbit.com/<domain>`. */
+  publisherLogoUrl?: string;
   publisherTitle: string;
   publisherType: TemplatePublisherType;
   sector: TemplateSector;
@@ -41,6 +44,7 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
       "Greenfield utility template with concept, evidence, and EXIM-specific gate defaults for sponsor-led infrastructure deals.",
     publisher: "Deutsche Bank",
     publisherMark: "DEUTSCHE BANK",
+    publisherLogoUrl: "https://logo.clearbit.com/db.com",
     publisherTitle: "Official lender template",
     publisherType: "official",
     sector: "water",
@@ -57,6 +61,7 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
       "Balanced development-finance structure for renewables with stakeholder mapping, permits, safeguards, and execution cadence baked in.",
     publisher: "IFC Infrastructure Advisory",
     publisherMark: "IFC",
+    publisherLogoUrl: "https://logo.clearbit.com/ifc.org",
     publisherTitle: "Institutional standard",
     publisherType: "official",
     sector: "energy",
@@ -71,14 +76,16 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     name: "Commercial Lending Industrial Capex",
     summary:
       "Lender-oriented deal room for industrial expansion with diligence lists, covenant prep, and faster close tracking.",
-    publisher: "Meridian Infrastructure Advisory",
-    publisherMark: "MERIDIAN",
-    publisherTitle: "Template creator",
-    publisherType: "community",
+    publisher: "Macquarie Group",
+    publisherMark: "MACQUARIE",
+    publisherLogoUrl: "https://logo.clearbit.com/macquarie.com",
+    publisherTitle: "Infrastructure advisory",
+    publisherType: "official",
     sector: "industrial",
     capitalPath: "commercial_finance",
     structureLabel: "Commercial lending",
     workspaces: ["Concept", "Capital", "Workplan", "Evidence"],
+    officialLabel: "Official advisor template",
     featured: true,
   },
   {
@@ -86,8 +93,9 @@ export const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
     name: "PPP / Concession Launch Kit",
     summary:
       "Public-private partnership framing template with counterparty roles, approvals, milestones, and structured government engagement.",
-    publisher: "Open Project Structuring Network",
-    publisherMark: "OPSN",
+    publisher: "Global Infrastructure Hub",
+    publisherMark: "GI HUB",
+    publisherLogoUrl: "https://logo.clearbit.com/gihub.org",
     publisherTitle: "Open-source publisher",
     publisherType: "community",
     sector: "transport",

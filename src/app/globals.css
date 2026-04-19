@@ -526,22 +526,35 @@
   /* ── Responsive layout helpers ─────────────────────────────────────────────── */
 
   .ls-header-inner {
-    max-width: 1200px;
-    margin: 0 auto;
     padding: 0 16px;
     height: 52px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 28px;
+  }
+
+  .ls-header-brand {
+    margin-right: 8px;
   }
 
   .ls-nav-links {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 22px;
     min-width: 0;
-    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .ls-header-spacer {
+    flex: 1;
+    min-width: 16px;
+  }
+
+  .ls-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
   }
 
   .ls-main-content {

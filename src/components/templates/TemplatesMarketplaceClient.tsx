@@ -231,30 +231,45 @@ export function TemplatesMarketplaceClient({ templates }: Props) {
                     height: "40px",
                     padding: "0 12px",
                     borderRadius: "12px",
-                    backgroundColor: "var(--bg)",
+                    backgroundColor: "var(--bg-card)",
                     border: `1px solid ${tone.color}`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
                     boxSizing: "border-box",
+                    overflow: "hidden",
                   }}
                 >
-                  <span
-                    style={{
-                      fontFamily:
-                        template.publisherType === "official"
-                          ? "'Inter', sans-serif"
-                          : "'DM Mono', monospace",
-                      fontSize: template.publisherMark.length > 10 ? "9px" : "10px",
-                      fontWeight: template.publisherType === "official" ? 700 : 500,
-                      color: tone.color,
-                      letterSpacing: template.publisherType === "official" ? "0.04em" : "0.03em",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {template.publisherMark}
-                  </span>
+                  {template.publisherLogoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={template.publisherLogoUrl}
+                      alt={template.publisher}
+                      loading="lazy"
+                      style={{
+                        maxHeight: "24px",
+                        maxWidth: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                  ) : (
+                    <span
+                      style={{
+                        fontFamily:
+                          template.publisherType === "official"
+                            ? "'Inter', sans-serif"
+                            : "'DM Mono', monospace",
+                        fontSize: template.publisherMark.length > 10 ? "9px" : "10px",
+                        fontWeight: template.publisherType === "official" ? 700 : 500,
+                        color: tone.color,
+                        letterSpacing: template.publisherType === "official" ? "0.04em" : "0.03em",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {template.publisherMark}
+                    </span>
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ minWidth: 0 }}>
