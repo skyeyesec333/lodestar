@@ -10,6 +10,7 @@ import { getStageLabel } from "@/lib/requirements/index";
 import { formatDealTypeLabel, formatTargetDate } from "@/lib/projects/labels";
 import { ProjectConceptPanel } from "@/components/projects/ProjectConceptPanel";
 import { ConceptBeaconBrief } from "@/components/projects/ConceptBeaconBrief";
+import { ConceptCoach } from "@/components/projects/ConceptCoach";
 
 export default async function ProjectConceptPage({
   params,
@@ -109,6 +110,12 @@ export default async function ProjectConceptPage({
           This workspace holds the project thesis, the target structure, and the reasons the team believes this deal deserves active pursuit before Capital and Workplan deepen it.
         </p>
       </div>
+
+      {canEditProjectContent ? (
+        <div style={{ marginBottom: "18px" }}>
+          <ConceptCoach project={project} concept={concept} />
+        </div>
+      ) : null}
 
       <div
         style={{
